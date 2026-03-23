@@ -27,7 +27,12 @@
       "Bash(npx prisma:*)",
       "Bash(npx vitest:*)",
       "Bash(npx next:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(psql --version)",
+      "Bash(docker --version)",
+      "Bash(brew list:*)",
+      "Bash(docker run:*)",
+      "Bash(node:*)"
     ]
   }
 }
