@@ -25,19 +25,19 @@ Connect the HanahOne Group ERP to external sales platforms and inventory systems
 - Credentials: seller ID, marketplace ID, refresh token, client ID, client secret
 
 **TikTok Shop (Sales)**
-- Primary: check if TikTok orders exist in CGETC ERP data — if yes, pull from there
-- Secondary: OrderDesk API if CGETC doesn't have TikTok data
-- Fallback: manual CSV upload from TikTok Seller Center
+- V1: Manual CSV upload from TikTok Seller Center (guaranteed to work, no API dependency)
 - CSV parser maps columns to Order model with duplicate detection via external order ID
-- Future: if TikTok Partner API access is granted, swap to API connector
+- Future V2 options (separate investigation, not in V1 scope):
+  - Pull TikTok orders from CGETC ERP if they exist there
+  - OrderDesk API integration
+  - TikTok Partner API if access is granted
 
-**CGETC ERP (Inventory + potentially TikTok sales)**
+**CGETC ERP (Inventory)**
 - Web-based ERP at `https://erp.cgetc.com`
-- Connection info: DB `linkup2017-cgetc-master-4705026`, Partner ID `1589358`
-- Login: `it@hanah1.com` / `1111`
-- Authenticate via HTTP client → discover JSON API endpoints from network traffic
+- Credentials stored in IntegrationConfig (encrypted), NOT in source code
+- Phase 1 (spike): Reverse-engineer the CGETC web app's API by inspecting network requests. Document discovered endpoints, auth flow, and response shapes. This is a research task before connector implementation.
+- Phase 2 (implementation): Build connector using discovered endpoints.
 - Fetch inventory/stock data → map to HOI Inventory model
-- May also contain TikTok order data — check during implementation
 - Sync frequency: every 30 minutes
 
 ### HOK
@@ -123,6 +123,9 @@ Unique constraint on (companyId, productId).
 **Order** — add field:
 - `externalSource` Enum (nullable): SHOPIFY, AMAZON, TIKTOK, NAVER, PHARMACY, CGETC, ORDERDESK, null (for manual orders)
 
+**User** — add a system user during seed:
+- A `SYSTEM` user record (name: "System", email: "system@hanahone.internal") is created during database seeding. This user ID is used as `created_by` for all automated InventoryAdjustment records from sync processes. This avoids the FK constraint issue on `InventoryAdjustment.createdBy`.
+
 ## Credential Security
 
 1. **Encryption at rest** — `IntegrationConfig.credentials` is AES-256 encrypted before storing. Encryption key is `ENCRYPTION_KEY` environment variable, never in code or database.
@@ -161,7 +164,7 @@ Triggered after any HOK sales sync (Naver or Pharmacy) completes:
 
 1. For each product with an `InventorySnapshot` record:
    a. Sum all HOK sales quantities from orders where `externalSource` in (NAVER, PHARMACY).
-   b. Sum all manual adjustments from `InventoryAdjustment` where type in (MANUAL, PRODUCTION).
+   b. Sum all positive adjustments from `InventoryAdjustment` where type in (MANUAL, PRODUCTION, PURCHASE, TRANSFER_IN) and negative adjustments from (TRANSFER_OUT).
    c. Calculate: `initialQuantity - totalSales + totalAdjustments`.
    d. Update `InventorySnapshot.calculatedQuantity` and `lastCalculatedAt`.
    e. Update `Inventory.quantity` to match.
