@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg: #f8f9fa;
+    --surface: #ffffff;
+    --border: rgba(0, 0, 0, 0.06);
+    --border-strong: rgba(0, 0, 0, 0.1);
+    --text-primary: #0f1419;
+    --text-secondary: #536471;
+    --text-tertiary: #8899a6;
+    --accent: #0d9488;
+    --accent-dim: rgba(13, 148, 136, 0.08);
+    --shadow-card: 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-card-hover: 0 12px 32px -8px rgba(0,0,0,0.08);
+    --radius-lg: 28px;
+  }
+
+  .dark {
+    --bg: #0a0a0c;
+    --surface: #16161a;
+    --border: rgba(255, 255, 255, 0.06);
+    --border-strong: rgba(255, 255, 255, 0.1);
+    --text-primary: #f0f0f3;
+    --text-secondary: #8a8a9a;
+    --text-tertiary: #55556a;
+    --accent: #2dd4bf;
+    --accent-dim: rgba(45, 212, 191, 0.10);
+    --shadow-card: 0 1px 2px rgba(0,0,0,0.3);
+    --shadow-card-hover: 0 12px 32px -8px rgba(0,0,0,0.5);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+}

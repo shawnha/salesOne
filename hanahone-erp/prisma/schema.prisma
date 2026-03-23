@@ -1,0 +1,302 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum CompanyType {
+  MOTHER
+  SUBSIDIARY
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  STAFF
+}
+
+enum CustomerType {
+  INDIVIDUAL
+  DRUGSTORE
+  WHOLESALE
+}
+
+enum OrderType {
+  SALE
+  PURCHASE
+  BROKERAGE
+  INTER_COMPANY
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum TransferStatus {
+  PENDING
+  SHIPPED
+  RECEIVED
+  CANCELLED
+}
+
+enum ProductionStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ConsultingStatus {
+  ACTIVE
+  COMPLETED
+  PAUSED
+}
+
+enum AdjustmentType {
+  MANUAL
+  SALE
+  PURCHASE
+  TRANSFER_OUT
+  TRANSFER_IN
+  PRODUCTION
+}
+
+model Company {
+  id              String      @id @default(uuid())
+  name            String
+  type            CompanyType
+  parentCompanyId String?     @map("parent_company_id")
+  parentCompany   Company?    @relation("CompanyHierarchy", fields: [parentCompanyId], references: [id])
+  subsidiaries    Company[]   @relation("CompanyHierarchy")
+
+  users                  User[]
+  customers              Customer[]
+  products               Product[]
+  inventories            Inventory[]
+  orders                 Order[]
+  transfersFrom          InterCompanyTransfer[] @relation("TransferFrom")
+  transfersTo            InterCompanyTransfer[] @relation("TransferTo")
+  productionOrders       ProductionOrder[]
+  consultingEngagements  ConsultingEngagement[]
+  inventoryAdjustments   InventoryAdjustment[]
+  billOfMaterials        BillOfMaterials[]
+
+  @@map("companies")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      UserRole
+  companyId String   @map("company_id")
+  company   Company  @relation(fields: [companyId], references: [id])
+
+  inventoryAdjustments InventoryAdjustment[]
+
+  @@map("users")
+}
+
+model Customer {
+  id          String       @id @default(uuid())
+  name        String
+  contactInfo Json?        @map("contact_info")
+  type        CustomerType
+  companyId   String       @map("company_id")
+  company     Company      @relation(fields: [companyId], references: [id])
+
+  orders                Order[]        @relation("CustomerOrders")
+  brokerageOrders       Order[]        @relation("BrokerageCustomer")
+  consultingEngagements ConsultingEngagement[]
+
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId])
+  @@map("customers")
+}
+
+model Product {
+  id          String  @id @default(uuid())
+  name        String
+  sku         String
+  description String?
+  category    String
+  basePrice   Decimal @map("base_price")
+  costPrice   Decimal @map("cost_price")
+  companyId   String  @map("company_id")
+  company     Company @relation(fields: [companyId], references: [id])
+
+  inventories        Inventory[]
+  orderItems         OrderItem[]
+  productionOrders   ProductionOrder[]
+  bomAsFinished      BillOfMaterials[] @relation("FinishedProduct")
+  bomAsRawMaterial   BillOfMaterials[] @relation("RawMaterial")
+
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@unique([sku, companyId])
+  @@index([companyId])
+  @@map("products")
+}
+
+model Inventory {
+  id                String  @id @default(uuid())
+  productId         String  @map("product_id")
+  product           Product @relation(fields: [productId], references: [id])
+  companyId         String  @map("company_id")
+  company           Company @relation(fields: [companyId], references: [id])
+  quantity          Int
+  warehouseLocation String  @map("warehouse_location")
+  reorderLevel      Int     @map("reorder_level")
+
+  adjustments InventoryAdjustment[]
+
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@unique([productId, companyId, warehouseLocation])
+  @@index([companyId])
+  @@map("inventories")
+}
+
+model Order {
+  id                    String      @id @default(uuid())
+  orderNumber           String      @unique @map("order_number")
+  companyId             String      @map("company_id")
+  company               Company     @relation(fields: [companyId], references: [id])
+  customerId            String?     @map("customer_id")
+  customer              Customer?   @relation("CustomerOrders", fields: [customerId], references: [id])
+  type                  OrderType
+  status                OrderStatus @default(PENDING)
+  totalAmount           Decimal     @map("total_amount")
+  costAmount            Decimal?    @map("cost_amount")
+  marginAmount          Decimal?    @map("margin_amount")
+  onBehalfOfCustomerId  String?     @map("on_behalf_of_customer_id")
+  onBehalfOfCustomer    Customer?   @relation("BrokerageCustomer", fields: [onBehalfOfCustomerId], references: [id])
+  orderDate             DateTime    @map("order_date")
+  shipDate              DateTime?   @map("ship_date")
+  notes                 String?
+
+  items     OrderItem[]
+  transfer  InterCompanyTransfer?
+
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId, orderDate])
+  @@index([companyId, status])
+  @@index([companyId, type])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String  @map("order_id")
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String  @map("product_id")
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  unitPrice Decimal @map("unit_price")
+  subtotal  Decimal
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model InterCompanyTransfer {
+  id            String         @id @default(uuid())
+  fromCompanyId String         @map("from_company_id")
+  fromCompany   Company        @relation("TransferFrom", fields: [fromCompanyId], references: [id])
+  toCompanyId   String         @map("to_company_id")
+  toCompany     Company        @relation("TransferTo", fields: [toCompanyId], references: [id])
+  orderId       String         @unique @map("order_id")
+  order         Order          @relation(fields: [orderId], references: [id])
+  status        TransferStatus @default(PENDING)
+  transferDate  DateTime       @map("transfer_date")
+  receivedDate  DateTime?      @map("received_date")
+
+  @@map("inter_company_transfers")
+}
+
+model ProductionOrder {
+  id                String           @id @default(uuid())
+  companyId         String           @map("company_id")
+  company           Company          @relation(fields: [companyId], references: [id])
+  productId         String           @map("product_id")
+  product           Product          @relation(fields: [productId], references: [id])
+  quantityToProduce Int              @map("quantity_to_produce")
+  quantityProduced  Int              @default(0) @map("quantity_produced")
+  status            ProductionStatus @default(PLANNED)
+  startDate         DateTime         @map("start_date")
+  endDate           DateTime?        @map("end_date")
+  notes             String?
+
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId, status])
+  @@map("production_orders")
+}
+
+model ConsultingEngagement {
+  id            String           @id @default(uuid())
+  companyId     String           @map("company_id")
+  company       Company          @relation(fields: [companyId], references: [id])
+  customerId    String           @map("customer_id")
+  customer      Customer         @relation(fields: [customerId], references: [id])
+  title         String
+  status        ConsultingStatus @default(ACTIVE)
+  startDate     DateTime         @map("start_date")
+  endDate       DateTime?        @map("end_date")
+  billingAmount Decimal          @map("billing_amount")
+  notes         String?
+
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId])
+  @@map("consulting_engagements")
+}
+
+model InventoryAdjustment {
+  id               String         @id @default(uuid())
+  inventoryId      String         @map("inventory_id")
+  inventory        Inventory      @relation(fields: [inventoryId], references: [id])
+  companyId        String         @map("company_id")
+  company          Company        @relation(fields: [companyId], references: [id])
+  adjustmentType   AdjustmentType @map("adjustment_type")
+  quantityChange   Int            @map("quantity_change")
+  previousQuantity Int            @map("previous_quantity")
+  newQuantity      Int            @map("new_quantity")
+  referenceId      String?        @map("reference_id")
+  reason           String?
+  createdBy        String         @map("created_by")
+  createdByUser    User           @relation(fields: [createdBy], references: [id])
+  createdAt        DateTime       @default(now()) @map("created_at")
+
+  @@index([inventoryId])
+  @@index([companyId, createdAt])
+  @@map("inventory_adjustments")
+}
+
+model BillOfMaterials {
+  id                String  @id @default(uuid())
+  companyId         String  @map("company_id")
+  company           Company @relation(fields: [companyId], references: [id])
+  finishedProductId String  @map("finished_product_id")
+  finishedProduct   Product @relation("FinishedProduct", fields: [finishedProductId], references: [id])
+  rawMaterialId     String  @map("raw_material_id")
+  rawMaterial       Product @relation("RawMaterial", fields: [rawMaterialId], references: [id])
+  quantityRequired  Decimal @map("quantity_required")
+
+  @@map("bill_of_materials")
+}

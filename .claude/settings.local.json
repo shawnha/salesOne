@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mv ~/.gstack/projects/claude_2 ~/.gstack/projects/financeOne)",
+      "Bash(echo \"gstack: $?\")",
+      "Bash(mv ~/.claude/projects/-Users-admin-Desktop-claude-claude-2 ~/.claude/projects/-Users-admin-Desktop-claude-financeOne)",
+      "Bash(echo \"memory: $?\")",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh auth:*)",
+      "Bash(brew install:*)",
+      "Bash(/opt/homebrew/bin/brew --version)",
+      "Bash(/usr/local/bin/brew --version)",
+      "Bash(/usr/local/bin/brew install:*)",
+      "Bash(gh --version)",
+      "Read(//opt/homebrew/**)",
+      "Read(//opt/homebrew/bin/**)",
+      "Read(//usr/local/Homebrew/bin/**)",
+      "Bash(/opt/homebrew/bin/gh --version 2>/dev/null)",
+      "Bash(/opt/homebrew/bin/gh auth:*)",
+      "Bash(/opt/homebrew/bin/neonctl projects:*)",
+      "Bash(/Users/admin/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.5/skills/brainstorming/scripts/start-server.sh --project-dir /Users/admin/Desktop/claude/claude_2)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(npx create-next-app@14 hanahone-erp --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm)",
+      "Bash(npm install:*)",
+      "Bash(npx prisma:*)"
+    ]
+  }
+}

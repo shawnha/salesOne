@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HanahOne ERP — Dark Mode Dashboard</title>
+<style>
+  @font-face { font-family: 'Geist'; src: local('Geist'); }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0a0a0c;
+    --bg-raised: #111114;
+    --surface: #16161a;
+    --surface-hover: #1c1c21;
+    --border: rgba(255, 255, 255, 0.06);
+    --border-strong: rgba(255, 255, 255, 0.1);
+    --text-primary: #f0f0f3;
+    --text-secondary: #8a8a9a;
+    --text-tertiary: #55556a;
+    --accent: #2dd4bf;
+    --accent-dim: rgba(45, 212, 191, 0.10);
+    --accent-medium: rgba(45, 212, 191, 0.18);
+    --shadow-card: 0 1px 2px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.03);
+    --shadow-card-hover: 0 12px 32px -8px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06);
+    --shadow-nav: 0 8px 32px -4px rgba(0,0,0,0.6);
+    --radius-sm: 12px;
+    --radius-md: 20px;
+    --radius-lg: 28px;
+  }
+
+  body {
+    font-family: 'Geist', -apple-system, system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+
+  /* Subtle grain overlay */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    pointer-events: none;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  }
+
+  /* Floating Pill Nav */
+  .top-nav {
+    position: sticky;
+    top: 16px;
+    z-index: 40;
+    max-width: 1400px;
+    margin: 16px auto 0;
+    padding: 0 24px;
+  }
+  .top-nav-inner {
+    background: rgba(22, 22, 26, 0.8);
+    backdrop-filter: blur(24px) saturate(150%);
+    -webkit-backdrop-filter: blur(24px) saturate(150%);
+    border: 1px solid var(--border);
+    border-radius: 9999px;
+    padding: 10px 10px 10px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: var(--shadow-nav);
+  }
+  .nav-brand {
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: -0.03em;
+    color: var(--text-primary);
+  }
+  .nav-brand span { color: var(--accent); }
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .nav-link {
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.32,0.72,0,1);
+    letter-spacing: -0.01em;
+  }
+  .nav-link:hover { color: var(--text-primary); background: rgba(255,255,255,0.05); }
+  .nav-link.active { color: var(--accent); background: var(--accent-dim); }
+  .nav-right { display: flex; align-items: center; gap: 8px; }
+
+  /* Company Switcher */
+  .company-switcher {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 9999px;
+    padding: 3px;
+  }
+  .company-pill {
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.32,0.72,0,1);
+    letter-spacing: -0.01em;
+  }
+  .company-pill:hover { color: var(--text-secondary); }
+  .company-pill.active {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  }
+
+  /* Main */
+  .main {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  /* Page Header */
+  .header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 32px;
+  }
+  .page-header h1 {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1.1;
+    color: var(--text-primary);
+  }
+  .page-header p {
+    font-size: 15px;
+    color: var(--text-secondary);
+    margin-top: 8px;
+    letter-spacing: -0.01em;
+  }
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    background: var(--accent-dim);
+    border-radius: 9999px;
+    margin-bottom: 12px;
+  }
+  .eyebrow-dot {
+    width: 6px; height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: pulse-dot 2s ease infinite;
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.7); }
+  }
+
+  /* Date Filters */
+  .date-filters {
+    display: flex;
+    gap: 2px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 9999px;
+    padding: 3px;
+  }
+  .date-pill {
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-tertiary);
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.32,0.72,0,1);
+  }
+  .date-pill.active {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  }
+
+  /* Bento Grid */
+  .bento {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 12px;
+  }
+
+  /* Card — Double Bezel Dark */
+  .card-shell {
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 5px;
+    transition: all 0.35s cubic-bezier(0.32,0.72,0,1);
+  }
+  .card-shell:hover {
+    box-shadow: var(--shadow-card-hover);
+    border-color: var(--border-strong);
+  }
+  .card-inner {
+    background: var(--surface);
+    border-radius: calc(var(--radius-lg) - 5px);
+    padding: 28px;
+    height: 100%;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 16px;
+  }
+
+  /* KPI */
+  .kpi-value {
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+  .kpi-change {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 9999px;
+    font-variant-numeric: tabular-nums;
+  }
+  .kpi-change.up { color: #2dd4bf; background: rgba(45,212,191,0.10); }
+  .kpi-change.down { color: #fb7185; background: rgba(251,113,133,0.10); }
+  .kpi-change.neutral { color: var(--text-tertiary); background: rgba(255,255,255,0.04); }
+  .kpi-sub {
+    font-size: 13px;
+    color: var(--text-tertiary);
+    margin-top: 6px;
+    letter-spacing: -0.01em;
+  }
+
+  /* Company Cards */
+  .company-card-accent {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    opacity: 0.7;
+  }
+  .company-name {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 16px;
+  }
+  .company-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .company-stat:last-child { border-bottom: none; }
+  .company-stat-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    letter-spacing: -0.01em;
+  }
+  .company-stat-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Table */
+  .table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .table-header h3 {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .table-link {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .table-link:hover { opacity: 0.7; }
+  .order-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 90px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    align-items: center;
+  }
+  .order-row:last-child { border-bottom: none; }
+  .order-id { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+  .order-customer { color: var(--text-secondary); }
+  .order-amount { font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+  .status-badge {
+    display: inline-flex;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 9999px;
+    width: fit-content;
+  }
+  .status-badge.shipped { color: #2dd4bf; background: rgba(45,212,191,0.10); }
+  .status-badge.pending { color: #fbbf24; background: rgba(251,191,36,0.10); }
+  .status-badge.processing { color: #a78bfa; background: rgba(167,139,250,0.10); }
+
+  /* Alerts */
+  .alert-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .alert-item:last-child { border-bottom: none; }
+  .alert-name { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+  .alert-detail { font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
+  .alert-count {
+    font-size: 13px;
+    font-weight: 700;
+    color: #fb7185;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* Ambient glow behind page */
+  .ambient {
+    position: fixed;
+    top: -200px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 800px;
+    height: 500px;
+    background: radial-gradient(ellipse, rgba(45,212,191,0.06) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .main { position: relative; z-index: 1; }
+  .top-nav { position: sticky; z-index: 40; }
+</style>
+</head>
+<body>
+
+<div class="ambient"></div>
+
+<!-- Floating Pill Nav -->
+<nav class="top-nav">
+  <div class="top-nav-inner">
+    <div style="display:flex;align-items:center;gap:32px;">
+      <div class="nav-brand">Hanah<span>One</span></div>
+      <div class="nav-links">
+        <div class="nav-link active">Dashboard</div>
+        <div class="nav-link">Sales</div>
+        <div class="nav-link">Orders</div>
+        <div class="nav-link">Inventory</div>
+        <div class="nav-link">Products</div>
+        <div class="nav-link">Customers</div>
+        <div class="nav-link">Transfers</div>
+        <div class="nav-link">Manufacturing</div>
+        <div class="nav-link">Reports</div>
+      </div>
+    </div>
+    <div class="nav-right">
+      <div class="company-switcher">
+        <div class="company-pill active">Group</div>
+        <div class="company-pill">HOI</div>
+        <div class="company-pill">HOK</div>
+        <div class="company-pill">HOR</div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<main class="main">
+  <div class="header-row">
+    <div class="page-header">
+      <div class="eyebrow">
+        <div class="eyebrow-dot"></div>
+        Live overview
+      </div>
+      <h1>Group dashboard</h1>
+      <p>HanahOne Group — consolidated across all entities</p>
+    </div>
+    <div class="date-filters">
+      <div class="date-pill">Today</div>
+      <div class="date-pill">7 days</div>
+      <div class="date-pill active">30 days</div>
+      <div class="date-pill">Quarter</div>
+    </div>
+  </div>
+
+  <div class="bento">
+
+    <!-- KPIs -->
+    <div class="card-shell" style="grid-column: span 3;">
+      <div class="card-inner">
+        <div class="card-label">Total sales</div>
+        <div class="kpi-value">&#8361;847.2M</div>
+        <div class="kpi-change up">&#9650; 12.3%</div>
+        <div class="kpi-sub">vs previous 30 days</div>
+      </div>
+    </div>
+
+    <div class="card-shell" style="grid-column: span 3;">
+      <div class="card-inner">
+        <div class="card-label">Open orders</div>
+        <div class="kpi-value">342</div>
+        <div class="kpi-change neutral">&#9654; 28 pending shipment</div>
+        <div class="kpi-sub">across all entities</div>
+      </div>
+    </div>
+
+    <div class="card-shell" style="grid-column: span 3;">
+      <div class="card-inner">
+        <div class="card-label">Inventory value</div>
+        <div class="kpi-value">&#8361;1.24B</div>
+        <div class="kpi-change down">&#9660; 14 below reorder</div>
+        <div class="kpi-sub">combined warehouse stock</div>
+      </div>
+    </div>
+
+    <div class="card-shell" style="grid-column: span 3;">
+      <div class="card-inner">
+        <div class="card-label">Production runs</div>
+        <div class="kpi-value">18</div>
+        <div class="kpi-change up">&#9650; 3 new this week</div>
+        <div class="kpi-sub">HOK manufacturing</div>
+      </div>
+    </div>
+
+    <!-- Company Breakdown -->
+    <div class="card-shell" style="grid-column: span 4;">
+      <div class="card-inner">
+        <div class="company-card-accent" style="background: var(--accent);"></div>
+        <div class="company-name" style="color: var(--accent);">HOI</div>
+        <div class="company-stat">
+          <span class="company-stat-label">Revenue</span>
+          <span class="company-stat-value">&#8361;412.8M</span>
+        </div>
+        <div class="company-stat">
+          <span class="company-stat-label">Orders</span>
+          <span class="company-stat-value">186</span>
+        </div>
+        <div class="company-stat">
+          <span class="company-stat-label">Active SKUs</span>
+          <span class="company-stat-value">423</span>
+        </div>
+        <div class="company-stat">
+          <span class="company-stat-label">D2C customers</span>
+          <span class="company-stat-value">2,847</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-shell" style="grid-column: span 4;">
+      <div class="card-inner">
+        <div class="company-card-accent" style="background: #a78bfa;"></div>
+        <div class="company-name" style="color: #a78bfa;">HOK</div>
+        <div class="company-stat">
+          <span class="company-stat-label">Revenue</span>
+          <span class="company-stat-value">&#8361;327.6M</span>
+        </div>
+        <div class="company-stat">
+          <span class="company-stat-label">Orders</span>
+          <span class="company-stat-value">124</span>
+        </div>
+        <div class="company-stat">
+          <span class="company-stat-label">Production runs</span>
+          <span class="company-stat-value">18</span>
+        </div>
+        <div class="company-stat">
+          <span class="company-stat-label">Drugstore clients</span>
+          <span class="company-stat-value">67</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-shell" style="grid-column: span 4;">
+      <div class="card-inner">
+        <div class="company-card-accent" style="background: #fbbf24;"></div>
+        <div class="company-name" style="color: #fbbf24;">HOR</div>
+        <div class="company-stat">
+          <span class="company-stat-label">Brokered value</span>
+          <span class="company-stat-value">&#8361;106.8M</span>
+        </div>
+        <div class="company-stat">
+          <span class="company-stat-label">Drugstore clients</span>
+          <span class="company-stat-value">32</span>
+        </div>
+        <div class="company-stat">
+          <span class="company-stat-label">Active consulting</span>
+          <span class="company-stat-value">8</span>
+        </div>
+        <div class="company-stat">
+          <span class="company-stat-label">Pending orders</span>
+          <span class="company-stat-value">12</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Orders -->
+    <div class="card-shell" style="grid-column: span 8;">
+      <div class="card-inner">
+        <div class="table-header">
+          <h3>Recent orders</h3>
+          <span class="table-link">View all orders &#8594;</span>
+        </div>
+        <div class="order-row" style="font-size:11px;color:var(--text-tertiary);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border);">
+          <span>Order</span><span>Customer</span><span>Status</span><span style="text-align:right;">Amount</span>
+        </div>
+        <div class="order-row">
+          <span class="order-id">ORD-4821</span>
+          <span class="order-customer">Gangnam Pharmacy</span>
+          <span><span class="status-badge shipped">Shipped</span></span>
+          <span class="order-amount">&#8361;3.2M</span>
+        </div>
+        <div class="order-row">
+          <span class="order-id">ORD-4820</span>
+          <span class="order-customer">Kim Yeji</span>
+          <span><span class="status-badge processing">Processing</span></span>
+          <span class="order-amount">&#8361;89,000</span>
+        </div>
+        <div class="order-row">
+          <span class="order-id">ORD-4819</span>
+          <span class="order-customer">Mapo Health Mart</span>
+          <span><span class="status-badge pending">Pending</span></span>
+          <span class="order-amount">&#8361;1.7M</span>
+        </div>
+        <div class="order-row">
+          <span class="order-id">ORD-4818</span>
+          <span class="order-customer">Park Seonghwa</span>
+          <span><span class="status-badge shipped">Shipped</span></span>
+          <span class="order-amount">&#8361;142,000</span>
+        </div>
+        <div class="order-row">
+          <span class="order-id">ICT-0312</span>
+          <span class="order-customer" style="color:var(--accent);">HOK &#8594; HOI (transfer)</span>
+          <span><span class="status-badge shipped">Received</span></span>
+          <span class="order-amount">&#8361;24.6M</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Low Stock Alerts -->
+    <div class="card-shell" style="grid-column: span 4;">
+      <div class="card-inner">
+        <div class="table-header">
+          <h3>Low stock alerts</h3>
+          <span class="table-link">Inventory &#8594;</span>
+        </div>
+        <div class="alert-item">
+          <div>
+            <div class="alert-name">Omega-3 Fish Oil 1000mg</div>
+            <div class="alert-detail">HOI &middot; Reorder at 500</div>
+          </div>
+          <div class="alert-count">127 left</div>
+        </div>
+        <div class="alert-item">
+          <div>
+            <div class="alert-name">Vitamin D3 5000IU</div>
+            <div class="alert-detail">HOI &middot; Reorder at 300</div>
+          </div>
+          <div class="alert-count">84 left</div>
+        </div>
+        <div class="alert-item">
+          <div>
+            <div class="alert-name">Probiotics Complex</div>
+            <div class="alert-detail">HOK &middot; Reorder at 200</div>
+          </div>
+          <div class="alert-count">52 left</div>
+        </div>
+        <div class="alert-item">
+          <div>
+            <div class="alert-name">Collagen Peptides</div>
+            <div class="alert-detail">HOK &middot; Reorder at 400</div>
+          </div>
+          <div class="alert-count">198 left</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+</body>
+</html>

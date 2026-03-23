@@ -1,0 +1,114 @@
+<h2>Section 2: Application Structure & UI Layout</h2>
+<p class="subtitle">How users navigate the HanahOne Group ERP</p>
+
+<div class="mockup">
+  <div class="mockup-header">Dashboard Layout — Company Switcher + Sidebar Navigation</div>
+  <div class="mockup-body" style="padding: 0; min-height: 500px; display: flex;">
+
+    <!-- Sidebar -->
+    <div style="width: 220px; background: #0f172a; border-right: 1px solid #1e293b; padding: 16px 0; flex-shrink: 0;">
+      <!-- Logo -->
+      <div style="padding: 0 16px 16px; border-bottom: 1px solid #1e293b;">
+        <div style="color: #f8fafc; font-weight: bold; font-size: 16px;">HanahOne ERP</div>
+      </div>
+
+      <!-- Company Switcher -->
+      <div style="padding: 12px 16px; border-bottom: 1px solid #1e293b;">
+        <div style="font-size: 10px; text-transform: uppercase; color: #64748b; margin-bottom: 6px;">Viewing As</div>
+        <div style="background: #1e293b; border: 1px solid #334155; border-radius: 6px; padding: 8px 12px; color: #60a5fa; font-weight: 600; cursor: pointer;">
+          HanahOne Group ▾
+        </div>
+        <div style="margin-top: 6px; font-size: 11px; color: #64748b;">
+          Switch: HOI · HOK · HOR · Group
+        </div>
+      </div>
+
+      <!-- Nav Items -->
+      <div style="padding: 12px 0;">
+        <div style="padding: 8px 16px; color: #60a5fa; background: #1e293b; font-size: 13px; font-weight: 600;">Dashboard</div>
+        <div style="padding: 8px 16px; color: #cbd5e1; font-size: 13px;">Sales</div>
+        <div style="padding: 8px 16px; color: #cbd5e1; font-size: 13px;">Orders</div>
+        <div style="padding: 8px 16px; color: #cbd5e1; font-size: 13px;">Inventory</div>
+        <div style="padding: 8px 16px; color: #cbd5e1; font-size: 13px;">Products</div>
+        <div style="padding: 8px 16px; color: #cbd5e1; font-size: 13px;">Customers</div>
+        <div style="padding: 8px 16px; color: #cbd5e1; font-size: 13px; border-top: 1px solid #1e293b; margin-top: 8px; padding-top: 16px;">Inter-Company</div>
+        <div style="padding: 8px 16px; color: #f472b6; font-size: 13px;">Manufacturing</div>
+        <div style="padding: 8px 16px; color: #cbd5e1; font-size: 13px;">Consulting</div>
+        <div style="padding: 8px 16px; color: #cbd5e1; font-size: 13px; border-top: 1px solid #1e293b; margin-top: 8px; padding-top: 16px;">Reports</div>
+        <div style="padding: 8px 16px; color: #cbd5e1; font-size: 13px;">Settings</div>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div style="flex: 1; padding: 24px;">
+      <!-- Top Bar -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <div>
+          <div style="color: #f8fafc; font-size: 20px; font-weight: bold;">Group Dashboard</div>
+          <div style="color: #64748b; font-size: 13px;">HanahOne Group — All Companies</div>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <div style="background: #1e293b; border: 1px solid #334155; border-radius: 6px; padding: 6px 12px; color: #94a3b8; font-size: 12px;">Today</div>
+          <div style="background: #1e293b; border: 1px solid #334155; border-radius: 6px; padding: 6px 12px; color: #94a3b8; font-size: 12px;">This Week</div>
+          <div style="background: #2563eb; border-radius: 6px; padding: 6px 12px; color: #fff; font-size: 12px;">This Month</div>
+        </div>
+      </div>
+
+      <!-- KPI Cards -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+        <div style="background: #1e293b; border-radius: 8px; padding: 16px;">
+          <div style="color: #64748b; font-size: 11px; text-transform: uppercase;">Total Sales</div>
+          <div style="color: #f8fafc; font-size: 24px; font-weight: bold; margin-top: 4px;">₩847.2M</div>
+          <div style="color: #34d399; font-size: 12px; margin-top: 4px;">+12.3% vs last month</div>
+        </div>
+        <div style="background: #1e293b; border-radius: 8px; padding: 16px;">
+          <div style="color: #64748b; font-size: 11px; text-transform: uppercase;">Open Orders</div>
+          <div style="color: #f8fafc; font-size: 24px; font-weight: bold; margin-top: 4px;">342</div>
+          <div style="color: #fbbf24; font-size: 12px; margin-top: 4px;">28 pending shipment</div>
+        </div>
+        <div style="background: #1e293b; border-radius: 8px; padding: 16px;">
+          <div style="color: #64748b; font-size: 11px; text-transform: uppercase;">Inventory Value</div>
+          <div style="color: #f8fafc; font-size: 24px; font-weight: bold; margin-top: 4px;">₩1.2B</div>
+          <div style="color: #fb923c; font-size: 12px; margin-top: 4px;">14 items below reorder</div>
+        </div>
+        <div style="background: #1e293b; border-radius: 8px; padding: 16px;">
+          <div style="color: #64748b; font-size: 11px; text-transform: uppercase;">Production</div>
+          <div style="color: #f8fafc; font-size: 24px; font-weight: bold; margin-top: 4px;">18</div>
+          <div style="color: #60a5fa; font-size: 12px; margin-top: 4px;">active production runs</div>
+        </div>
+      </div>
+
+      <!-- Company Breakdown -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
+        <div style="background: #1e293b; border-radius: 8px; padding: 16px; border-left: 3px solid #60a5fa;">
+          <div style="color: #60a5fa; font-weight: bold; margin-bottom: 8px;">HOI</div>
+          <div style="color: #94a3b8; font-size: 13px;">Sales: ₩412M</div>
+          <div style="color: #94a3b8; font-size: 13px;">Orders: 186</div>
+          <div style="color: #94a3b8; font-size: 13px;">SKUs: 420</div>
+        </div>
+        <div style="background: #1e293b; border-radius: 8px; padding: 16px; border-left: 3px solid #34d399;">
+          <div style="color: #34d399; font-weight: bold; margin-bottom: 8px;">HOK</div>
+          <div style="color: #94a3b8; font-size: 13px;">Sales: ₩328M</div>
+          <div style="color: #94a3b8; font-size: 13px;">Orders: 124</div>
+          <div style="color: #94a3b8; font-size: 13px;">Production: 18 runs</div>
+        </div>
+        <div style="background: #1e293b; border-radius: 8px; padding: 16px; border-left: 3px solid #a78bfa;">
+          <div style="color: #a78bfa; font-weight: bold; margin-bottom: 8px;">HOR</div>
+          <div style="color: #94a3b8; font-size: 13px;">Brokered: ₩107M</div>
+          <div style="color: #94a3b8; font-size: 13px;">Clients: 32 drugstores</div>
+          <div style="color: #94a3b8; font-size: 13px;">Consulting: 8 active</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 20px; padding: 16px; border: 1px solid #334155; border-radius: 8px;">
+  <h3>Navigation Structure</h3>
+  <ul style="color: #cbd5e1; line-height: 1.8;">
+    <li><strong>Company Switcher</strong> — top of sidebar, switch between HOI / HOK / HOR / Group view. All pages filter accordingly.</li>
+    <li><strong>Shared modules</strong> — Dashboard, Sales, Orders, Inventory, Products, Customers, Reports, Settings</li>
+    <li><strong>Company-specific modules</strong> — Manufacturing (HOK only), Consulting (HOR only), Inter-Company Transfers</li>
+    <li><strong>Role-based visibility</strong> — Staff see their company only. Managers see their company + reports. Admins see everything + Group view.</li>
+  </ul>
+</div>

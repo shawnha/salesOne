@@ -1,0 +1,4 @@
+{"type":"server-started","port":54995,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:54995","screen_dir":"/Users/admin/Desktop/claude/claude_2/.superpowers/brainstorm/36301-1774262359"}
+{"type":"screen-added","file":"/Users/admin/Desktop/claude/claude_2/.superpowers/brainstorm/36301-1774262359/ui-layout-v2.html"}
+{"type":"screen-added","file":"/Users/admin/Desktop/claude/claude_2/.superpowers/brainstorm/36301-1774262359/ui-layout-dark.html"}
+{"type":"server-stopped","reason":"idle timeout"}

@@ -1,0 +1,87 @@
+<h2>Architecture Approaches</h2>
+<p class="subtitle">Three ways to structure the HanahOne Group ERP</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Single Multi-Tenant Database</h3>
+      <p><strong>Recommended</strong></p>
+      <p>One database with a <code>company_id</code> column on every table. All three companies share the same schema. Consolidated group reports are simple JOINs. Inter-company transfers are rows in the same DB.</p>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Simplest to build and maintain</li>
+            <li>Consolidated reporting is trivial</li>
+            <li>Inter-company transfers are easy</li>
+            <li>Single deployment, single codebase</li>
+            <li>Perfect for ~1000 SKUs / 5+ users</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Must enforce data isolation via app logic</li>
+            <li>Schema changes affect all companies</li>
+            <li>Company-specific customization is harder</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Separate Databases per Company</h3>
+      <p>Each company gets its own database. A consolidation layer aggregates data for group-level views.</p>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Strong data isolation by default</li>
+            <li>Each company can evolve independently</li>
+            <li>Easier to split off a company later</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Consolidated reporting requires cross-DB queries or ETL</li>
+            <li>Inter-company transfers are complex (distributed transactions)</li>
+            <li>3x the operational overhead</li>
+            <li>Overkill for this scale</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Microservices per Domain</h3>
+      <p>Separate services for Sales, Inventory, Manufacturing, CRM, etc. Each service owns its data. Companies are a dimension within each service.</p>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Clean domain boundaries</li>
+            <li>Independent scaling per domain</li>
+            <li>Team independence</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Massive overengineering for 5 users / 1000 SKUs</li>
+            <li>Distributed system complexity</li>
+            <li>Much slower to build</li>
+            <li>Harder to maintain with a small team</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

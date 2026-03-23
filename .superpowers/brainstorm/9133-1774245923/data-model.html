@@ -1,0 +1,123 @@
+<h2>Section 1: Core Data Model</h2>
+<p class="subtitle">Entity relationships for the HanahOne Group ERP</p>
+
+<div class="mockup">
+  <div class="mockup-header">Entity Relationship Diagram</div>
+  <div class="mockup-body" style="padding: 24px; font-family: monospace; font-size: 13px; line-height: 1.6;">
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+
+      <!-- Company -->
+      <div style="border: 2px solid #60a5fa; border-radius: 8px; padding: 12px; background: #1e293b;">
+        <div style="color: #60a5fa; font-weight: bold; margin-bottom: 8px; font-size: 14px;">COMPANY</div>
+        <div style="color: #94a3b8;">id (PK)</div>
+        <div style="color: #f8fafc;">name</div>
+        <div style="color: #f8fafc;">type (MOTHER|SUBSIDIARY)</div>
+        <div style="color: #94a3b8;">parent_company_id (FK)</div>
+      </div>
+
+      <!-- User -->
+      <div style="border: 2px solid #60a5fa; border-radius: 8px; padding: 12px; background: #1e293b;">
+        <div style="color: #60a5fa; font-weight: bold; margin-bottom: 8px; font-size: 14px;">USER</div>
+        <div style="color: #94a3b8;">id (PK)</div>
+        <div style="color: #f8fafc;">name, email, password</div>
+        <div style="color: #f8fafc;">role (ADMIN|MANAGER|STAFF)</div>
+        <div style="color: #94a3b8;">company_id (FK)</div>
+      </div>
+
+      <!-- Customer -->
+      <div style="border: 2px solid #a78bfa; border-radius: 8px; padding: 12px; background: #1e293b;">
+        <div style="color: #a78bfa; font-weight: bold; margin-bottom: 8px; font-size: 14px;">CUSTOMER</div>
+        <div style="color: #94a3b8;">id (PK)</div>
+        <div style="color: #f8fafc;">name, contact_info</div>
+        <div style="color: #f8fafc;">type (INDIVIDUAL|DRUGSTORE|WHOLESALE)</div>
+        <div style="color: #94a3b8;">company_id (FK)</div>
+      </div>
+
+      <!-- Product -->
+      <div style="border: 2px solid #34d399; border-radius: 8px; padding: 12px; background: #1e293b;">
+        <div style="color: #34d399; font-weight: bold; margin-bottom: 8px; font-size: 14px;">PRODUCT</div>
+        <div style="color: #94a3b8;">id (PK)</div>
+        <div style="color: #f8fafc;">name, sku, description</div>
+        <div style="color: #f8fafc;">category</div>
+        <div style="color: #f8fafc;">unit_price</div>
+        <div style="color: #94a3b8;">company_id (FK)</div>
+      </div>
+
+      <!-- Inventory -->
+      <div style="border: 2px solid #34d399; border-radius: 8px; padding: 12px; background: #1e293b;">
+        <div style="color: #34d399; font-weight: bold; margin-bottom: 8px; font-size: 14px;">INVENTORY</div>
+        <div style="color: #94a3b8;">id (PK)</div>
+        <div style="color: #94a3b8;">product_id (FK)</div>
+        <div style="color: #94a3b8;">company_id (FK)</div>
+        <div style="color: #f8fafc;">quantity</div>
+        <div style="color: #f8fafc;">warehouse_location</div>
+        <div style="color: #f8fafc;">reorder_level</div>
+      </div>
+
+      <!-- Order -->
+      <div style="border: 2px solid #fbbf24; border-radius: 8px; padding: 12px; background: #1e293b;">
+        <div style="color: #fbbf24; font-weight: bold; margin-bottom: 8px; font-size: 14px;">ORDER</div>
+        <div style="color: #94a3b8;">id (PK)</div>
+        <div style="color: #94a3b8;">company_id (FK)</div>
+        <div style="color: #94a3b8;">customer_id (FK)</div>
+        <div style="color: #f8fafc;">type (SALE|PURCHASE|INTER_COMPANY)</div>
+        <div style="color: #f8fafc;">status, total_amount</div>
+        <div style="color: #f8fafc;">order_date, ship_date</div>
+      </div>
+
+      <!-- Order Item -->
+      <div style="border: 2px solid #fbbf24; border-radius: 8px; padding: 12px; background: #1e293b;">
+        <div style="color: #fbbf24; font-weight: bold; margin-bottom: 8px; font-size: 14px;">ORDER_ITEM</div>
+        <div style="color: #94a3b8;">id (PK)</div>
+        <div style="color: #94a3b8;">order_id (FK)</div>
+        <div style="color: #94a3b8;">product_id (FK)</div>
+        <div style="color: #f8fafc;">quantity, unit_price</div>
+        <div style="color: #f8fafc;">subtotal</div>
+      </div>
+
+      <!-- Inter-Company Transfer -->
+      <div style="border: 2px solid #fb923c; border-radius: 8px; padding: 12px; background: #1e293b;">
+        <div style="color: #fb923c; font-weight: bold; margin-bottom: 8px; font-size: 14px;">INTER_COMPANY_TRANSFER</div>
+        <div style="color: #94a3b8;">id (PK)</div>
+        <div style="color: #94a3b8;">from_company_id (FK)</div>
+        <div style="color: #94a3b8;">to_company_id (FK)</div>
+        <div style="color: #94a3b8;">order_id (FK)</div>
+        <div style="color: #f8fafc;">status (PENDING|SHIPPED|RECEIVED)</div>
+        <div style="color: #f8fafc;">transfer_date</div>
+      </div>
+
+      <!-- Production -->
+      <div style="border: 2px solid #f472b6; border-radius: 8px; padding: 12px; background: #1e293b;">
+        <div style="color: #f472b6; font-weight: bold; margin-bottom: 8px; font-size: 14px;">PRODUCTION_ORDER (HOK only)</div>
+        <div style="color: #94a3b8;">id (PK)</div>
+        <div style="color: #94a3b8;">product_id (FK)</div>
+        <div style="color: #f8fafc;">quantity_to_produce</div>
+        <div style="color: #f8fafc;">status (PLANNED|IN_PROGRESS|DONE)</div>
+        <div style="color: #f8fafc;">start_date, end_date</div>
+      </div>
+
+    </div>
+
+    <div style="margin-top: 24px; padding: 16px; border: 1px solid #334155; border-radius: 8px;">
+      <div style="color: #60a5fa; font-weight: bold; margin-bottom: 8px;">Color Legend</div>
+      <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+        <span><span style="color: #60a5fa;">&#9632;</span> Core/Auth</span>
+        <span><span style="color: #a78bfa;">&#9632;</span> CRM</span>
+        <span><span style="color: #34d399;">&#9632;</span> Products/Inventory</span>
+        <span><span style="color: #fbbf24;">&#9632;</span> Orders/Sales</span>
+        <span><span style="color: #fb923c;">&#9632;</span> Inter-Company</span>
+        <span><span style="color: #f472b6;">&#9632;</span> Manufacturing</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 20px; padding: 16px; border: 1px solid #334155; border-radius: 8px;">
+  <h3>Key Design Decisions</h3>
+  <ul style="color: #cbd5e1; line-height: 1.8;">
+    <li><strong>company_id on every table</strong> — enables per-company filtering and group-wide rollups</li>
+    <li><strong>Order.type = INTER_COMPANY</strong> — inter-company transfers are modeled as orders with a linked transfer record</li>
+    <li><strong>Production orders are HOK-specific</strong> — but stored in the shared schema for group visibility</li>
+    <li><strong>Customer.type</strong> — distinguishes D2C consumers (HOI) from drugstores (HOK/HOR)</li>
+  </ul>
+</div>
