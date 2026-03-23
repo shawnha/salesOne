@@ -25,7 +25,9 @@
       "Bash(npx create-next-app@14 hanahone-erp --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm)",
       "Bash(npm install:*)",
       "Bash(npx prisma:*)",
-      "Bash(npx vitest:*)"
+      "Bash(npx vitest:*)",
+      "Bash(npx next:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }
