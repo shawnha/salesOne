@@ -41,7 +41,7 @@ All three companies share one PostgreSQL database. Every business table includes
 | Backend | Next.js API routes |
 | ORM | Prisma |
 | Database | PostgreSQL (Supabase or Neon) |
-| Auth | NextAuth.js (role-based) |
+| Auth | Auth.js v5 (NextAuth.js successor, role-based) |
 | Deployment | Vercel + managed PostgreSQL |
 
 ## Data model
@@ -64,7 +64,7 @@ All three companies share one PostgreSQL database. Every business table includes
 | email | String (unique) | |
 | password | String (hashed) | |
 | role | Enum | ADMIN, MANAGER, STAFF |
-| company_id | UUID (FK) | |
+| company_id | UUID (FK) | User's home company. ADMINs can access all companies via the company switcher; MANAGER/STAFF are filtered to this company only. |
 
 ### Customer
 
@@ -82,10 +82,11 @@ All three companies share one PostgreSQL database. Every business table includes
 |-------|------|-------|
 | id | UUID (PK) | |
 | name | String | |
-| sku | String (unique) | |
+| sku | String | Unique per company (composite unique on sku + company_id) |
 | description | Text | |
 | category | String | |
-| unit_price | Decimal | |
+| base_price | Decimal | Default retail price. Actual sale price is always on OrderItem.unit_price, which may differ by channel. |
+| cost_price | Decimal | Cost/wholesale price for margin calculations |
 | company_id | UUID (FK) | |
 
 ### Inventory
@@ -106,12 +107,15 @@ Composite unique constraint on (product_id, company_id, warehouse_location).
 | Field | Type | Notes |
 |-------|------|-------|
 | id | UUID (PK) | |
-| order_number | String (unique) | Human-readable (e.g., ORD-4821) |
+| order_number | String (unique) | Human-readable, per-company prefix: HOI-0001, HOK-0001, HOR-0001. Auto-incremented per company. |
 | company_id | UUID (FK) | Owning company |
 | customer_id | UUID (FK, nullable) | Null for inter-company orders |
-| type | Enum | SALE, PURCHASE, INTER_COMPANY |
+| type | Enum | SALE, PURCHASE, BROKERAGE, INTER_COMPANY |
 | status | Enum | PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED |
 | total_amount | Decimal | |
+| cost_amount | Decimal (nullable) | For BROKERAGE orders: what HOR paid the supplier |
+| margin_amount | Decimal (nullable) | For BROKERAGE orders: total_amount - cost_amount |
+| on_behalf_of_customer_id | UUID (FK, nullable) | For BROKERAGE: the drugstore HOR is purchasing for |
 | order_date | DateTime | |
 | ship_date | DateTime (nullable) | |
 | notes | Text (nullable) | |
@@ -144,6 +148,7 @@ Composite unique constraint on (product_id, company_id, warehouse_location).
 | Field | Type | Notes |
 |-------|------|-------|
 | id | UUID (PK) | |
+| company_id | UUID (FK) | Always HOK, included for consistent multi-tenant pattern |
 | product_id | UUID (FK) | |
 | quantity_to_produce | Integer | |
 | quantity_produced | Integer | Default 0 |
@@ -157,6 +162,7 @@ Composite unique constraint on (product_id, company_id, warehouse_location).
 | Field | Type | Notes |
 |-------|------|-------|
 | id | UUID (PK) | |
+| company_id | UUID (FK) | Always HOR, included for consistent multi-tenant filtering |
 | customer_id | UUID (FK) | Drugstore client |
 | title | String | |
 | status | Enum | ACTIVE, COMPLETED, PAUSED |
@@ -164,6 +170,32 @@ Composite unique constraint on (product_id, company_id, warehouse_location).
 | end_date | DateTime (nullable) | |
 | billing_amount | Decimal | |
 | notes | Text (nullable) | |
+
+### InventoryAdjustment (audit trail)
+
+| Field | Type | Notes |
+|-------|------|-------|
+| id | UUID (PK) | |
+| inventory_id | UUID (FK) | |
+| company_id | UUID (FK) | |
+| adjustment_type | Enum | MANUAL, SALE, PURCHASE, TRANSFER_OUT, TRANSFER_IN, PRODUCTION |
+| quantity_change | Integer | Positive for additions, negative for deductions |
+| previous_quantity | Integer | Snapshot before adjustment |
+| new_quantity | Integer | Snapshot after adjustment |
+| reference_id | UUID (nullable) | Links to order_id, transfer_id, or production_order_id |
+| reason | Text (nullable) | |
+| created_by | UUID (FK) | User who triggered the adjustment |
+| created_at | DateTime | |
+
+### BillOfMaterials (HOK manufacturing)
+
+| Field | Type | Notes |
+|-------|------|-------|
+| id | UUID (PK) | |
+| company_id | UUID (FK) | Always HOK, included for consistent multi-tenant pattern |
+| finished_product_id | UUID (FK) | The product being manufactured |
+| raw_material_id | UUID (FK) | Raw material product (also in Product table) |
+| quantity_required | Decimal | Amount of raw material per unit of finished product |
 
 ## Business logic
 
@@ -183,10 +215,11 @@ Composite unique constraint on (product_id, company_id, warehouse_location).
 
 **HOR (brokerage):**
 1. Drugstore client requests supplements
-2. HOR creates PURCHASE order from supplier (future: from HOK)
-3. Supplements purchased on behalf of drugstore
-4. HOR records brokerage margin
-5. Order passed through to drugstore
+2. HOR creates Order with type=BROKERAGE, company_id=HOR, on_behalf_of_customer_id=drugstore
+3. HOR sources from supplier (future: from HOK via INTER_COMPANY order)
+4. cost_amount recorded (what HOR paid), total_amount set (what drugstore pays), margin_amount = total - cost
+5. Order status: PENDING → PROCESSING → SHIPPED (to drugstore) → DELIVERED
+6. Inventory does NOT pass through HOR's stock — goods ship directly from supplier to drugstore. HOR's order is a financial record of the brokerage transaction.
 
 ### Inter-company transfer flow
 
@@ -262,7 +295,7 @@ Composite unique constraint on (product_id, company_id, warehouse_location).
 
 - Production efficiency (planned vs actual)
 - Manufacturing output by product
-- Raw material consumption
+- Raw material consumption (derived from BillOfMaterials + ProductionOrder data)
 
 ### HOR-specific
 
