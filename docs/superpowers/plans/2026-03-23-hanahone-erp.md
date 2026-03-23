@@ -156,8 +156,8 @@ cd hanahone-erp
 - [ ] **Step 2: Install dependencies**
 
 ```bash
-npm install prisma @prisma/client next-auth@beta @auth/prisma-adapter
-npm install -D vitest @testing-library/react @testing-library/jest-dom
+npm install prisma @prisma/client next-auth@beta @auth/prisma-adapter bcryptjs zod
+npm install -D vitest @testing-library/react @testing-library/jest-dom @types/bcryptjs
 npx prisma init
 ```
 
@@ -374,6 +374,10 @@ model Customer {
   brokerageOrders       Order[]        @relation("BrokerageCustomer")
   consultingEngagements ConsultingEngagement[]
 
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId])
   @@map("customers")
 }
 
@@ -394,7 +398,11 @@ model Product {
   bomAsFinished      BillOfMaterials[] @relation("FinishedProduct")
   bomAsRawMaterial   BillOfMaterials[] @relation("RawMaterial")
 
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
   @@unique([sku, companyId])
+  @@index([companyId])
   @@map("products")
 }
 
@@ -410,7 +418,11 @@ model Inventory {
 
   adjustments InventoryAdjustment[]
 
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
   @@unique([productId, companyId, warehouseLocation])
+  @@index([companyId])
   @@map("inventories")
 }
 
@@ -435,6 +447,12 @@ model Order {
   items     OrderItem[]
   transfer  InterCompanyTransfer?
 
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId, orderDate])
+  @@index([companyId, status])
+  @@index([companyId, type])
   @@map("orders")
 }
 
@@ -448,6 +466,7 @@ model OrderItem {
   unitPrice Decimal @map("unit_price")
   subtotal  Decimal
 
+  @@index([orderId])
   @@map("order_items")
 }
 
@@ -479,6 +498,10 @@ model ProductionOrder {
   endDate           DateTime?        @map("end_date")
   notes             String?
 
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId, status])
   @@map("production_orders")
 }
 
@@ -495,6 +518,10 @@ model ConsultingEngagement {
   billingAmount Decimal          @map("billing_amount")
   notes         String?
 
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId])
   @@map("consulting_engagements")
 }
 
@@ -514,6 +541,8 @@ model InventoryAdjustment {
   createdByUser    User           @relation(fields: [createdBy], references: [id])
   createdAt        DateTime       @default(now()) @map("created_at")
 
+  @@index([inventoryId])
+  @@index([companyId, createdAt])
   @@map("inventory_adjustments")
 }
 
@@ -555,7 +584,19 @@ NEXTAUTH_SECRET="dev-secret-change-in-production"
 NEXTAUTH_URL="http://localhost:3000"
 ```
 
-- [ ] **Step 8: Generate Prisma client and verify schema**
+- [ ] **Step 8: Add .gitignore**
+
+Ensure `.gitignore` includes:
+
+```
+node_modules/
+.env
+.env.local
+.env.*.local
+.next/
+```
+
+- [ ] **Step 9: Generate Prisma client and verify schema**
 
 ```bash
 npx prisma generate
@@ -584,12 +625,12 @@ Write `prisma/seed.ts`:
 
 ```typescript
 import { PrismaClient, CompanyType, UserRole, CustomerType, OrderType, OrderStatus } from "@prisma/client";
-import { createHash } from "crypto";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
-function hashPassword(password: string): string {
-  return createHash("sha256").update(password).digest("hex");
+async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, 12);
 }
 
 async function main() {
@@ -605,14 +646,18 @@ async function main() {
   });
 
   // Users
+  const adminPw = await hashPassword("admin123");
+  const managerPw = await hashPassword("manager123");
+  const staffPw = await hashPassword("staff123");
+
   await prisma.user.createMany({
     data: [
-      { name: "Admin User", email: "admin@hanahone.com", password: hashPassword("admin123"), role: UserRole.ADMIN, companyId: hoi.id },
-      { name: "HOI Manager", email: "manager@hoi.com", password: hashPassword("manager123"), role: UserRole.MANAGER, companyId: hoi.id },
-      { name: "HOK Manager", email: "manager@hok.com", password: hashPassword("manager123"), role: UserRole.MANAGER, companyId: hok.id },
-      { name: "HOR Manager", email: "manager@hor.com", password: hashPassword("manager123"), role: UserRole.MANAGER, companyId: hor.id },
-      { name: "HOI Staff", email: "staff@hoi.com", password: hashPassword("staff123"), role: UserRole.STAFF, companyId: hoi.id },
-      { name: "HOK Staff", email: "staff@hok.com", password: hashPassword("staff123"), role: UserRole.STAFF, companyId: hok.id },
+      { name: "Admin User", email: "admin@hanahone.com", password: adminPw, role: UserRole.ADMIN, companyId: hoi.id },
+      { name: "HOI Manager", email: "manager@hoi.com", password: managerPw, role: UserRole.MANAGER, companyId: hoi.id },
+      { name: "HOK Manager", email: "manager@hok.com", password: managerPw, role: UserRole.MANAGER, companyId: hok.id },
+      { name: "HOR Manager", email: "manager@hor.com", password: managerPw, role: UserRole.MANAGER, companyId: hor.id },
+      { name: "HOI Staff", email: "staff@hoi.com", password: staffPw, role: UserRole.STAFF, companyId: hoi.id },
+      { name: "HOK Staff", email: "staff@hok.com", password: staffPw, role: UserRole.STAFF, companyId: hok.id },
     ],
   });
 
@@ -776,7 +821,7 @@ Write `src/lib/auth.ts`:
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "./prisma";
-import { createHash } from "crypto";
+import bcrypt from "bcryptjs";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
@@ -795,8 +840,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (!user) return null;
 
-        const hashedPassword = createHash("sha256").update(credentials.password as string).digest("hex");
-        if (user.password !== hashedPassword) return null;
+        const valid = await bcrypt.compare(credentials.password as string, user.password);
+        if (!valid) return null;
 
         return {
           id: user.id,
@@ -938,11 +983,73 @@ export default function LoginPage() {
 }
 ```
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 9: Write Next.js middleware for route protection**
+
+Write `src/middleware.ts`:
+
+```typescript
+import { auth } from "@/lib/auth";
+import { NextResponse } from "next/server";
+
+export default auth((req) => {
+  const isLoggedIn = !!req.auth;
+  const isLoginPage = req.nextUrl.pathname === "/login";
+  const isApiAuth = req.nextUrl.pathname.startsWith("/api/auth");
+
+  if (isApiAuth) return NextResponse.next();
+
+  if (!isLoggedIn && !isLoginPage) {
+    return NextResponse.redirect(new URL("/login", req.url));
+  }
+
+  if (isLoggedIn && isLoginPage) {
+    return NextResponse.redirect(new URL("/dashboard", req.url));
+  }
+
+  return NextResponse.next();
+});
+
+export const config = {
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+};
+```
+
+- [ ] **Step 10: Write API auth guard helper**
+
+Write `src/lib/api-guard.ts`:
+
+```typescript
+import { auth } from "@/lib/auth";
+import { canAccessCompany } from "@/lib/auth-utils";
+import { NextResponse } from "next/server";
+
+export async function requireAuth() {
+  const session = await auth();
+  if (!session?.user) {
+    return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }), session: null };
+  }
+  return { error: null, session };
+}
+
+export async function requireCompanyAccess(targetCompanyId: string | null) {
+  const { error, session } = await requireAuth();
+  if (error) return { error, session: null };
+
+  const user = session!.user as any;
+  if (!canAccessCompany(user.role, user.companyId, targetCompanyId)) {
+    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }), session: null };
+  }
+  return { error: null, session };
+}
+```
+
+All API routes must call `requireAuth()` or `requireCompanyAccess()` at the start and return early if `error` is set. The `userId` for audit trails must come from `session.user.id`, never from the request body.
+
+- [ ] **Step 11: Commit**
 
 ```bash
 git add -A
-git commit -m "feat: add Auth.js v5 with credentials provider, login page, RBAC utils"
+git commit -m "feat: add Auth.js v5 with bcrypt, route protection middleware, API auth guards"
 ```
 
 ---
@@ -1674,8 +1781,18 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const { inventoryId, change, type, reason, userId } = await req.json();
 
+  const { error, session } = await requireAuth();
+  if (error) return error;
+  const currentUserId = (session!.user as any).id;
+
   const result = await prisma.$transaction(async (tx) => {
-    const inventory = await tx.inventory.findUniqueOrThrow({ where: { id: inventoryId } });
+    // Row-level lock to prevent lost updates under concurrent writes
+    const [inventory] = await tx.$queryRaw`
+      SELECT * FROM inventories WHERE id = ${inventoryId}::uuid FOR UPDATE
+    ` as any[];
+
+    if (!inventory) throw new Error("Inventory not found");
+
     const adj = calculateAdjustment(inventory.quantity, change, type);
 
     const updated = await tx.inventory.update({
@@ -1686,13 +1803,13 @@ export async function PATCH(req: NextRequest) {
     await tx.inventoryAdjustment.create({
       data: {
         inventoryId,
-        companyId: inventory.companyId,
+        companyId: inventory.company_id,
         adjustmentType: type,
         quantityChange: adj.quantityChange,
         previousQuantity: adj.previousQuantity,
         newQuantity: adj.newQuantity,
         reason,
-        createdBy: userId,
+        createdBy: currentUserId,
       },
     });
 
@@ -1760,10 +1877,20 @@ export function formatOrderNumber(companyName: string, sequence: number): string
   return `${companyName}-${padded}`;
 }
 
-export async function generateOrderNumber(companyId: string): Promise<string> {
-  const company = await prisma.company.findUniqueOrThrow({ where: { id: companyId } });
-  const count = await prisma.order.count({ where: { companyId } });
-  return formatOrderNumber(company.name, count + 1);
+export async function generateOrderNumber(companyId: string, tx?: any): Promise<string> {
+  const db = tx || prisma;
+  const company = await db.company.findUniqueOrThrow({ where: { id: companyId } });
+
+  // Use SELECT FOR UPDATE to prevent race conditions on concurrent order creation
+  const [result] = await db.$queryRaw`
+    SELECT COALESCE(
+      (SELECT order_number FROM orders WHERE company_id = ${companyId}::uuid ORDER BY created_at DESC LIMIT 1),
+      ${company.name + '-0000'}
+    ) as last_number FOR UPDATE
+  ` as any[];
+
+  const lastSeq = parseInt(result.last_number.split('-')[1]) || 0;
+  return formatOrderNumber(company.name, lastSeq + 1);
 }
 ```
 
@@ -1860,8 +1987,55 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const { transferId, status, userId } = await req.json();
+  const { error, session } = await requireCompanyAccess(null); // ADMINs only for transfers
+  if (error) return error;
+  const currentUserId = (session!.user as any).id;
 
+  const { transferId, status } = await req.json();
+
+  // SHIPPED: deduct from source company inventory
+  if (status === "SHIPPED") {
+    const result = await prisma.$transaction(async (tx) => {
+      const transfer = await tx.interCompanyTransfer.findUniqueOrThrow({
+        where: { id: transferId },
+        include: { order: { include: { items: true } } },
+      });
+
+      const updated = await tx.interCompanyTransfer.update({
+        where: { id: transferId },
+        data: { status: "SHIPPED" },
+      });
+
+      for (const item of transfer.order.items) {
+        const [inventory] = await tx.$queryRaw`
+          SELECT * FROM inventories WHERE product_id = ${item.productId}::uuid AND company_id = ${transfer.fromCompanyId}::uuid FOR UPDATE
+        ` as any[];
+
+        if (inventory) {
+          const adj = calculateAdjustment(inventory.quantity, -item.quantity, "TRANSFER_OUT");
+          await tx.inventory.update({ where: { id: inventory.id }, data: { quantity: adj.newQuantity } });
+          await tx.inventoryAdjustment.create({
+            data: {
+              inventoryId: inventory.id,
+              companyId: transfer.fromCompanyId,
+              adjustmentType: "TRANSFER_OUT",
+              quantityChange: -item.quantity,
+              previousQuantity: adj.previousQuantity,
+              newQuantity: adj.newQuantity,
+              referenceId: transfer.id,
+              createdBy: currentUserId,
+            },
+          });
+        }
+      }
+
+      return updated;
+    });
+
+    return NextResponse.json(result);
+  }
+
+  // RECEIVED: increment receiving company inventory
   if (status === "RECEIVED") {
     const result = await prisma.$transaction(async (tx) => {
       const transfer = await tx.interCompanyTransfer.findUniqueOrThrow({
@@ -1896,7 +2070,7 @@ export async function PATCH(req: NextRequest) {
               previousQuantity: adj.previousQuantity,
               newQuantity: adj.newQuantity,
               referenceId: transfer.id,
-              createdBy: userId,
+              createdBy: currentUserId,
             },
           });
         }
