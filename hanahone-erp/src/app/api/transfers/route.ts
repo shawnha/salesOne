@@ -35,9 +35,9 @@ export async function PATCH(req: NextRequest) {
         data: { status: "SHIPPED" },
       });
       for (const item of transfer.order.items) {
-        const [inventory] = await tx.$queryRaw`
-          SELECT * FROM inventories WHERE product_id = ${item.productId}::uuid AND company_id = ${transfer.fromCompanyId}::uuid FOR UPDATE
-        ` as any[];
+        const inventory = await tx.inventory.findFirst({
+          where: { productId: item.productId, companyId: transfer.fromCompanyId },
+        });
         if (inventory) {
           const adj = calculateAdjustment(inventory.quantity, -item.quantity, "TRANSFER_OUT");
           await tx.inventory.update({ where: { id: inventory.id }, data: { quantity: adj.newQuantity } });

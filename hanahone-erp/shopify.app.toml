@@ -1,0 +1,13 @@
+name = "HanahOne ERP"
+client_id = "8a584058d5570e1239fc5ebefe73d465"
+application_url = "http://localhost:4000"
+embedded = false
+
+[access_scopes]
+scopes = "read_orders,read_products,read_inventory,read_customers"
+
+[auth]
+redirect_urls = ["http://localhost:4000/api/auth/callback"]
+
+[webhooks]
+api_version = "2024-01"

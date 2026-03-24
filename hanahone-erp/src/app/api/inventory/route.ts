@@ -34,10 +34,7 @@ export async function PATCH(req: NextRequest) {
   const { inventoryId, change, type, reason } = await req.json();
 
   const result = await prisma.$transaction(async (tx) => {
-    const [inventory] = await tx.$queryRaw`
-      SELECT * FROM inventories WHERE id = ${inventoryId}::uuid FOR UPDATE
-    ` as any[];
-    if (!inventory) throw new Error("Inventory not found");
+    const inventory = await tx.inventory.findUniqueOrThrow({ where: { id: inventoryId } });
 
     const adj = calculateAdjustment(inventory.quantity, change, type);
     const updated = await tx.inventory.update({
@@ -47,7 +44,7 @@ export async function PATCH(req: NextRequest) {
     await tx.inventoryAdjustment.create({
       data: {
         inventoryId,
-        companyId: inventory.company_id,
+        companyId: inventory.companyId,
         adjustmentType: type,
         quantityChange: adj.quantityChange,
         previousQuantity: adj.previousQuantity,
