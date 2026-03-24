@@ -5,6 +5,18 @@ import { RecentOrders } from "@/components/dashboard/recent-orders";
 import { LowStockAlerts } from "@/components/dashboard/low-stock-alerts";
 import { DateFilter } from "@/components/ui/date-filter";
 
+function timeAgo(date: Date | null): string {
+  if (!date) return "unknown";
+  const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hours ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} days ago`;
+}
+
 export default async function DashboardPage({ searchParams }: { searchParams: { company?: string } }) {
   const companyId = searchParams.company || null;
   const companyFilter = companyId ? { companyId } : {};
@@ -19,10 +31,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
   const lowStock = allInventory.filter((inv) => inv.quantity <= inv.reorderLevel).slice(0, 5);
   const inventoryValue = allInventory.reduce((sum, inv) => sum + inv.quantity * Number(inv.product.costPrice), 0);
 
-  const [totalSales, openOrders, pendingShipments] = await Promise.all([
+  const [totalSales, openOrders, pendingShipments, latestSyncs] = await Promise.all([
     prisma.order.aggregate({ where: { ...companyFilter, type: { in: ["SALE", "BROKERAGE"] } }, _sum: { totalAmount: true } }),
     prisma.order.count({ where: { ...companyFilter, status: { in: ["PENDING", "PROCESSING", "SHIPPED"] } } }),
     prisma.order.count({ where: { ...companyFilter, status: "PROCESSING" } }),
+    prisma.syncJob.findMany({
+      where: { status: "SUCCESS" },
+      orderBy: { completedAt: "desc" },
+      distinct: ["platform"],
+      select: { platform: true, completedAt: true },
+      take: 10,
+    }),
   ]);
 
   const companyBreakdowns = await Promise.all(
@@ -54,6 +73,16 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
       </div>
       <div className="space-y-4">
         <KpiRow data={{ totalSales: Number(totalSales._sum.totalAmount || 0), openOrders, inventoryValue, productionRuns: productionOrders, salesChange: 0, pendingShipments, lowStockCount: lowStock.length, newProductionRuns: 0 }} />
+        {latestSyncs.length > 0 && (
+          <div className="flex gap-3 flex-wrap">
+            {latestSyncs.map((sync) => (
+              <div key={sync.platform} className="text-[11px] text-[var(--text-tertiary)] flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-accent rounded-full" />
+                {sync.platform}: {timeAgo(sync.completedAt)}
+              </div>
+            ))}
+          </div>
+        )}
         {!companyId && (
           <CompanyBreakdown companies={companyBreakdowns.map((c) => ({
             name: c.name,
