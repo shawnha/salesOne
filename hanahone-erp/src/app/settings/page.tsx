@@ -21,6 +21,23 @@ export default async function SettingsPage() {
       </div>
 
       <div className="space-y-6">
+        <a href="/settings/integrations" className="block group">
+          <Card>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[var(--accent-dim)] flex items-center justify-center">
+                  <span className="text-accent text-sm font-bold">&#x21C4;</span>
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold tracking-tight">Integrations</h2>
+                  <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5">Manage Shopify, Amazon, Naver, and other platform connections</p>
+                </div>
+              </div>
+              <span className="text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)] transition-colors text-sm">&rarr;</span>
+            </div>
+          </Card>
+        </a>
+
         <Card>
           <h2 className="text-sm font-bold tracking-tight mb-4">Users ({users.length})</h2>
           <div className="space-y-0">
