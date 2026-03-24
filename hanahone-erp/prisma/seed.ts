@@ -38,6 +38,17 @@ async function main() {
     ],
   });
 
+  // System user for automated processes
+  await prisma.user.create({
+    data: {
+      name: "System",
+      email: "system@hanahone.internal",
+      password: await hashPassword("system-no-login-" + Date.now()),
+      role: UserRole.ADMIN,
+      companyId: hoi.id,
+    },
+  });
+
   // Customers
   const gangnamPharmacy = await prisma.customer.create({
     data: { name: "Gangnam Pharmacy", type: CustomerType.DRUGSTORE, companyId: hok.id, contactInfo: { phone: "+82-2-555-0147", address: "Gangnam-gu, Seoul" } },

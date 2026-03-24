@@ -86,6 +86,10 @@ model Company {
   consultingEngagements  ConsultingEngagement[]
   inventoryAdjustments   InventoryAdjustment[]
   billOfMaterials        BillOfMaterials[]
+  integrationConfigs     IntegrationConfig[]
+  syncJobs               SyncJob[]
+  externalOrders         ExternalOrder[]
+  inventorySnapshots     InventorySnapshot[]
 
   @@map("companies")
 }
@@ -139,6 +143,7 @@ model Product {
   productionOrders   ProductionOrder[]
   bomAsFinished      BillOfMaterials[] @relation("FinishedProduct")
   bomAsRawMaterial   BillOfMaterials[] @relation("RawMaterial")
+  inventorySnapshots InventorySnapshot[]
 
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
@@ -188,6 +193,9 @@ model Order {
 
   items     OrderItem[]
   transfer  InterCompanyTransfer?
+
+  externalSource    Platform?  @map("external_source")
+  externalOrders    ExternalOrder[]
 
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
@@ -299,4 +307,93 @@ model BillOfMaterials {
   quantityRequired  Decimal @map("quantity_required")
 
   @@map("bill_of_materials")
+}
+
+enum Platform {
+  SHOPIFY
+  AMAZON
+  TIKTOK
+  CGETC
+  NAVER
+  PHARMACY
+  ORDERDESK
+}
+
+enum SyncStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+enum ExternalOrderStatus {
+  PENDING
+  MAPPED
+  FAILED
+}
+
+model IntegrationConfig {
+  id                  String    @id @default(uuid())
+  companyId           String    @map("company_id")
+  company             Company   @relation(fields: [companyId], references: [id])
+  platform            Platform
+  credentials         String
+  isActive            Boolean   @default(false) @map("is_active")
+  syncIntervalMinutes Int       @default(15) @map("sync_interval_minutes")
+  lastSyncAt          DateTime? @map("last_sync_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  @@unique([companyId, platform])
+  @@map("integration_configs")
+}
+
+model SyncJob {
+  id               String     @id @default(uuid())
+  companyId        String     @map("company_id")
+  company          Company    @relation(fields: [companyId], references: [id])
+  platform         Platform
+  status           SyncStatus @default(RUNNING)
+  startedAt        DateTime   @default(now()) @map("started_at")
+  completedAt      DateTime?  @map("completed_at")
+  recordsProcessed Int        @default(0) @map("records_processed")
+  recordsFailed    Int        @default(0) @map("records_failed")
+  errorMessage     String?    @map("error_message")
+  createdAt        DateTime   @default(now()) @map("created_at")
+
+  @@index([companyId, platform])
+  @@index([createdAt])
+  @@map("sync_jobs")
+}
+
+model ExternalOrder {
+  id              String              @id @default(uuid())
+  companyId       String              @map("company_id")
+  company         Company             @relation(fields: [companyId], references: [id])
+  platform        Platform
+  externalOrderId String              @map("external_order_id")
+  rawData         Json                @map("raw_data")
+  mappedOrderId   String?             @map("mapped_order_id")
+  mappedOrder     Order?              @relation(fields: [mappedOrderId], references: [id])
+  status          ExternalOrderStatus @default(PENDING)
+  createdAt       DateTime            @default(now()) @map("created_at")
+
+  @@unique([platform, externalOrderId])
+  @@index([companyId, platform])
+  @@map("external_orders")
+}
+
+model InventorySnapshot {
+  id                 String   @id @default(uuid())
+  companyId          String   @map("company_id")
+  company            Company  @relation(fields: [companyId], references: [id])
+  productId          String   @map("product_id")
+  product            Product  @relation(fields: [productId], references: [id])
+  initialQuantity    Int      @map("initial_quantity")
+  calculatedQuantity Int      @map("calculated_quantity")
+  lastCalculatedAt   DateTime @map("last_calculated_at")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, productId])
+  @@map("inventory_snapshots")
 }
