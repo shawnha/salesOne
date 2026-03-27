@@ -21,8 +21,9 @@ interface FieldDef {
 
 const platformFields: Record<Platform, FieldDef[]> = {
   SHOPIFY: [
-    { key: "apiKey", label: "API Key" },
-    { key: "storeUrl", label: "Store URL" },
+    { key: "clientId", label: "Client ID" },
+    { key: "clientSecret", label: "Client Secret", type: "password" },
+    { key: "shop", label: "Store URL (예: shop-odd-us.myshopify.com)" },
   ],
   AMAZON: [
     { key: "sellerId", label: "Seller ID" },

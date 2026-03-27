@@ -5,8 +5,17 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/table";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 
-const formatWon = (n: number) => `₩${n.toLocaleString()}`;
+const formatUSD = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+
+const platformLabels: Record<string, string> = {
+  SHOPIFY: "Shopify",
+  AMAZON: "Amazon",
+  TIKTOK: "TikTok",
+  NAVER: "Naver",
+  PHARMACY: "Pharmacy",
+};
 
 export default async function OrderDetailPage({
   params,
@@ -30,14 +39,6 @@ export default async function OrderDetailPage({
   });
 
   if (!order) return notFound();
-
-  const statusTransitions: Record<string, string[]> = {
-    PENDING: ["PROCESSING", "CANCELLED"],
-    PROCESSING: ["SHIPPED", "CANCELLED"],
-    SHIPPED: ["DELIVERED"],
-  };
-
-  const nextStatuses = statusTransitions[order.status] ?? [];
 
   const itemColumns = [
     {
@@ -67,7 +68,7 @@ export default async function OrderDetailPage({
       header: "Unit Price",
       align: "right" as const,
       render: (row: (typeof order.items)[0]) => (
-        <span className="text-[var(--text-secondary)]">{formatWon(Number(row.unitPrice))}</span>
+        <span className="text-[var(--text-secondary)]">{formatUSD(Number(row.unitPrice))}</span>
       ),
     },
     {
@@ -75,7 +76,7 @@ export default async function OrderDetailPage({
       header: "Subtotal",
       align: "right" as const,
       render: (row: (typeof order.items)[0]) => (
-        <span className="font-semibold">{formatWon(Number(row.subtotal))}</span>
+        <span className="font-semibold">{formatUSD(Number(row.subtotal))}</span>
       ),
     },
   ];
@@ -86,8 +87,13 @@ export default async function OrderDetailPage({
         <Link href="/orders" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm">
           &larr; Orders
         </Link>
-        <h1 className="text-xl font-bold tracking-tight">{order.orderNumber}</h1>
-        <Badge status={order.status} />
+        <h1 className="text-xl font-bold tracking-tight">
+          {order.externalOrderNumber || order.orderNumber}
+        </h1>
+        <OrderStatusBadge
+          fulfillmentStatus={order.fulfillmentStatus}
+          financialStatus={order.financialStatus}
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-6">
@@ -102,6 +108,18 @@ export default async function OrderDetailPage({
               <span className="text-[var(--text-secondary)]">Type</span>
               <Badge status={order.type} />
             </div>
+            {order.externalSource && (
+              <div className="flex justify-between">
+                <span className="text-[var(--text-secondary)]">Channel</span>
+                <span className="font-semibold">{platformLabels[order.externalSource] || order.externalSource}</span>
+              </div>
+            )}
+            {order.externalOrderNumber && (
+              <div className="flex justify-between">
+                <span className="text-[var(--text-secondary)]">Original Order #</span>
+                <span className="font-semibold">{order.externalOrderNumber}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-[var(--text-secondary)]">Customer</span>
               <span className="font-semibold">
@@ -109,11 +127,15 @@ export default async function OrderDetailPage({
                   <Link href={`/customers/${order.customer.id}`} className="text-accent hover:underline">
                     {order.customer.name}
                   </Link>
-                ) : (
-                  "—"
-                )}
+                ) : "—"}
               </span>
             </div>
+            {order.customer?.email && (
+              <div className="flex justify-between">
+                <span className="text-[var(--text-secondary)]">Email</span>
+                <span className="text-[var(--text-secondary)]">{order.customer.email}</span>
+              </div>
+            )}
             {order.onBehalfOfCustomer && (
               <div className="flex justify-between">
                 <span className="text-[var(--text-secondary)]">On behalf of</span>
@@ -122,28 +144,18 @@ export default async function OrderDetailPage({
             )}
             <div className="flex justify-between">
               <span className="text-[var(--text-secondary)]">Order Date</span>
-              <span className="font-semibold">{new Date(order.orderDate).toLocaleDateString("ko-KR")}</span>
+              <span className="font-semibold">{new Date(order.orderDate).toLocaleDateString("en-US")}</span>
             </div>
             {order.shipDate && (
               <div className="flex justify-between">
                 <span className="text-[var(--text-secondary)]">Ship Date</span>
-                <span className="font-semibold">{new Date(order.shipDate).toLocaleDateString("ko-KR")}</span>
+                <span className="font-semibold">{new Date(order.shipDate).toLocaleDateString("en-US")}</span>
               </div>
             )}
-            <div className="flex justify-between">
-              <span className="text-[var(--text-secondary)]">Total Amount</span>
-              <span className="font-semibold">{formatWon(Number(order.totalAmount))}</span>
-            </div>
-            {order.costAmount && (
+            {order.deliveredAt && (
               <div className="flex justify-between">
-                <span className="text-[var(--text-secondary)]">Cost</span>
-                <span className="font-semibold">{formatWon(Number(order.costAmount))}</span>
-              </div>
-            )}
-            {order.marginAmount && (
-              <div className="flex justify-between">
-                <span className="text-[var(--text-secondary)]">Margin</span>
-                <span className="font-semibold">{formatWon(Number(order.marginAmount))}</span>
+                <span className="text-[var(--text-secondary)]">Delivered</span>
+                <span className="font-semibold">{new Date(order.deliveredAt).toLocaleDateString("en-US")}</span>
               </div>
             )}
             {order.notes && (
@@ -156,25 +168,45 @@ export default async function OrderDetailPage({
         </Card>
 
         <Card>
-          <h2 className="text-sm font-bold mb-4">Status Management</h2>
-          <div className="space-y-3">
-            <p className="text-[13px] text-[var(--text-secondary)]">
-              Current status: <Badge status={order.status} />
-            </p>
-            {nextStatuses.length > 0 ? (
-              <div className="flex gap-2 flex-wrap">
-                {nextStatuses.map((status) => (
-                  <Button
-                    key={status}
-                    variant={status === "CANCELLED" ? "secondary" : "primary"}
-                    size="sm"
-                  >
-                    Mark as {status.charAt(0) + status.slice(1).toLowerCase()}
-                  </Button>
-                ))}
+          <h2 className="text-sm font-bold mb-4">Status & Financials</h2>
+          <div className="space-y-3 text-[13px]">
+            <div className="flex justify-between">
+              <span className="text-[var(--text-secondary)]">Fulfillment</span>
+              <Badge status={order.fulfillmentStatus} />
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[var(--text-secondary)]">Financial</span>
+              <Badge status={order.financialStatus} />
+            </div>
+            <div className="border-t border-[var(--border)] my-2" />
+            <div className="flex justify-between">
+              <span className="text-[var(--text-secondary)]">Total Amount</span>
+              <span className="font-semibold">{formatUSD(Number(order.totalAmount))}</span>
+            </div>
+            {order.refundAmount && Number(order.refundAmount) > 0 && (
+              <div className="flex justify-between">
+                <span className="text-[var(--text-secondary)]">Refund</span>
+                <span className="font-semibold text-red-500">-{formatUSD(Number(order.refundAmount))}</span>
               </div>
-            ) : (
-              <p className="text-xs text-[var(--text-tertiary)]">No further transitions available.</p>
+            )}
+            <div className="flex justify-between">
+              <span className="text-[var(--text-secondary)]">Net Amount</span>
+              <span className="font-bold text-base">{formatUSD(Number(order.netAmount ?? order.totalAmount))}</span>
+            </div>
+            {order.costAmount && (
+              <>
+                <div className="border-t border-[var(--border)] my-2" />
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">Cost</span>
+                  <span className="font-semibold">{formatUSD(Number(order.costAmount))}</span>
+                </div>
+              </>
+            )}
+            {order.marginAmount && (
+              <div className="flex justify-between">
+                <span className="text-[var(--text-secondary)]">Margin</span>
+                <span className="font-semibold">{formatUSD(Number(order.marginAmount))}</span>
+              </div>
             )}
           </div>
 

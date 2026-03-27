@@ -9,12 +9,14 @@ export async function GET(req: NextRequest) {
 
   const companyId = req.nextUrl.searchParams.get("companyId");
   const type = req.nextUrl.searchParams.get("type");
-  const status = req.nextUrl.searchParams.get("status");
+  const fulfillmentStatus = req.nextUrl.searchParams.get("fulfillmentStatus");
+  const financialStatus = req.nextUrl.searchParams.get("financialStatus");
 
   const where: any = {};
   if (companyId) where.companyId = companyId;
   if (type) where.type = type;
-  if (status) where.status = status;
+  if (fulfillmentStatus) where.fulfillmentStatus = fulfillmentStatus;
+  if (financialStatus) where.financialStatus = financialStatus;
 
   const orders = await prisma.order.findMany({
     where,

@@ -33,8 +33,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
 
   const [totalSales, openOrders, pendingShipments, latestSyncs] = await Promise.all([
     prisma.order.aggregate({ where: { ...companyFilter, type: { in: ["SALE", "BROKERAGE"] } }, _sum: { totalAmount: true } }),
-    prisma.order.count({ where: { ...companyFilter, status: { in: ["PENDING", "PROCESSING", "SHIPPED"] } } }),
-    prisma.order.count({ where: { ...companyFilter, status: "PROCESSING" } }),
+    prisma.order.count({ where: { ...companyFilter, fulfillmentStatus: { in: ["UNFULFILLED", "PARTIALLY_FULFILLED", "FULFILLED"] } } }),
+    prisma.order.count({ where: { ...companyFilter, fulfillmentStatus: "UNFULFILLED", financialStatus: "PAID" } }),
     prisma.syncJob.findMany({
       where: { status: "SUCCESS" },
       orderBy: { completedAt: "desc" },
@@ -92,7 +92,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
         )}
         <div className="grid grid-cols-12 gap-4">
           <div className="col-span-8">
-            <RecentOrders orders={orders.map((o) => ({ id: o.id, orderNumber: o.orderNumber, customerName: o.customer?.name || "—", status: o.status, totalAmount: Number(o.totalAmount), isTransfer: o.type === "INTER_COMPANY", transferLabel: o.transfer ? `${o.transfer.fromCompany.name} → ${o.transfer.toCompany.name}` : undefined }))} />
+            <RecentOrders orders={orders.map((o) => ({ id: o.id, orderNumber: o.orderNumber, customerName: o.customer?.name || "—", status: o.fulfillmentStatus, totalAmount: Number(o.totalAmount), isTransfer: o.type === "INTER_COMPANY", transferLabel: o.transfer ? `${o.transfer.fromCompany.name} → ${o.transfer.toCompany.name}` : undefined }))} />
           </div>
           <div className="col-span-4">
             <LowStockAlerts items={lowStock.map((inv) => ({ productName: inv.product.name, companyName: inv.company.name, reorderLevel: inv.reorderLevel, quantity: inv.quantity }))} />

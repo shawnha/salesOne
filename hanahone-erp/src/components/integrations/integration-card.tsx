@@ -52,10 +52,10 @@ export function IntegrationCard({ platform, companyId, isActive, hasCreds, lastS
   async function handleSync() {
     setSyncing(true);
     try {
-      await fetch("/api/integrations/sync", {
+      await fetch(`/api/sync/${platform.toLowerCase()}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ platform, companyId }),
+        body: JSON.stringify({ companyId }),
       });
       window.location.reload();
     } catch {

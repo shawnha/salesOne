@@ -46,7 +46,7 @@ export default async function CustomerDetailPage({
     {
       key: "status",
       header: "Status",
-      render: (row: (typeof customer.orders)[0]) => <Badge status={row.status} />,
+      render: (row: (typeof customer.orders)[0]) => <Badge status={row.fulfillmentStatus} />,
     },
     {
       key: "totalAmount",
