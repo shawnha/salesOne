@@ -10,7 +10,6 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
-  Legend,
 } from "recharts";
 import type { ChannelSalesData, MonthlyChannelData } from "@/lib/sales-chart-data";
 import { CHANNEL_COLORS } from "@/lib/sales-chart-data";
