@@ -2,9 +2,9 @@ import { prisma } from "@/lib/prisma";
 import { Card } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/empty-state";
-import Link from "next/link";
+import { ProductEditButton, ProductDeleteButton } from "@/components/products/product-actions";
 
-const formatWon = (n: number) => `₩${n.toLocaleString()}`;
+const formatPrice = (n: number) => n === 0 ? "—" : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
 export default async function ProductsPage({
   searchParams,
@@ -21,19 +21,17 @@ export default async function ProductsPage({
 
   const columns = [
     {
-      key: "sku",
-      header: "SKU",
-      render: (row: (typeof products)[0]) => (
-        <Link href={`/products/${row.id}`} className="font-semibold text-accent hover:underline">
-          {row.sku}
-        </Link>
-      ),
-    },
-    {
       key: "name",
       header: "Name",
       render: (row: (typeof products)[0]) => (
         <span className="font-semibold">{row.name}</span>
+      ),
+    },
+    {
+      key: "sku",
+      header: "SKU",
+      render: (row: (typeof products)[0]) => (
+        <span className="text-[var(--text-secondary)] font-mono text-xs">{row.sku}</span>
       ),
     },
     {
@@ -48,7 +46,7 @@ export default async function ProductsPage({
       header: "Base Price",
       align: "right" as const,
       render: (row: (typeof products)[0]) => (
-        <span className="font-semibold">{formatWon(Number(row.basePrice))}</span>
+        <span className="font-semibold">{formatPrice(Number(row.basePrice))}</span>
       ),
     },
     {
@@ -56,7 +54,7 @@ export default async function ProductsPage({
       header: "Cost Price",
       align: "right" as const,
       render: (row: (typeof products)[0]) => (
-        <span className="text-[var(--text-secondary)]">{formatWon(Number(row.costPrice))}</span>
+        <span className="text-[var(--text-secondary)]">{formatPrice(Number(row.costPrice))}</span>
       ),
     },
     {
@@ -66,14 +64,46 @@ export default async function ProductsPage({
         <span className="text-[var(--text-secondary)]">{row.company.name}</span>
       ),
     },
+    {
+      key: "actions",
+      header: "",
+      align: "right" as const,
+      render: (row: (typeof products)[0]) => (
+        <div className="flex items-center gap-1 justify-end">
+          <ProductEditButton product={{
+            id: row.id,
+            name: row.name,
+            sku: row.sku,
+            description: row.description,
+            category: row.category,
+            basePrice: Number(row.basePrice),
+            costPrice: Number(row.costPrice),
+            companyId: row.companyId,
+          }} />
+          <ProductDeleteButton product={{
+            id: row.id,
+            name: row.name,
+            sku: row.sku,
+            description: row.description,
+            category: row.category,
+            basePrice: Number(row.basePrice),
+            costPrice: Number(row.costPrice),
+            companyId: row.companyId,
+          }} />
+        </div>
+      ),
+    },
   ];
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-bold tracking-tight">Products</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold tracking-tight">Products</h1>
+        <span className="text-xs text-[var(--text-tertiary)]">{products.length} products</span>
+      </div>
       <Card>
         {products.length === 0 ? (
-          <EmptyState title="No products" description="No products found for the selected company." />
+          <EmptyState title="No products" description="No products found." />
         ) : (
           <DataTable columns={columns} data={products} />
         )}

@@ -45,6 +45,23 @@ export default async function InventoryPage({
     try {
       const credentials = JSON.parse(decrypt(cgetcConfig.credentials));
       cgetcProducts = await fetchCgetcInventory(credentials);
+
+      // Auto-register CGETC products in Products table
+      for (const cp of cgetcProducts) {
+        if (!cp.sku) continue;
+        await prisma.product.upsert({
+          where: { sku_companyId: { sku: cp.sku, companyId: cgetcConfig.companyId } },
+          update: { name: cp.name },
+          create: {
+            name: cp.name,
+            sku: cp.sku,
+            category: "CGETC",
+            basePrice: 0,
+            costPrice: 0,
+            companyId: cgetcConfig.companyId,
+          },
+        });
+      }
     } catch (err: any) {
       cgetcError = err.message || "Failed to fetch CGETC inventory";
     }
