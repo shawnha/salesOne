@@ -16,7 +16,7 @@ function shortName(fullName: string): string {
   return `${parts[0]} ${parts[parts.length - 1]}`;
 }
 
-export function TopCustomersCard({ customers, columnCount = 6 }: { customers: TopCustomer[]; columnCount?: number }) {
+export function TopCustomersCard({ customers }: { customers: TopCustomer[] }) {
   const styleInjected = useRef(false);
 
   useEffect(() => {
@@ -32,52 +32,37 @@ export function TopCustomersCard({ customers, columnCount = 6 }: { customers: To
       }
       .order-highlight {
         animation: orderHighlightFlash 2s ease-in-out !important;
+        border-radius: 6px;
       }
     `;
     document.head.appendChild(style);
   }, []);
 
   const handleClick = useCallback((customerName: string) => {
-    // DataTable uses CSS Grid with flat divs — every `columnCount` divs = 1 row
-    // Find the grid container by its inline style (gridTemplateColumns)
-    const allGrids = document.querySelectorAll(".grid.gap-4");
-    let gridContainer: Element | null = null;
-    allGrids.forEach((g) => {
-      if (g.getAttribute("style")?.includes("grid-template-columns")) {
-        gridContainer = g;
-      }
-    });
-    if (!gridContainer) return;
-
-    const cells = Array.from(gridContainer.children);
-    // Skip header cells (first `columnCount` items)
-    const dataCells = cells.slice(columnCount);
+    // DataTable now uses row wrappers with class "data-table-row"
+    const rows = document.querySelectorAll(".data-table-row");
     let firstMatch: Element | null = null;
 
-    for (let i = 0; i < dataCells.length; i += columnCount) {
+    rows.forEach((row) => {
+      const cells = row.children;
       // Customer is the 2nd column (index 1)
-      const customerCell = dataCells[i + 1];
-      if (!customerCell) continue;
+      const customerCell = cells[1];
+      if (!customerCell) return;
 
       const cellText = customerCell.textContent?.trim() || "";
       if (cellText === customerName) {
-        // Highlight all cells in this row
-        for (let j = 0; j < columnCount && (i + j) < dataCells.length; j++) {
-          const cell = dataCells[i + j];
-          cell.classList.remove("order-highlight");
-          // Force reflow to restart animation
-          void (cell as HTMLElement).offsetWidth;
-          cell.classList.add("order-highlight");
-          setTimeout(() => cell.classList.remove("order-highlight"), 2000);
-        }
-        if (!firstMatch) firstMatch = dataCells[i];
+        if (!firstMatch) firstMatch = row;
+        row.classList.remove("order-highlight");
+        void (row as HTMLElement).offsetWidth;
+        row.classList.add("order-highlight");
+        setTimeout(() => row.classList.remove("order-highlight"), 2000);
       }
-    }
+    });
 
     if (firstMatch) {
       firstMatch.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-  }, [columnCount]);
+  }, []);
 
   if (customers.length === 0) {
     return <p className="text-xs text-[var(--text-tertiary)]">No data</p>;
