@@ -113,25 +113,61 @@ export async function runSync(connector: Connector, companyId: string): Promise<
 
     if (connector.fetchInventory) {
       const inventoryData = await connector.fetchInventory(credentials);
+      const now = new Date();
+
       for (const item of inventoryData) {
-        const product = await prisma.product.findFirst({
-          where: { sku: item.sku, companyId },
+        // 1. ExternalInventory에 원본 전체 저장 (upsert)
+        await prisma.externalInventory.upsert({
+          where: {
+            companyId_platform_externalSku: {
+              companyId,
+              platform: connector.platform,
+              externalSku: item.sku,
+            },
+          },
+          update: {
+            externalName: item.productName,
+            quantity: item.quantity,
+            warehouseLocation: item.warehouseLocation || null,
+            lastSyncAt: now,
+          },
+          create: {
+            companyId,
+            platform: connector.platform,
+            externalSku: item.sku,
+            externalName: item.productName,
+            quantity: item.quantity,
+            warehouseLocation: item.warehouseLocation || null,
+            lastSyncAt: now,
+          },
         });
-        if (product) {
+
+        // 2. SkuMapping이 있으면 → 매핑된 Product의 Inventory 업데이트
+        const mapping = await prisma.skuMapping.findUnique({
+          where: {
+            companyId_platform_externalSku: {
+              companyId,
+              platform: connector.platform,
+              externalSku: item.sku,
+            },
+          },
+        });
+
+        if (mapping?.productId) {
           await prisma.inventory.upsert({
             where: {
               productId_companyId_warehouseLocation: {
-                productId: product.id,
+                productId: mapping.productId,
                 companyId,
-                warehouseLocation: item.warehouseLocation || "Main",
+                warehouseLocation: item.warehouseLocation || "CGETC",
               },
             },
             update: { quantity: item.quantity },
             create: {
-              productId: product.id,
+              productId: mapping.productId,
               companyId,
               quantity: item.quantity,
-              warehouseLocation: item.warehouseLocation || "Main",
+              warehouseLocation: item.warehouseLocation || "CGETC",
               reorderLevel: 0,
             },
           });
