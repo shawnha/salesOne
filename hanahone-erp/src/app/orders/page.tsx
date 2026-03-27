@@ -6,6 +6,7 @@ import { MonthPicker } from "@/components/ui/month-picker";
 import Link from "next/link";
 import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 import { OrdersChart } from "@/components/orders/OrdersChart";
+import { TopCustomersCard } from "@/components/orders/TopCustomersCard";
 import { getDailyOrderData } from "@/lib/orders-chart-data";
 import { getUsdKrwRate } from "@/lib/exchange-rate";
 import { CurrencyDisplay, getPrimaryCurrency } from "@/components/ui/currency-display";
@@ -199,27 +200,7 @@ export default async function OrdersPage({
         </Card>
         <Card className="p-5">
           <p className="text-xs text-[var(--text-secondary)] mb-3">Top Customers</p>
-          {topCustomers.length === 0 ? (
-            <p className="text-xs text-[var(--text-tertiary)]">No data</p>
-          ) : (
-            <div className="space-y-3">
-              {topCustomers.map((c, i) => (
-                <div key={c.name} className="flex items-start gap-2">
-                  <span className={`text-xs font-bold mt-0.5 ${
-                    i === 0 ? "text-amber-500" : i === 1 ? "text-gray-400" : "text-amber-700"
-                  }`}>
-                    {i + 1}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold truncate">{c.name}</p>
-                    <p className="text-[11px] text-[var(--text-tertiary)]">
-                      {c.count} orders · {formatUSD(c.amount)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <TopCustomersCard customers={topCustomers} />
         </Card>
       </div>
       <Card>
