@@ -39,9 +39,14 @@ export function TopCustomersCard({ customers, columnCount = 6 }: { customers: To
 
   const handleClick = useCallback((customerName: string) => {
     // DataTable uses CSS Grid with flat divs — every `columnCount` divs = 1 row
-    // Find the grid container (skip the header row)
-    const gridContainer = document.querySelector("[data-table-grid]") ||
-      document.querySelector(".grid.gap-4");
+    // Find the grid container by its inline style (gridTemplateColumns)
+    const allGrids = document.querySelectorAll(".grid.gap-4");
+    let gridContainer: Element | null = null;
+    allGrids.forEach((g) => {
+      if (g.getAttribute("style")?.includes("grid-template-columns")) {
+        gridContainer = g;
+      }
+    });
     if (!gridContainer) return;
 
     const cells = Array.from(gridContainer.children);
