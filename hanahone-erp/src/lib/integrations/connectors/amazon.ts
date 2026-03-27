@@ -1,5 +1,21 @@
 import type { Connector, ExternalOrderData } from "../types";
 
+function mapFulfillmentStatus(status: string): string {
+  switch (status.toLowerCase()) {
+    case "shipped":
+    case "fulfilled":
+    case "completed":
+      return "FULFILLED";
+    case "delivered":
+      return "DELIVERED";
+    case "cancelled":
+    case "canceled":
+      return "CANCELLED";
+    default:
+      return "UNFULFILLED";
+  }
+}
+
 async function refreshLwaToken(credentials: { clientId: string; clientSecret: string; refreshToken: string }) {
   const res = await fetch("https://api.amazon.com/auth/o2/token", {
     method: "POST",
@@ -43,11 +59,16 @@ export const amazonConnector: Connector = {
       const itemsRes = await fetch(`${baseUrl}/orders/v0/orders/${order.AmazonOrderId}/orderItems`, { headers });
       const itemsData = itemsRes.ok ? await itemsRes.json() : { payload: { OrderItems: [] } };
 
+      const rawStatus = order.OrderStatus || "pending";
+      const isCancelled = rawStatus.toLowerCase() === "canceled" || rawStatus.toLowerCase() === "cancelled";
+
       orders.push({
         externalOrderId: order.AmazonOrderId,
+        externalOrderNumber: order.AmazonOrderId,
         rawData: order,
         orderDate: new Date(order.PurchaseDate),
-        status: order.OrderStatus?.toLowerCase() || "pending",
+        fulfillmentStatus: mapFulfillmentStatus(rawStatus),
+        financialStatus: isCancelled ? "VOIDED" : "PAID",
         totalAmount: parseFloat(order.OrderTotal?.Amount || "0"),
         items: (itemsData.payload?.OrderItems || []).map((item: any) => ({
           externalItemId: item.OrderItemId,

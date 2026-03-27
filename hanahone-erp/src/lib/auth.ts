@@ -16,21 +16,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!credentials?.email || !credentials?.password) return null;
         const user = await prisma.user.findUnique({
           where: { email: credentials.email as string },
-          include: { company: true },
+          include: {
+            appRoles: {
+              where: { app: "salesone" },
+              include: { company: true },
+            },
+          },
         });
-        if (!user) return null;
+        if (!user || !user.passwordHash) return null;
         const valid = await bcrypt.compare(
           credentials.password as string,
-          user.password
+          user.passwordHash
         );
         if (!valid) return null;
+        const primaryRole = user.appRoles[0];
+        if (!primaryRole || !primaryRole.company) return null;
         return {
           id: user.id,
           name: user.name,
           email: user.email,
-          role: user.role,
-          companyId: user.companyId,
-          companyName: user.company.name,
+          role: primaryRole.role,
+          companyId: primaryRole.companyId!,
+          companyName: primaryRole.company.name,
         };
       },
     }),

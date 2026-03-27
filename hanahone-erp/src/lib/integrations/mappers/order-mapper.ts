@@ -1,28 +1,56 @@
 import { prisma } from "@/lib/prisma";
-import { Platform, OrderStatus, OrderType } from "@prisma/client";
+import { Platform, FulfillmentStatus, FinancialStatus, OrderType } from "@prisma/client";
 import { generateOrderNumber } from "@/lib/order-number";
-import type { ExternalOrderData, ExternalOrderItemData } from "../types";
+import type { ExternalOrderData } from "../types";
 
-const STATUS_MAP: Record<string, OrderStatus> = {
-  paid: "PROCESSING",
-  processing: "PROCESSING",
-  shipped: "SHIPPED",
-  fulfilled: "SHIPPED",
-  delivered: "DELIVERED",
-  completed: "DELIVERED",
-  cancelled: "CANCELLED",
-  canceled: "CANCELLED",
-  refunded: "CANCELLED",
-  unfulfilled: "PENDING",
-  pending: "PENDING",
+const FULFILLMENT_MAP: Record<string, FulfillmentStatus> = {
+  UNFULFILLED: "UNFULFILLED",
+  PARTIALLY_FULFILLED: "PARTIALLY_FULFILLED",
+  FULFILLED: "FULFILLED",
+  DELIVERED: "DELIVERED",
+  CANCELLED: "CANCELLED",
 };
 
-export function mapStatusToOrderStatus(status: string): OrderStatus {
-  return STATUS_MAP[status.toLowerCase()] || "PENDING";
+const FINANCIAL_MAP: Record<string, FinancialStatus> = {
+  PENDING: "PENDING",
+  PAID: "PAID",
+  PARTIALLY_PAID: "PARTIALLY_PAID",
+  PARTIALLY_REFUNDED: "PARTIALLY_REFUNDED",
+  REFUNDED: "REFUNDED",
+  VOIDED: "VOIDED",
+};
+
+export function mapFulfillmentStatus(status: string): FulfillmentStatus {
+  return FULFILLMENT_MAP[status] || "UNFULFILLED";
 }
 
-export function calculateOrderTotal(items: ExternalOrderItemData[]): number {
-  return items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+export function mapFinancialStatus(status: string): FinancialStatus {
+  return FINANCIAL_MAP[status] || "PENDING";
+}
+
+async function findOrCreateCustomer(
+  companyId: string,
+  name?: string,
+  email?: string,
+) {
+  if (!name && !email) return null;
+
+  if (email) {
+    const existing = await prisma.customer.findFirst({
+      where: { email, companyId },
+    });
+    if (existing) return existing.id;
+  }
+
+  const customer = await prisma.customer.create({
+    data: {
+      companyId,
+      name: name || "Unknown",
+      email: email || null,
+      type: "INDIVIDUAL",
+    },
+  });
+  return customer.id;
 }
 
 export async function mapExternalOrder(
@@ -30,11 +58,24 @@ export async function mapExternalOrder(
   companyId: string,
   platform: Platform,
 ) {
-  const total = extOrder.totalAmount || calculateOrderTotal(extOrder.items);
+  const total = extOrder.totalAmount;
+  const refund = extOrder.refundAmount || 0;
+  const net = total - refund;
+
+  const fulfillmentStatus = mapFulfillmentStatus(extOrder.fulfillmentStatus);
+  const financialStatus = mapFinancialStatus(extOrder.financialStatus);
+
+  const customerId = await findOrCreateCustomer(
+    companyId,
+    extOrder.customerName,
+    extOrder.customerEmail,
+  );
 
   const resolvedItems = await Promise.all(
     extOrder.items.map(async (item) => {
-      const product = await prisma.product.findFirst({ where: { sku: item.sku, companyId } });
+      const product = item.sku
+        ? await prisma.product.findFirst({ where: { sku: item.sku, companyId } })
+        : null;
       return {
         productId: product?.id || null,
         quantity: item.quantity,
@@ -53,21 +94,27 @@ export async function mapExternalOrder(
       data: {
         orderNumber,
         companyId,
+        customerId,
         type: OrderType.SALE,
-        status: mapStatusToOrderStatus(extOrder.status),
+        fulfillmentStatus,
+        financialStatus,
         totalAmount: total,
+        refundAmount: refund > 0 ? refund : null,
+        netAmount: net,
         costAmount: extOrder.costAmount,
         marginAmount: extOrder.marginAmount,
         orderDate: new Date(extOrder.orderDate),
+        deliveredAt: fulfillmentStatus === "DELIVERED" ? new Date(extOrder.orderDate) : null,
         externalSource: platform,
-        items: {
+        externalOrderNumber: extOrder.externalOrderNumber,
+        items: validItems.length > 0 ? {
           create: validItems.map((item) => ({
             productId: item.productId!,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             subtotal: item.subtotal,
           })),
-        },
+        } : undefined,
       },
     });
   });

@@ -7,10 +7,13 @@ export interface ConnectorResult {
 
 export interface ExternalOrderData {
   externalOrderId: string;
+  externalOrderNumber?: string;
   rawData: any;
   orderDate: Date;
-  status: string;
+  fulfillmentStatus: string;
+  financialStatus: string;
   totalAmount: number;
+  refundAmount?: number;
   costAmount?: number;
   marginAmount?: number;
   customerName?: string;

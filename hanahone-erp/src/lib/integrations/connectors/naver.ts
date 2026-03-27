@@ -1,5 +1,21 @@
 import type { Connector, ExternalOrderData } from "../types";
 
+function mapFulfillmentStatus(status: string): string {
+  switch (status.toLowerCase()) {
+    case "shipped":
+    case "fulfilled":
+    case "completed":
+      return "FULFILLED";
+    case "delivered":
+      return "DELIVERED";
+    case "cancelled":
+    case "canceled":
+      return "CANCELLED";
+    default:
+      return "UNFULFILLED";
+  }
+}
+
 export const naverConnector: Connector = {
   platform: "NAVER",
 
@@ -17,11 +33,17 @@ export const naverConnector: Connector = {
     if (!res.ok) throw new Error(`Naver API error: ${res.status} ${res.statusText}`);
     const data = await res.json();
 
-    return (data.data || []).map((order: any) => ({
+    return (data.data || []).map((order: any) => {
+      const rawStatus = order.productOrderStatus || "pending";
+      const isCancelled = rawStatus.toLowerCase() === "cancelled" || rawStatus.toLowerCase() === "canceled";
+
+      return {
       externalOrderId: String(order.orderId || order.productOrderId),
+      externalOrderNumber: String(order.orderId || order.productOrderId),
       rawData: order,
       orderDate: new Date(order.orderDate || order.paymentDate),
-      status: (order.productOrderStatus || "pending").toLowerCase(),
+      fulfillmentStatus: mapFulfillmentStatus(rawStatus),
+      financialStatus: isCancelled ? "VOIDED" : "PAID",
       totalAmount: order.totalPaymentAmount || 0,
       customerName: order.ordererName,
       items: (order.productOrderItems || [order]).map((item: any) => ({
@@ -31,6 +53,7 @@ export const naverConnector: Connector = {
         quantity: item.quantity || 1,
         unitPrice: item.unitPrice || item.totalPaymentAmount || 0,
       })),
-    }));
+    };
+    });
   },
 };

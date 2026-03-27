@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { decrypt } from "./encryption";
 import { SyncStatus } from "@prisma/client";
 import type { Connector, SyncResult } from "./types";
-import { mapExternalOrder } from "./mappers/order-mapper";
+import { mapExternalOrder, mapFulfillmentStatus, mapFinancialStatus } from "./mappers/order-mapper";
 
 export async function runSync(connector: Connector, companyId: string): Promise<SyncResult> {
   const config = await prisma.integrationConfig.findUnique({
@@ -11,6 +11,14 @@ export async function runSync(connector: Connector, companyId: string): Promise<
 
   if (!config || !config.isActive) {
     return { recordsProcessed: 0, recordsFailed: 0, errorMessage: "Integration not active" };
+  }
+
+  // Concurrency guard
+  const runningJob = await prisma.syncJob.findFirst({
+    where: { companyId, platform: connector.platform, status: "RUNNING" },
+  });
+  if (runningJob) {
+    return { recordsProcessed: 0, recordsFailed: 0, errorMessage: "Sync already in progress" };
   }
 
   const job = await prisma.syncJob.create({
@@ -33,10 +41,48 @@ export async function runSync(connector: Connector, companyId: string): Promise<
               externalOrderId: extOrder.externalOrderId,
             },
           },
+          include: { mappedOrder: true },
         });
+
+        if (existing && existing.mappedOrder) {
+          // Update existing order's statuses (refund sync)
+          const newFulfillment = mapFulfillmentStatus(extOrder.fulfillmentStatus);
+          const newFinancial = mapFinancialStatus(extOrder.financialStatus);
+          const refund = extOrder.refundAmount || 0;
+          const net = extOrder.totalAmount - refund;
+
+          const needsUpdate =
+            existing.mappedOrder.fulfillmentStatus !== newFulfillment ||
+            existing.mappedOrder.financialStatus !== newFinancial ||
+            Number(existing.mappedOrder.totalAmount) !== extOrder.totalAmount;
+
+          if (needsUpdate) {
+            await prisma.order.update({
+              where: { id: existing.mappedOrder.id },
+              data: {
+                fulfillmentStatus: newFulfillment,
+                financialStatus: newFinancial,
+                totalAmount: extOrder.totalAmount,
+                refundAmount: refund > 0 ? refund : null,
+                netAmount: net,
+                deliveredAt: newFulfillment === "DELIVERED" && !existing.mappedOrder.deliveredAt
+                  ? new Date()
+                  : existing.mappedOrder.deliveredAt,
+              },
+            });
+            // Update raw data
+            await prisma.externalOrder.update({
+              where: { id: existing.id },
+              data: { rawData: extOrder.rawData },
+            });
+          }
+          processed++;
+          continue;
+        }
 
         if (existing) { processed++; continue; }
 
+        // New order
         const mappedOrder = await mapExternalOrder(extOrder, companyId, connector.platform);
 
         await prisma.externalOrder.create({

@@ -1,4 +1,4 @@
-import { PrismaClient, CompanyType, UserRole, CustomerType } from "@prisma/client";
+import { PrismaClient, CompanyType, CustomerType } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -19,31 +19,45 @@ async function main() {
     data: { name: "HOR", type: CompanyType.SUBSIDIARY, parentCompanyId: hok.id },
   });
 
-  // Users
+  // Users (shared public.users)
   const adminPw = await hashPassword("admin123");
   const managerPw = await hashPassword("manager123");
   const staffPw = await hashPassword("staff123");
 
-  await prisma.user.createMany({
-    data: [
-      { name: "Admin User", email: "admin@hanahone.com", password: adminPw, role: UserRole.ADMIN, companyId: hoi.id },
-      { name: "HOI Manager", email: "manager@hoi.com", password: managerPw, role: UserRole.MANAGER, companyId: hoi.id },
-      { name: "HOK Manager", email: "manager@hok.com", password: managerPw, role: UserRole.MANAGER, companyId: hok.id },
-      { name: "HOR Manager", email: "manager@hor.com", password: managerPw, role: UserRole.MANAGER, companyId: hor.id },
-      { name: "HOI Staff", email: "staff@hoi.com", password: staffPw, role: UserRole.STAFF, companyId: hoi.id },
-      { name: "HOK Staff", email: "staff@hok.com", password: staffPw, role: UserRole.STAFF, companyId: hok.id },
-    ],
-  });
+  const users = [
+    { name: "Admin User", email: "admin@hanahone.com", passwordHash: adminPw, authProvider: "credentials" },
+    { name: "HOI Manager", email: "manager@hoi.com", passwordHash: managerPw, authProvider: "credentials" },
+    { name: "HOK Manager", email: "manager@hok.com", passwordHash: managerPw, authProvider: "credentials" },
+    { name: "HOR Manager", email: "manager@hor.com", passwordHash: managerPw, authProvider: "credentials" },
+    { name: "HOI Staff", email: "staff@hoi.com", passwordHash: staffPw, authProvider: "credentials" },
+    { name: "HOK Staff", email: "staff@hok.com", passwordHash: staffPw, authProvider: "credentials" },
+  ];
 
-  // System user for automated processes
-  await prisma.user.create({
+  const createdUsers = await Promise.all(
+    users.map((u) => prisma.user.create({ data: u }))
+  );
+
+  // System user
+  const systemUser = await prisma.user.create({
     data: {
       name: "System",
       email: "system@hanahone.internal",
-      password: await hashPassword("system-no-login-" + Date.now()),
-      role: UserRole.ADMIN,
-      companyId: hoi.id,
+      passwordHash: await hashPassword("system-no-login-" + Date.now()),
+      authProvider: "credentials",
     },
+  });
+
+  // App roles (public.user_app_roles)
+  await prisma.userAppRole.createMany({
+    data: [
+      { userId: createdUsers[0].id, app: "salesone", role: "ADMIN", companyId: hoi.id },
+      { userId: createdUsers[1].id, app: "salesone", role: "MANAGER", companyId: hoi.id },
+      { userId: createdUsers[2].id, app: "salesone", role: "MANAGER", companyId: hok.id },
+      { userId: createdUsers[3].id, app: "salesone", role: "MANAGER", companyId: hor.id },
+      { userId: createdUsers[4].id, app: "salesone", role: "STAFF", companyId: hoi.id },
+      { userId: createdUsers[5].id, app: "salesone", role: "STAFF", companyId: hok.id },
+      { userId: systemUser.id, app: "salesone", role: "ADMIN", companyId: hoi.id },
+    ],
   });
 
   // Customers
@@ -61,7 +75,7 @@ async function main() {
     ],
   });
 
-  // Products (HOK manufactures, HOI sells same products via transfer)
+  // Products
   const omega3Hok = await prisma.product.create({
     data: { name: "Omega-3 Fish Oil 1000mg", sku: "OMEGA3-1000", category: "Fish Oil", basePrice: 32000, costPrice: 12000, companyId: hok.id },
   });
@@ -74,8 +88,6 @@ async function main() {
   const collagenHok = await prisma.product.create({
     data: { name: "Collagen Peptides", sku: "COLL-PEP", category: "Collagen", basePrice: 38000, costPrice: 14000, companyId: hok.id },
   });
-
-  // Same products in HOI catalog (transferred from HOK)
   const omega3Hoi = await prisma.product.create({
     data: { name: "Omega-3 Fish Oil 1000mg", sku: "OMEGA3-1000", category: "Fish Oil", basePrice: 35000, costPrice: 18000, companyId: hoi.id },
   });

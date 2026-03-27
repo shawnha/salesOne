@@ -1,5 +1,21 @@
 import type { ExternalOrderData } from "../types";
 
+function mapFulfillmentStatus(status: string): string {
+  switch (status.toLowerCase()) {
+    case "shipped":
+    case "fulfilled":
+    case "completed":
+      return "FULFILLED";
+    case "delivered":
+      return "DELIVERED";
+    case "cancelled":
+    case "canceled":
+      return "CANCELLED";
+    default:
+      return "UNFULFILLED";
+  }
+}
+
 export function parseTikTokCsv(csvContent: string): ExternalOrderData[] {
   const lines = csvContent.trim().split("\n");
   if (lines.length <= 1) return [];
@@ -27,11 +43,16 @@ export function parseTikTokCsv(csvContent: string): ExternalOrderData[] {
     if (existing) {
       existing.items.push(item);
     } else {
+      const rawStatus = row["Order Status"] || "pending";
+      const isCancelled = rawStatus.toLowerCase() === "cancelled" || rawStatus.toLowerCase() === "canceled";
+
       orders.set(orderId, {
         externalOrderId: orderId,
+        externalOrderNumber: orderId,
         rawData: row,
         orderDate: new Date(row["Created Time"]),
-        status: (row["Order Status"] || "pending").toLowerCase(),
+        fulfillmentStatus: mapFulfillmentStatus(rawStatus),
+        financialStatus: isCancelled ? "VOIDED" : "PAID",
         totalAmount: parseFloat(row["Order Total"]) || 0,
         items: [item],
       });

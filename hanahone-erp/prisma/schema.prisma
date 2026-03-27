@@ -1,71 +1,21 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["public", "salesone"]
 }
+
+// ─── Shared (public schema) ──────────────────────────────
 
 enum CompanyType {
   MOTHER
   SUBSIDIARY
-}
 
-enum UserRole {
-  ADMIN
-  MANAGER
-  STAFF
-}
-
-enum CustomerType {
-  INDIVIDUAL
-  DRUGSTORE
-  WHOLESALE
-}
-
-enum OrderType {
-  SALE
-  PURCHASE
-  BROKERAGE
-  INTER_COMPANY
-}
-
-enum OrderStatus {
-  PENDING
-  PROCESSING
-  SHIPPED
-  DELIVERED
-  CANCELLED
-}
-
-enum TransferStatus {
-  PENDING
-  SHIPPED
-  RECEIVED
-  CANCELLED
-}
-
-enum ProductionStatus {
-  PLANNED
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-}
-
-enum ConsultingStatus {
-  ACTIVE
-  COMPLETED
-  PAUSED
-}
-
-enum AdjustmentType {
-  MANUAL
-  SALE
-  PURCHASE
-  TRANSFER_OUT
-  TRANSFER_IN
-  PRODUCTION
+  @@schema("public")
 }
 
 model Company {
@@ -76,7 +26,7 @@ model Company {
   parentCompany   Company?    @relation("CompanyHierarchy", fields: [parentCompanyId], references: [id])
   subsidiaries    Company[]   @relation("CompanyHierarchy")
 
-  users                  User[]
+  userAppRoles           UserAppRole[]
   customers              Customer[]
   products               Product[]
   inventories            Inventory[]
@@ -93,25 +43,151 @@ model Company {
   inventorySnapshots     InventorySnapshot[]
 
   @@map("companies")
+  @@schema("public")
 }
 
 model User {
-  id        String   @id @default(uuid())
-  name      String
-  email     String   @unique
-  password  String
-  role      UserRole
-  companyId String   @map("company_id")
-  company   Company  @relation(fields: [companyId], references: [id])
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String?  @map("password_hash")
+  authProvider String?  @map("auth_provider")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
+  appRoles             UserAppRole[]
   inventoryAdjustments InventoryAdjustment[]
 
   @@map("users")
+  @@schema("public")
+}
+
+model UserAppRole {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id])
+  app       String
+  role      String
+  companyId String?  @map("company_id")
+  company   Company? @relation(fields: [companyId], references: [id])
+
+  @@unique([userId, app, companyId])
+  @@index([userId])
+  @@index([app])
+  @@map("user_app_roles")
+  @@schema("public")
+}
+
+// ─── ERP schema ──────────────────────────────────────────
+
+enum CustomerType {
+  INDIVIDUAL
+  DRUGSTORE
+  WHOLESALE
+
+  @@schema("salesone")
+}
+
+enum OrderType {
+  SALE
+  PURCHASE
+  BROKERAGE
+  INTER_COMPANY
+
+  @@schema("salesone")
+}
+
+enum FulfillmentStatus {
+  UNFULFILLED
+  PARTIALLY_FULFILLED
+  FULFILLED
+  DELIVERED
+  CANCELLED
+
+  @@schema("salesone")
+}
+
+enum FinancialStatus {
+  PENDING
+  PAID
+  PARTIALLY_PAID
+  PARTIALLY_REFUNDED
+  REFUNDED
+  VOIDED
+
+  @@schema("salesone")
+}
+
+enum TransferStatus {
+  PENDING
+  SHIPPED
+  RECEIVED
+  CANCELLED
+
+  @@schema("salesone")
+}
+
+enum ProductionStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+
+  @@schema("salesone")
+}
+
+enum ConsultingStatus {
+  ACTIVE
+  COMPLETED
+  PAUSED
+
+  @@schema("salesone")
+}
+
+enum AdjustmentType {
+  MANUAL
+  SALE
+  PURCHASE
+  TRANSFER_OUT
+  TRANSFER_IN
+  PRODUCTION
+
+  @@schema("salesone")
+}
+
+enum Platform {
+  SHOPIFY
+  AMAZON
+  TIKTOK
+  CGETC
+  NAVER
+  PHARMACY
+  ORDERDESK
+
+  @@schema("salesone")
+}
+
+enum SyncStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+
+  @@schema("salesone")
+}
+
+enum ExternalOrderStatus {
+  PENDING
+  MAPPED
+  FAILED
+
+  @@schema("salesone")
 }
 
 model Customer {
   id          String       @id @default(uuid())
   name        String
+  email       String?
   contactInfo Json?        @map("contact_info")
   type        CustomerType
   companyId   String       @map("company_id")
@@ -126,6 +202,7 @@ model Customer {
 
   @@index([companyId])
   @@map("customers")
+  @@schema("salesone")
 }
 
 model Product {
@@ -152,6 +229,7 @@ model Product {
   @@unique([sku, companyId])
   @@index([companyId])
   @@map("products")
+  @@schema("salesone")
 }
 
 model Inventory {
@@ -172,6 +250,7 @@ model Inventory {
   @@unique([productId, companyId, warehouseLocation])
   @@index([companyId])
   @@map("inventories")
+  @@schema("salesone")
 }
 
 model Order {
@@ -182,14 +261,19 @@ model Order {
   customerId            String?     @map("customer_id")
   customer              Customer?   @relation("CustomerOrders", fields: [customerId], references: [id])
   type                  OrderType
-  status                OrderStatus @default(PENDING)
+  fulfillmentStatus     FulfillmentStatus  @default(UNFULFILLED) @map("fulfillment_status")
+  financialStatus       FinancialStatus    @default(PENDING)     @map("financial_status")
   totalAmount           Decimal     @map("total_amount")
+  refundAmount          Decimal?    @map("refund_amount")
+  netAmount             Decimal?    @map("net_amount")
   costAmount            Decimal?    @map("cost_amount")
   marginAmount          Decimal?    @map("margin_amount")
   onBehalfOfCustomerId  String?     @map("on_behalf_of_customer_id")
   onBehalfOfCustomer    Customer?   @relation("BrokerageCustomer", fields: [onBehalfOfCustomerId], references: [id])
   orderDate             DateTime    @map("order_date")
   shipDate              DateTime?   @map("ship_date")
+  deliveredAt           DateTime?   @map("delivered_at")
+  externalOrderNumber   String?     @map("external_order_number")
   notes                 String?
 
   items     OrderItem[]
@@ -202,9 +286,11 @@ model Order {
   updatedAt  DateTime @updatedAt @map("updated_at")
 
   @@index([companyId, orderDate])
-  @@index([companyId, status])
+  @@index([companyId, fulfillmentStatus])
+  @@index([companyId, financialStatus])
   @@index([companyId, type])
   @@map("orders")
+  @@schema("salesone")
 }
 
 model OrderItem {
@@ -219,6 +305,7 @@ model OrderItem {
 
   @@index([orderId])
   @@map("order_items")
+  @@schema("salesone")
 }
 
 model InterCompanyTransfer {
@@ -234,6 +321,7 @@ model InterCompanyTransfer {
   receivedDate  DateTime?      @map("received_date")
 
   @@map("inter_company_transfers")
+  @@schema("salesone")
 }
 
 model ProductionOrder {
@@ -254,6 +342,7 @@ model ProductionOrder {
 
   @@index([companyId, status])
   @@map("production_orders")
+  @@schema("salesone")
 }
 
 model ConsultingEngagement {
@@ -274,6 +363,7 @@ model ConsultingEngagement {
 
   @@index([companyId])
   @@map("consulting_engagements")
+  @@schema("salesone")
 }
 
 model InventoryAdjustment {
@@ -295,6 +385,7 @@ model InventoryAdjustment {
   @@index([inventoryId])
   @@index([companyId, createdAt])
   @@map("inventory_adjustments")
+  @@schema("salesone")
 }
 
 model BillOfMaterials {
@@ -308,28 +399,7 @@ model BillOfMaterials {
   quantityRequired  Decimal @map("quantity_required")
 
   @@map("bill_of_materials")
-}
-
-enum Platform {
-  SHOPIFY
-  AMAZON
-  TIKTOK
-  CGETC
-  NAVER
-  PHARMACY
-  ORDERDESK
-}
-
-enum SyncStatus {
-  RUNNING
-  SUCCESS
-  FAILED
-}
-
-enum ExternalOrderStatus {
-  PENDING
-  MAPPED
-  FAILED
+  @@schema("salesone")
 }
 
 model IntegrationConfig {
@@ -346,6 +416,7 @@ model IntegrationConfig {
 
   @@unique([companyId, platform])
   @@map("integration_configs")
+  @@schema("salesone")
 }
 
 model SyncJob {
@@ -364,6 +435,7 @@ model SyncJob {
   @@index([companyId, platform])
   @@index([createdAt])
   @@map("sync_jobs")
+  @@schema("salesone")
 }
 
 model ExternalOrder {
@@ -381,6 +453,7 @@ model ExternalOrder {
   @@unique([platform, externalOrderId])
   @@index([companyId, platform])
   @@map("external_orders")
+  @@schema("salesone")
 }
 
 model InventorySnapshot {
@@ -397,4 +470,5 @@ model InventorySnapshot {
 
   @@unique([companyId, productId])
   @@map("inventory_snapshots")
+  @@schema("salesone")
 }
