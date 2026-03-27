@@ -1,5 +1,3 @@
-import type { Connector, ExternalInventoryData } from "../types";
-
 interface CgetcCredentials {
   url: string;
   email: string;
@@ -7,27 +5,16 @@ interface CgetcCredentials {
   db: string;
 }
 
-interface OdooJsonRpcResponse {
-  jsonrpc: string;
-  id: number | null;
-  result?: any;
-  error?: { message?: string; data?: { message?: string } };
-}
-
-interface StockQuant {
-  id: number;
-  product_id: [number, string];
+export interface CgetcProduct {
+  sku: string;
+  name: string;
+  barcode: string;
   quantity: number;
-  location_id: [number, string];
-  product_uom_id: [number, string];
+  reserved: number;
+  available: number;
 }
 
-async function odooAuthenticate(
-  url: string,
-  db: string,
-  email: string,
-  password: string
-): Promise<string> {
+async function authenticate(url: string, db: string, email: string, password: string): Promise<string> {
   const res = await fetch(`${url}/web/session/authenticate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -40,103 +27,56 @@ async function odooAuthenticate(
 
   if (!res.ok) throw new Error(`CGETC auth failed: HTTP ${res.status}`);
 
-  const data: OdooJsonRpcResponse = await res.json();
-  if (data.error) throw new Error(`CGETC auth error: ${data.error.data?.message || data.error.message || "Unknown error"}`);
-  if (!data.result?.uid) throw new Error("CGETC auth failed: no uid returned");
+  const data = await res.json();
+  if (data.error) throw new Error(`CGETC auth error: ${data.error.data?.message || data.error.message}`);
+  if (!data.result?.uid) throw new Error("CGETC auth failed: no uid");
 
   const setCookie = res.headers.get("set-cookie");
-  const sessionMatch = setCookie?.match(/session_id=([^;]+)/);
-  if (!sessionMatch) throw new Error("CGETC auth failed: no session cookie");
+  const match = setCookie?.match(/session_id=([^;]+)/);
+  if (!match) throw new Error("CGETC auth failed: no session cookie");
 
-  return sessionMatch[1];
+  return match[1];
 }
 
-async function odooSearchRead(
-  url: string,
-  sessionId: string,
-  model: string,
-  domain: any[],
-  fields: string[],
-  limit?: number
-): Promise<any[]> {
-  const res = await fetch(`${url}/web/dataset/call_kw`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Cookie: `session_id=${sessionId}`,
-    },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      method: "call",
-      params: {
-        model,
-        method: "search_read",
-        args: [domain],
-        kwargs: { fields, ...(limit ? { limit } : {}) },
-      },
-    }),
-  });
+function parsePortalProducts(html: string): CgetcProduct[] {
+  const tbodyMatch = html.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/);
+  if (!tbodyMatch) return [];
 
-  if (!res.ok) throw new Error(`CGETC API error: HTTP ${res.status}`);
+  const rows = tbodyMatch[1].match(/<tr[^>]*>([\s\S]*?)<\/tr>/g) || [];
+  const products: CgetcProduct[] = [];
 
-  const data: OdooJsonRpcResponse = await res.json();
-  if (data.error) throw new Error(`CGETC API error: ${data.error.data?.message || data.error.message || "Unknown error"}`);
+  for (const row of rows) {
+    const cells = (row.match(/<td[^>]*>([\s\S]*?)<\/td>/g) || [])
+      .map((c) => c.replace(/<[^>]+>/g, "").replace(/[\n\t]/g, "").trim());
 
-  return data.result || [];
-}
+    if (cells.length < 12) continue;
 
-function extractSku(productName: string): string {
-  const match = productName.match(/^\[([^\]]+)\]/);
-  return match ? match[1] : productName;
-}
-
-export const cgetcConnector: Connector = {
-  platform: "CGETC",
-
-  async fetchOrders(_credentials: any, _since: Date | null) {
-    return [];
-  },
-
-  async fetchInventory(credentials: CgetcCredentials): Promise<ExternalInventoryData[]> {
-    const { url, email, password, db } = credentials;
-
-    const sessionId = await odooAuthenticate(url, db, email, password);
-
-    const quants: StockQuant[] = await odooSearchRead(
-      url,
-      sessionId,
-      "stock.quant",
-      [
-        ["quantity", ">", 0],
-        ["location_id.usage", "=", "internal"],
-      ],
-      ["product_id", "quantity", "location_id", "product_uom_id"]
-    );
-
-    const skuTotals = new Map<string, { productName: string; quantity: number }>();
-
-    for (const quant of quants) {
-      const sku = extractSku(quant.product_id[1]);
-      const existing = skuTotals.get(sku);
-      if (existing) {
-        existing.quantity += quant.quantity;
-      } else {
-        const fullName = quant.product_id[1];
-        const productName = fullName.replace(/^\[[^\]]+\]\s*/, "");
-        skuTotals.set(sku, { productName, quantity: quant.quantity });
-      }
-    }
-
-    const result: ExternalInventoryData[] = [];
-    skuTotals.forEach((data, sku) => {
-      result.push({
-        sku,
-        productName: data.productName,
-        quantity: data.quantity,
-        warehouseLocation: "CGETC",
-      });
+    products.push({
+      sku: cells[1] || "",
+      name: cells[3] || "",
+      barcode: cells[4] || "",
+      quantity: parseFloat(cells[8]) || 0,
+      reserved: parseFloat(cells[10]) || 0,
+      available: parseFloat(cells[11]) || 0,
     });
+  }
 
-    return result;
-  },
-};
+  return products;
+}
+
+export async function fetchCgetcInventory(credentials: CgetcCredentials): Promise<CgetcProduct[]> {
+  const sessionId = await authenticate(
+    credentials.url,
+    credentials.db,
+    credentials.email,
+    credentials.password,
+  );
+
+  const res = await fetch(`${credentials.url}/portal/product`, {
+    headers: { Cookie: `session_id=${sessionId}` },
+  });
+  if (!res.ok) throw new Error(`CGETC portal error: HTTP ${res.status}`);
+
+  const html = await res.text();
+  return parsePortalProducts(html);
+}
