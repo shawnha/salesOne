@@ -64,6 +64,22 @@ export default async function OrdersPage({
   const refundedCount = orders.filter(o => o.financialStatus === "REFUNDED" || o.financialStatus === "PARTIALLY_REFUNDED").length;
   const fulfilledCount = orders.filter(o => o.fulfillmentStatus === "FULFILLED" || o.fulfillmentStatus === "DELIVERED").length;
 
+  // Top 3 customers by order count
+  const customerCounts = new Map<string, { name: string; count: number; amount: number }>();
+  for (const order of orders) {
+    const name = order.customer?.name ?? "Unknown";
+    const existing = customerCounts.get(name);
+    if (existing) {
+      existing.count++;
+      existing.amount += Number(order.netAmount ?? order.totalAmount);
+    } else {
+      customerCounts.set(name, { name, count: 1, amount: Number(order.netAmount ?? order.totalAmount) });
+    }
+  }
+  const topCustomers = Array.from(customerCounts.values())
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 3);
+
   const columns = [
     {
       key: "orderNumber",
@@ -170,16 +186,42 @@ export default async function OrdersPage({
           </div>
         </div>
       </div>
-      {/* Orders Line Chart */}
-      <Card className="p-5">
-        <div className="flex items-center justify-between mb-1">
-          <div />
-          <p className="text-[10px] text-[var(--text-tertiary)]">
-            ₩{exchangeRate.rate.toLocaleString()}/$ ({exchangeRate.date})
-          </p>
-        </div>
-        <OrdersChart data={chartData} />
-      </Card>
+      {/* Orders Line Chart + Top Customers */}
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-4">
+        <Card className="p-5">
+          <div className="flex items-center justify-between mb-1">
+            <div />
+            <p className="text-[10px] text-[var(--text-tertiary)]">
+              ₩{exchangeRate.rate.toLocaleString()}/$ ({exchangeRate.date})
+            </p>
+          </div>
+          <OrdersChart data={chartData} />
+        </Card>
+        <Card className="p-5">
+          <p className="text-xs text-[var(--text-secondary)] mb-3">Top Customers</p>
+          {topCustomers.length === 0 ? (
+            <p className="text-xs text-[var(--text-tertiary)]">No data</p>
+          ) : (
+            <div className="space-y-3">
+              {topCustomers.map((c, i) => (
+                <div key={c.name} className="flex items-start gap-2">
+                  <span className={`text-xs font-bold mt-0.5 ${
+                    i === 0 ? "text-amber-500" : i === 1 ? "text-gray-400" : "text-amber-700"
+                  }`}>
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold truncate">{c.name}</p>
+                    <p className="text-[11px] text-[var(--text-tertiary)]">
+                      {c.count} orders · {formatUSD(c.amount)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
       <Card>
         {orders.length === 0 ? (
           <EmptyState title="No orders" description="No orders found for this month." />
