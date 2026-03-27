@@ -5,6 +5,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { MonthPicker } from "@/components/ui/month-picker";
 import { SalesChart } from "@/components/sales/SalesChart";
 import { getChannelSalesData } from "@/lib/sales-chart-data";
+import { getUsdKrwRate } from "@/lib/exchange-rate";
+import { CurrencyDisplay, getPrimaryCurrency } from "@/components/ui/currency-display";
 import Link from "next/link";
 
 const formatUSD = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -42,7 +44,7 @@ export default async function SalesPage({
   };
   if (searchParams.company) where.companyId = searchParams.company;
 
-  const [orders, chartData] = await Promise.all([
+  const [orders, chartData, exchangeRate, companies] = await Promise.all([
     prisma.order.findMany({
       where,
       include: {
@@ -52,7 +54,11 @@ export default async function SalesPage({
       orderBy: { orderDate: "desc" },
     }),
     getChannelSalesData(searchParams.company, searchParams.month),
+    getUsdKrwRate(),
+    prisma.company.findMany({ select: { id: true, name: true } }),
   ]);
+
+  const primaryCurrency = getPrimaryCurrency(searchParams.company, companies);
 
   const totalRevenue = orders.reduce((sum, o) => sum + Number(o.netAmount ?? o.totalAmount), 0);
   const orderCount = orders.length;
@@ -126,12 +132,21 @@ export default async function SalesPage({
           </div>
           <div className="text-right">
             <p className="text-xs text-[var(--text-secondary)]">Net Revenue</p>
-            <p className="text-lg font-semibold">{formatUSD(totalRevenue)}</p>
+            <CurrencyDisplay
+              amount={totalRevenue}
+              exchangeRate={exchangeRate.rate}
+              primaryCurrency={primaryCurrency}
+            />
           </div>
         </div>
       </div>
       {/* Channel Sales Charts */}
       <Card className="p-5">
+        <div className="flex items-center justify-end mb-1">
+          <p className="text-[10px] text-[var(--text-tertiary)]">
+            ₩{exchangeRate.rate.toLocaleString()}/$ ({exchangeRate.date})
+          </p>
+        </div>
         <SalesChart donut={chartData.donut} monthly={chartData.monthly} />
       </Card>
       <Card>
