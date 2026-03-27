@@ -40,27 +40,21 @@ export function TopCustomersCard({ customers }: { customers: TopCustomer[] }) {
 
   const handleClick = useCallback((customerName: string) => {
     // DataTable now uses row wrappers with class "data-table-row"
-    const rows = document.querySelectorAll(".data-table-row");
-    let firstMatch: Element | null = null;
-
-    rows.forEach((row) => {
-      const cells = row.children;
-      // Customer is the 2nd column (index 1)
-      const customerCell = cells[1];
-      if (!customerCell) return;
-
-      const cellText = customerCell.textContent?.trim() || "";
-      if (cellText === customerName) {
-        if (!firstMatch) firstMatch = row;
-        row.classList.remove("order-highlight");
-        void (row as HTMLElement).offsetWidth;
-        row.classList.add("order-highlight");
-        setTimeout(() => row.classList.remove("order-highlight"), 2000);
-      }
+    const rows = Array.from(document.querySelectorAll(".data-table-row"));
+    const matches = rows.filter((row) => {
+      const customerCell = row.children[1];
+      return customerCell?.textContent?.trim() === customerName;
     });
 
-    if (firstMatch) {
-      firstMatch.scrollIntoView({ behavior: "smooth", block: "center" });
+    for (const row of matches) {
+      row.classList.remove("order-highlight");
+      void (row as HTMLElement).offsetWidth;
+      row.classList.add("order-highlight");
+      setTimeout(() => row.classList.remove("order-highlight"), 2000);
+    }
+
+    if (matches[0]) {
+      matches[0].scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }, []);
 

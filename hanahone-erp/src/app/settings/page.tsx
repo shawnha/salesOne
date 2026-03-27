@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 
 export default async function SettingsPage() {
   const users = await prisma.user.findMany({
-    include: { company: { select: { name: true } } },
+    include: { appRoles: { include: { company: true }, where: { app: "salesone" }, take: 1 } },
     orderBy: { name: "asc" },
   });
 
@@ -52,8 +52,8 @@ export default async function SettingsPage() {
               <div key={user.id} className="grid grid-cols-5 py-3 border-b border-[var(--border)] last:border-b-0 text-[13px] items-center">
                 <span className="font-semibold">{user.name}</span>
                 <span className="text-[var(--text-secondary)]">{user.email}</span>
-                <span><Badge status={user.role} /></span>
-                <span className="text-[var(--text-secondary)]">{user.company.name}</span>
+                <span><Badge status={user.appRoles[0]?.role ?? "—"} /></span>
+                <span className="text-[var(--text-secondary)]">{user.appRoles[0]?.company?.name ?? "—"}</span>
                 <span><Badge status="Active" /></span>
               </div>
             ))}

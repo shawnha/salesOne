@@ -62,7 +62,7 @@ export function SalesChart({ donut, monthly }: SalesChartProps) {
               ))}
             </Pie>
             <Tooltip
-              formatter={(value: number) => formatUSD(value)}
+              formatter={(value) => formatUSD(Number(value))}
               contentStyle={{
                 background: "var(--surface)",
                 border: "1px solid var(--border)",
@@ -102,7 +102,7 @@ export function SalesChart({ donut, monthly }: SalesChartProps) {
               width={50}
             />
             <Tooltip
-              formatter={(value: number, name: string) => [formatUSD(value), name]}
+              formatter={(value, name) => [formatUSD(Number(value)), name]}
               contentStyle={{
                 background: "var(--surface)",
                 border: "1px solid var(--border)",

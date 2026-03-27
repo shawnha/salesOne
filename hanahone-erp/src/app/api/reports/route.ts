@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
     }
     case "order-fulfillment": {
       const total = await prisma.order.count({ where: { ...companyFilter, type: "SALE" } });
-      const delivered = await prisma.order.count({ where: { ...companyFilter, type: "SALE", status: "DELIVERED" } });
+      const delivered = await prisma.order.count({ where: { ...companyFilter, type: "SALE", fulfillmentStatus: "DELIVERED" } });
       data = { total, delivered, rate: total > 0 ? ((delivered / total) * 100).toFixed(1) : "0" };
       break;
     }
