@@ -42,10 +42,10 @@ const platformFields: Record<Platform, FieldDef[]> = {
     { key: "apiKey", label: "API Key" },
   ],
   CGETC: [
-    { key: "url", label: "URL" },
+    { key: "url", label: "Odoo URL (예: https://cgetc.odoo.com)" },
+    { key: "db", label: "Database Name" },
     { key: "email", label: "Email", type: "email" },
     { key: "password", label: "Password", type: "password" },
-    { key: "partnerId", label: "Partner ID" },
   ],
 };
 

@@ -89,6 +89,26 @@ export default async function InventoryPage({
           <DataTable columns={columns} data={inventories} />
         )}
       </Card>
+      <a href="/inventory/cgetc" className="block group">
+        <Card>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[var(--accent-dim)] flex items-center justify-center">
+                <span className="text-accent text-sm font-bold">C</span>
+              </div>
+              <div>
+                <h2 className="text-sm font-bold tracking-tight">CGETC 3PL Inventory</h2>
+                <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5">
+                  View and map external SKUs from CGETC warehouse
+                </p>
+              </div>
+            </div>
+            <span className="text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)] transition-colors text-sm">
+              &rarr;
+            </span>
+          </div>
+        </Card>
+      </a>
     </div>
   );
 }
