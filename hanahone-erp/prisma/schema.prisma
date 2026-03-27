@@ -41,6 +41,8 @@ model Company {
   syncJobs               SyncJob[]
   externalOrders         ExternalOrder[]
   inventorySnapshots     InventorySnapshot[]
+  externalInventories    ExternalInventory[]
+  skuMappings            SkuMapping[]
 
   @@map("companies")
   @@schema("public")
@@ -222,6 +224,7 @@ model Product {
   bomAsFinished      BillOfMaterials[] @relation("FinishedProduct")
   bomAsRawMaterial   BillOfMaterials[] @relation("RawMaterial")
   inventorySnapshots InventorySnapshot[]
+  skuMappings        SkuMapping[]
 
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
@@ -470,5 +473,43 @@ model InventorySnapshot {
 
   @@unique([companyId, productId])
   @@map("inventory_snapshots")
+  @@schema("salesone")
+}
+
+model ExternalInventory {
+  id                String   @id @default(uuid())
+  companyId         String   @map("company_id")
+  company           Company  @relation(fields: [companyId], references: [id])
+  platform          Platform
+  externalSku       String   @map("external_sku")
+  externalName      String   @map("external_name")
+  quantity          Int
+  warehouseLocation String?  @map("warehouse_location")
+  lastSyncAt        DateTime @map("last_sync_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, platform, externalSku])
+  @@index([companyId, platform])
+  @@map("external_inventories")
+  @@schema("salesone")
+}
+
+model SkuMapping {
+  id            String   @id @default(uuid())
+  companyId     String   @map("company_id")
+  company       Company  @relation(fields: [companyId], references: [id])
+  platform      Platform
+  externalSku   String   @map("external_sku")
+  displayName   String   @map("display_name")
+  productId     String?  @map("product_id")
+  product       Product? @relation(fields: [productId], references: [id])
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, platform, externalSku])
+  @@index([companyId, platform])
+  @@index([productId])
+  @@map("sku_mappings")
   @@schema("salesone")
 }
