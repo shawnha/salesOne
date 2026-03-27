@@ -11,7 +11,7 @@ interface OdooJsonRpcResponse {
   jsonrpc: string;
   id: number | null;
   result?: any;
-  error?: { message: string; data: { message: string } };
+  error?: { message?: string; data?: { message?: string } };
 }
 
 interface StockQuant {
@@ -41,7 +41,7 @@ async function odooAuthenticate(
   if (!res.ok) throw new Error(`CGETC auth failed: HTTP ${res.status}`);
 
   const data: OdooJsonRpcResponse = await res.json();
-  if (data.error) throw new Error(`CGETC auth error: ${data.error.data.message}`);
+  if (data.error) throw new Error(`CGETC auth error: ${data.error.data?.message || data.error.message || "Unknown error"}`);
   if (!data.result?.uid) throw new Error("CGETC auth failed: no uid returned");
 
   const setCookie = res.headers.get("set-cookie");
@@ -80,7 +80,7 @@ async function odooSearchRead(
   if (!res.ok) throw new Error(`CGETC API error: HTTP ${res.status}`);
 
   const data: OdooJsonRpcResponse = await res.json();
-  if (data.error) throw new Error(`CGETC API error: ${data.error.data.message}`);
+  if (data.error) throw new Error(`CGETC API error: ${data.error.data?.message || data.error.message || "Unknown error"}`);
 
   return data.result || [];
 }

@@ -1,31 +1,61 @@
 import { prisma } from "@/lib/prisma";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/empty-state";
+import { MonthPicker } from "@/components/ui/month-picker";
+import { SalesChart } from "@/components/sales/SalesChart";
+import { getChannelSalesData } from "@/lib/sales-chart-data";
 import Link from "next/link";
 
-const formatWon = (n: number) => `₩${n.toLocaleString()}`;
+const formatUSD = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+
+const platformBadge: Record<string, { label: string; color: string }> = {
+  SHOPIFY: { label: "Shopify", color: "text-green-600 bg-green-600/[0.08]" },
+  AMAZON: { label: "Amazon", color: "text-orange-600 bg-orange-600/[0.08]" },
+  TIKTOK: { label: "TikTok", color: "text-pink-600 bg-pink-600/[0.08]" },
+  NAVER: { label: "Naver", color: "text-emerald-600 bg-emerald-600/[0.08]" },
+  PHARMACY: { label: "Pharmacy", color: "text-blue-600 bg-blue-600/[0.08]" },
+};
+
+function getMonthRange(monthParam?: string) {
+  const now = new Date();
+  const [y, m] = monthParam
+    ? [parseInt(monthParam.split("-")[0]), parseInt(monthParam.split("-")[1]) - 1]
+    : [now.getFullYear(), now.getMonth()];
+  const start = new Date(y, m, 1);
+  const end = new Date(y, m + 1, 1);
+  return { gte: start, lt: end };
+}
 
 export default async function SalesPage({
   searchParams,
 }: {
-  searchParams: { company?: string };
+  searchParams: { company?: string; month?: string };
 }) {
-  const where: any = { type: "SALE" as const };
+  const dateRange = getMonthRange(searchParams.month);
+
+  const where: any = {
+    type: "SALE" as const,
+    fulfillmentStatus: { in: ["FULFILLED", "DELIVERED"] },
+    financialStatus: { in: ["PAID", "PARTIALLY_PAID", "PARTIALLY_REFUNDED"] },
+    orderDate: dateRange,
+  };
   if (searchParams.company) where.companyId = searchParams.company;
 
-  const orders = await prisma.order.findMany({
-    where,
-    include: {
-      customer: { select: { name: true } },
-      company: { select: { name: true } },
-    },
-    orderBy: { orderDate: "desc" },
-    take: 100,
-  });
+  const [orders, chartData] = await Promise.all([
+    prisma.order.findMany({
+      where,
+      include: {
+        customer: { select: { name: true } },
+        company: { select: { name: true } },
+      },
+      orderBy: { orderDate: "desc" },
+    }),
+    getChannelSalesData(searchParams.company, searchParams.month),
+  ]);
 
-  const totalRevenue = orders.reduce((sum, o) => sum + Number(o.totalAmount), 0);
+  const totalRevenue = orders.reduce((sum, o) => sum + Number(o.netAmount ?? o.totalAmount), 0);
+  const orderCount = orders.length;
 
   const columns = [
     {
@@ -33,7 +63,7 @@ export default async function SalesPage({
       header: "Order #",
       render: (row: (typeof orders)[0]) => (
         <Link href={`/orders/${row.id}`} className="font-semibold text-accent hover:underline">
-          {row.orderNumber}
+          {row.externalOrderNumber || row.orderNumber}
         </Link>
       ),
     },
@@ -45,9 +75,16 @@ export default async function SalesPage({
       ),
     },
     {
-      key: "status",
-      header: "Status",
-      render: (row: (typeof orders)[0]) => <Badge status={row.status} />,
+      key: "platform",
+      header: "Channel",
+      render: (row: (typeof orders)[0]) => {
+        const p = row.externalSource ? platformBadge[row.externalSource] : null;
+        return p ? (
+          <span className={`inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full ${p.color}`}>
+            {p.label}
+          </span>
+        ) : <span className="text-[var(--text-tertiary)]">Manual</span>;
+      },
     },
     {
       key: "company",
@@ -57,11 +94,11 @@ export default async function SalesPage({
       ),
     },
     {
-      key: "totalAmount",
-      header: "Amount",
+      key: "netAmount",
+      header: "Net Amount",
       align: "right" as const,
       render: (row: (typeof orders)[0]) => (
-        <span className="font-semibold">{formatWon(Number(row.totalAmount))}</span>
+        <span className="font-semibold">{formatUSD(Number(row.netAmount ?? row.totalAmount))}</span>
       ),
     },
     {
@@ -69,7 +106,7 @@ export default async function SalesPage({
       header: "Date",
       render: (row: (typeof orders)[0]) => (
         <span className="text-[var(--text-secondary)]">
-          {new Date(row.orderDate).toLocaleDateString("ko-KR")}
+          {new Date(row.orderDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
         </span>
       ),
     },
@@ -78,15 +115,28 @@ export default async function SalesPage({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold tracking-tight">Sales</h1>
-        <div className="text-right">
-          <p className="text-xs text-[var(--text-secondary)]">Total Revenue</p>
-          <p className="text-lg font-semibold">{formatWon(totalRevenue)}</p>
+        <div className="flex items-center gap-4">
+          <h1 className="text-xl font-bold tracking-tight">Sales</h1>
+          <MonthPicker />
+        </div>
+        <div className="flex items-center gap-6">
+          <div className="text-right">
+            <p className="text-xs text-[var(--text-secondary)]">Orders</p>
+            <p className="text-lg font-semibold">{orderCount}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-[var(--text-secondary)]">Net Revenue</p>
+            <p className="text-lg font-semibold">{formatUSD(totalRevenue)}</p>
+          </div>
         </div>
       </div>
+      {/* Channel Sales Charts */}
+      <Card className="p-5">
+        <SalesChart donut={chartData.donut} monthly={chartData.monthly} />
+      </Card>
       <Card>
         {orders.length === 0 ? (
-          <EmptyState title="No sales" description="No sales orders found for the selected company." />
+          <EmptyState title="No sales" description="No delivered & paid orders for this month." />
         ) : (
           <DataTable columns={columns} data={orders} />
         )}
