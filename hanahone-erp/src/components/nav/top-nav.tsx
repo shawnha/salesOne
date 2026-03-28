@@ -25,16 +25,16 @@ export function TopNav() {
     <nav className="sticky top-4 z-40 max-w-[1400px] mx-auto px-6">
       <div className="flex items-center justify-between gap-3">
         {/* Main nav pill — logo + menu links */}
-        <div className="bg-[var(--surface)]/80 backdrop-blur-xl border border-[var(--border)] rounded-full px-6 py-2.5 flex items-center gap-8 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.06)]">
-          <Link href="/dashboard" className="font-bold text-[15px] tracking-tight whitespace-nowrap">
+        <div className="bg-[var(--surface)]/80 backdrop-blur-xl border border-[var(--border)] rounded-full px-6 py-2.5 flex items-center gap-6 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.06)] min-w-0 overflow-hidden">
+          <Link href="/dashboard" className="font-bold text-[15px] tracking-tight whitespace-nowrap flex-shrink-0">
             Hanah<span className="text-accent">One</span>
           </Link>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 overflow-x-auto scrollbar-hide">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`px-4 py-2 text-[13px] font-medium rounded-full transition-all duration-200 whitespace-nowrap ${
+                className={`px-3 py-1.5 text-[12px] font-medium rounded-full transition-all duration-200 whitespace-nowrap flex-shrink-0 ${
                   pathname === link.href || pathname?.startsWith(link.href + "/")
                     ? "text-accent bg-[var(--accent-dim)]"
                     : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
