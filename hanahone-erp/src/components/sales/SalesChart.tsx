@@ -23,6 +23,8 @@ const BAR_CHANNELS = [
   { key: "TIKTOK", label: "TikTok" },
   { key: "NAVER", label: "Naver" },
   { key: "PHARMACY", label: "Pharmacy" },
+  { key: "CGETC", label: "CGETC" },
+  { key: "SEEDING", label: "Seeding" },
   { key: "MANUAL", label: "Manual" },
 ] as const;
 
@@ -45,38 +47,42 @@ export function SalesChart({ donut, monthly }: SalesChartProps) {
       {/* Donut Chart */}
       <div className="flex flex-col items-center">
         <p className="text-xs text-[var(--text-secondary)] mb-2">Channel Breakdown</p>
-        <ResponsiveContainer width="100%" height={200}>
-          <PieChart>
-            <Pie
-              data={donut}
-              dataKey="amount"
-              nameKey="channel"
-              cx="50%"
-              cy="50%"
-              innerRadius={50}
-              outerRadius={80}
-              paddingAngle={2}
-            >
-              {donut.map((entry, i) => (
-                <Cell key={i} fill={entry.color} />
-              ))}
-            </Pie>
-            <Tooltip
-              formatter={(value) => formatUSD(Number(value))}
-              contentStyle={{
-                background: "var(--surface)",
-                border: "1px solid var(--border)",
-                borderRadius: "8px",
-                fontSize: "12px",
-              }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-        <p className="text-lg font-bold mt-[-40px]">{formatUSD(total)}</p>
-        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 justify-center">
+        <div className="relative">
+          <ResponsiveContainer width={200} height={200}>
+            <PieChart>
+              <Pie
+                data={donut}
+                dataKey="amount"
+                nameKey="channel"
+                cx="50%"
+                cy="50%"
+                innerRadius={55}
+                outerRadius={85}
+                paddingAngle={2}
+              >
+                {donut.map((entry, i) => (
+                  <Cell key={i} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip
+                formatter={(value) => formatUSD(Number(value))}
+                contentStyle={{
+                  background: "var(--surface)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <p className="text-sm font-bold">{formatUSD(total)}</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 justify-center">
           {donut.map((d) => (
             <div key={d.channel} className="flex items-center gap-1 text-[11px]">
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
+              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
               <span className="text-[var(--text-secondary)]">{d.channel}</span>
             </div>
           ))}

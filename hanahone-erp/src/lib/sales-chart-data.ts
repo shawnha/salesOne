@@ -44,9 +44,25 @@ const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Se
 
 export { CHANNEL_COLORS, CHANNEL_LABELS };
 
+function applyChannelFilter(where: any, channel?: string) {
+  if (channel === "SEEDING") {
+    where.externalSource = "CGETC";
+    where.notes = { startsWith: "free gifting", mode: "insensitive" };
+  } else if (channel === "CGETC") {
+    where.externalSource = "CGETC";
+    where.OR = [
+      { notes: null },
+      { NOT: { notes: { startsWith: "free gifting", mode: "insensitive" } } },
+    ];
+  } else if (channel) {
+    where.externalSource = channel;
+  }
+}
+
 export async function getChannelSalesData(
   companyId: string | undefined,
-  month: string | undefined
+  month: string | undefined,
+  channel?: string | undefined,
 ): Promise<{ donut: ChannelSalesData[]; monthly: MonthlyChannelData[] }> {
   const now = new Date();
   const [targetYear, targetMonth] = month
@@ -63,6 +79,7 @@ export async function getChannelSalesData(
     orderDate: { gte: monthStart, lt: monthEnd },
   };
   if (companyId) where.companyId = companyId;
+  applyChannelFilter(where, channel);
 
   const orders = await prisma.order.findMany({
     where,
@@ -94,6 +111,7 @@ export async function getChannelSalesData(
     orderDate: { gte: sixMonthsAgo, lt: monthEnd },
   };
   if (companyId) monthlyWhere.companyId = companyId;
+  applyChannelFilter(monthlyWhere, channel);
 
   const monthlyOrders = await prisma.order.findMany({
     where: monthlyWhere,

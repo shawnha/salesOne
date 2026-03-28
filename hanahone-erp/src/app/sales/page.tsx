@@ -67,7 +67,7 @@ export default async function SalesPage({
       },
       orderBy: { orderDate: "desc" },
     }),
-    getChannelSalesData(searchParams.company, searchParams.month),
+    getChannelSalesData(searchParams.company, searchParams.month, searchParams.channel),
     getUsdKrwRate(),
     prisma.company.findMany({ select: { id: true, name: true } }),
   ]);
