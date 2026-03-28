@@ -104,12 +104,16 @@ export async function getChannelSalesData(
     }))
     .sort((a, b) => b.amount - a.amount);
 
-  const sixMonthsAgo = new Date(targetYear, targetMonth - 5, 1);
+  // 7 months centered on selected month: -3 ... selected ... +3
+  const RANGE = 7;
+  const OFFSET = 3;
+  const rangeStart = new Date(targetYear, targetMonth - OFFSET, 1);
+  const rangeEnd = new Date(targetYear, targetMonth + OFFSET + 1, 1);
   const monthlyWhere: any = {
     type: "SALE",
     fulfillmentStatus: { in: ["FULFILLED", "DELIVERED"] },
     financialStatus: { in: ["PAID", "PARTIALLY_PAID", "PARTIALLY_REFUNDED"] },
-    orderDate: { gte: sixMonthsAgo, lt: monthEnd },
+    orderDate: { gte: rangeStart, lt: rangeEnd },
   };
   if (companyId) monthlyWhere.companyId = companyId;
   applyChannelFilter(monthlyWhere, channel);
@@ -120,8 +124,8 @@ export async function getChannelSalesData(
   });
 
   const monthly: MonthlyChannelData[] = [];
-  for (let i = 0; i < 6; i++) {
-    const m = new Date(targetYear, targetMonth - 5 + i, 1);
+  for (let i = 0; i < RANGE; i++) {
+    const m = new Date(targetYear, targetMonth - OFFSET + i, 1);
     monthly.push({
       month: MONTH_NAMES[m.getMonth()],
       yearMonth: `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`,
@@ -131,8 +135,8 @@ export async function getChannelSalesData(
 
   for (const order of monthlyOrders) {
     const d = new Date(order.orderDate);
-    const idx = (d.getFullYear() - sixMonthsAgo.getFullYear()) * 12 + d.getMonth() - sixMonthsAgo.getMonth();
-    if (idx >= 0 && idx < 6) {
+    const idx = (d.getFullYear() - rangeStart.getFullYear()) * 12 + d.getMonth() - rangeStart.getMonth();
+    if (idx >= 0 && idx < RANGE) {
       let channel = (order.externalSource || "MANUAL") as keyof Omit<MonthlyChannelData, "month" | "yearMonth">;
       if (channel === "CGETC" && order.notes?.toLowerCase().startsWith("free gifting")) {
         channel = "SEEDING";

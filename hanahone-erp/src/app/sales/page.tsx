@@ -170,7 +170,7 @@ export default async function SalesPage({
             ₩{exchangeRate.rate.toLocaleString()}/$ ({exchangeRate.date})
           </p>
         </div>
-        <SalesChart donut={chartData.donut} monthly={chartData.monthly} />
+        <SalesChart donut={chartData.donut} monthly={chartData.monthly} currentMonth={searchParams.month || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`} />
       </Card>
       <Card>
         {orders.length === 0 ? (

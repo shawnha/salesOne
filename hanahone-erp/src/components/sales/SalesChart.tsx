@@ -32,9 +32,10 @@ const BAR_CHANNELS = [
 interface SalesChartProps {
   donut: ChannelSalesData[];
   monthly: MonthlyChannelData[];
+  currentMonth?: string; // "YYYY-MM"
 }
 
-export function SalesChart({ donut, monthly }: SalesChartProps) {
+export function SalesChart({ donut, monthly, currentMonth }: SalesChartProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -103,12 +104,26 @@ export function SalesChart({ donut, monthly }: SalesChartProps) {
 
       {/* Stacked Bar Chart */}
       <div>
-        <p className="text-xs text-[var(--text-secondary)] mb-2">Monthly Trend (6 months)</p>
+        <p className="text-xs text-[var(--text-secondary)] mb-2">Monthly Trend</p>
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={monthly} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
             <XAxis
               dataKey="month"
-              tick={{ fontSize: 11, fill: "var(--text-secondary)" }}
+              tick={(props: any) => {
+                const { x, y, payload, index } = props;
+                const isSelected = monthly[index]?.yearMonth === currentMonth;
+                return (
+                  <text
+                    x={x} y={y + 12}
+                    textAnchor="middle"
+                    fontSize={11}
+                    fontWeight={isSelected ? 700 : 400}
+                    fill={isSelected ? "var(--text-primary)" : "var(--text-secondary)"}
+                  >
+                    {payload.value}
+                  </text>
+                );
+              }}
               axisLine={false}
               tickLine={false}
             />
