@@ -67,9 +67,14 @@ export default async function InventoryPage({
     }
   }
 
-  // Merge into unified rows
+  // Merge into unified rows — exclude internal records that overlap with CGETC live data
+  const cgetcSkus = new Set(cgetcProducts.map((p) => p.sku));
+  const filteredInventories = inventories.filter(
+    (inv) => !(inv.warehouseLocation === "CGETC" && inv.product.sku && cgetcSkus.has(inv.product.sku))
+  );
+
   const rows: InventoryRow[] = [
-    ...inventories.map((inv) => ({
+    ...filteredInventories.map((inv) => ({
       id: inv.id,
       name: inv.product.name,
       warehouse: inv.warehouseLocation,
