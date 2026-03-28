@@ -4,6 +4,8 @@ import { CompanyBreakdown } from "@/components/dashboard/company-breakdown";
 import { RecentOrders } from "@/components/dashboard/recent-orders";
 import { LowStockAlerts } from "@/components/dashboard/low-stock-alerts";
 import { DateFilter } from "@/components/ui/date-filter";
+import { fetchCgetcInventory, type CgetcProduct } from "@/lib/integrations/connectors/cgetc";
+import { decrypt } from "@/lib/integrations/encryption";
 
 function timeAgo(date: Date | null): string {
   if (!date) return "unknown";
@@ -21,15 +23,32 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
   const companyId = searchParams.company || null;
   const companyFilter = companyId ? { companyId } : {};
 
-  const [orders, allInventory, companies, productionOrders] = await Promise.all([
+  const [orders, allInventory, companies, productionOrders, cgetcConfig] = await Promise.all([
     prisma.order.findMany({ where: companyFilter, take: 5, orderBy: { orderDate: "desc" }, include: { customer: { select: { name: true } }, company: { select: { name: true } }, transfer: { include: { fromCompany: { select: { name: true } }, toCompany: { select: { name: true } } } } } }),
-    prisma.inventory.findMany({ where: companyFilter, include: { product: { select: { name: true, costPrice: true } }, company: { select: { name: true } } }, orderBy: { quantity: "asc" } }),
+    prisma.inventory.findMany({ where: companyFilter, include: { product: { select: { name: true, sku: true, costPrice: true } }, company: { select: { name: true } } }, orderBy: { quantity: "asc" } }),
     prisma.company.findMany({ select: { id: true, name: true } }),
     prisma.productionOrder.count({ where: { ...companyFilter, status: { in: ["PLANNED", "IN_PROGRESS"] } } }),
+    prisma.integrationConfig.findFirst({ where: { platform: "CGETC", isActive: true } }),
   ]);
 
-  const lowStock = allInventory.filter((inv) => inv.quantity <= inv.reorderLevel).slice(0, 5);
-  const inventoryValue = allInventory.reduce((sum, inv) => sum + inv.quantity * Number(inv.product.costPrice), 0);
+  // Fetch CGETC live inventory for dashboard KPIs
+  let cgetcProducts: CgetcProduct[] = [];
+  if (cgetcConfig) {
+    try {
+      const credentials = JSON.parse(decrypt(cgetcConfig.credentials));
+      cgetcProducts = await fetchCgetcInventory(credentials);
+    } catch {}
+  }
+
+  // Exclude internal records that overlap with CGETC live data
+  const cgetcSkus = new Set(cgetcProducts.map((p) => p.sku));
+  const filteredInventory = allInventory.filter(
+    (inv) => !(inv.warehouseLocation === "CGETC" && inv.product.sku && cgetcSkus.has(inv.product.sku))
+  );
+
+  const lowStock = filteredInventory.filter((inv) => inv.quantity <= inv.reorderLevel).slice(0, 5);
+  const inventoryValue = filteredInventory.reduce((sum, inv) => sum + inv.quantity * Number(inv.product.costPrice), 0)
+    + cgetcProducts.reduce((sum, p) => sum + p.quantity * 0, 0); // CGETC products have no costPrice yet
 
   const [totalSales, openOrders, pendingShipments, latestSyncs] = await Promise.all([
     prisma.order.aggregate({ where: { ...companyFilter, type: { in: ["SALE", "BROKERAGE"] } }, _sum: { totalAmount: true } }),
