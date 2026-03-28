@@ -8,6 +8,7 @@ export interface ChannelSalesData {
 
 export interface MonthlyChannelData {
   month: string;
+  yearMonth: string; // "YYYY-MM" for navigation
   SHOPIFY: number;
   AMAZON: number;
   TIKTOK: number;
@@ -123,6 +124,7 @@ export async function getChannelSalesData(
     const m = new Date(targetYear, targetMonth - 5 + i, 1);
     monthly.push({
       month: MONTH_NAMES[m.getMonth()],
+      yearMonth: `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`,
       SHOPIFY: 0, AMAZON: 0, TIKTOK: 0, NAVER: 0, PHARMACY: 0, CGETC: 0, SEEDING: 0, MANUAL: 0,
     });
   }
@@ -131,7 +133,7 @@ export async function getChannelSalesData(
     const d = new Date(order.orderDate);
     const idx = (d.getFullYear() - sixMonthsAgo.getFullYear()) * 12 + d.getMonth() - sixMonthsAgo.getMonth();
     if (idx >= 0 && idx < 6) {
-      let channel = (order.externalSource || "MANUAL") as keyof Omit<MonthlyChannelData, "month">;
+      let channel = (order.externalSource || "MANUAL") as keyof Omit<MonthlyChannelData, "month" | "yearMonth">;
       if (channel === "CGETC" && order.notes?.toLowerCase().startsWith("free gifting")) {
         channel = "SEEDING";
       }

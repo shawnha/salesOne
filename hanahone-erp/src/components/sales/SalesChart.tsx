@@ -11,6 +11,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import type { ChannelSalesData, MonthlyChannelData } from "@/lib/sales-chart-data";
 import { CHANNEL_COLORS } from "@/lib/sales-chart-data";
 
@@ -34,7 +35,18 @@ interface SalesChartProps {
 }
 
 export function SalesChart({ donut, monthly }: SalesChartProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const total = donut.reduce((sum, d) => sum + d.amount, 0);
+
+  function handleBarClick(data: any) {
+    if (!data?.activePayload?.[0]?.payload?.yearMonth) return;
+    const yearMonth = data.activePayload[0].payload.yearMonth;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("month", yearMonth);
+    router.push(`${pathname}?${params.toString()}`);
+  }
 
   const activeChannels = BAR_CHANNELS.filter((ch) =>
     monthly.some((m) => m[ch.key as keyof MonthlyChannelData] as number > 0)
@@ -93,7 +105,7 @@ export function SalesChart({ donut, monthly }: SalesChartProps) {
       <div>
         <p className="text-xs text-[var(--text-secondary)] mb-2">Monthly Trend (6 months)</p>
         <ResponsiveContainer width="100%" height={220}>
-          <BarChart data={monthly} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+          <BarChart data={monthly} margin={{ top: 0, right: 0, left: 0, bottom: 0 }} onClick={handleBarClick} style={{ cursor: "pointer" }}>
             <XAxis
               dataKey="month"
               tick={{ fontSize: 11, fill: "var(--text-secondary)" }}
