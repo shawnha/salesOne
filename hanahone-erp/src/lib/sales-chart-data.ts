@@ -13,6 +13,8 @@ export interface MonthlyChannelData {
   TIKTOK: number;
   NAVER: number;
   PHARMACY: number;
+  CGETC: number;
+  SEEDING: number;
   MANUAL: number;
 }
 
@@ -22,6 +24,8 @@ const CHANNEL_COLORS: Record<string, string> = {
   TIKTOK: "#000000",
   NAVER: "#03C75A",
   PHARMACY: "#6B7280",
+  CGETC: "#4F46E5",
+  SEEDING: "#7C3AED",
   MANUAL: "#9CA3AF",
 };
 
@@ -31,6 +35,8 @@ const CHANNEL_LABELS: Record<string, string> = {
   TIKTOK: "TikTok",
   NAVER: "Naver",
   PHARMACY: "Pharmacy",
+  CGETC: "CGETC",
+  SEEDING: "Seeding",
   MANUAL: "Manual",
 };
 
@@ -60,12 +66,15 @@ export async function getChannelSalesData(
 
   const orders = await prisma.order.findMany({
     where,
-    select: { externalSource: true, netAmount: true, totalAmount: true },
+    select: { externalSource: true, netAmount: true, totalAmount: true, notes: true },
   });
 
   const channelTotals: Record<string, number> = {};
   for (const order of orders) {
-    const channel = order.externalSource || "MANUAL";
+    let channel = order.externalSource || "MANUAL";
+    if (channel === "CGETC" && order.notes?.toLowerCase().startsWith("free gifting")) {
+      channel = "SEEDING";
+    }
     channelTotals[channel] = (channelTotals[channel] || 0) + Number(order.netAmount ?? order.totalAmount);
   }
 
@@ -88,7 +97,7 @@ export async function getChannelSalesData(
 
   const monthlyOrders = await prisma.order.findMany({
     where: monthlyWhere,
-    select: { externalSource: true, netAmount: true, totalAmount: true, orderDate: true },
+    select: { externalSource: true, netAmount: true, totalAmount: true, orderDate: true, notes: true },
   });
 
   const monthly: MonthlyChannelData[] = [];
@@ -96,7 +105,7 @@ export async function getChannelSalesData(
     const m = new Date(targetYear, targetMonth - 5 + i, 1);
     monthly.push({
       month: MONTH_NAMES[m.getMonth()],
-      SHOPIFY: 0, AMAZON: 0, TIKTOK: 0, NAVER: 0, PHARMACY: 0, MANUAL: 0,
+      SHOPIFY: 0, AMAZON: 0, TIKTOK: 0, NAVER: 0, PHARMACY: 0, CGETC: 0, SEEDING: 0, MANUAL: 0,
     });
   }
 
@@ -104,7 +113,10 @@ export async function getChannelSalesData(
     const d = new Date(order.orderDate);
     const idx = (d.getFullYear() - sixMonthsAgo.getFullYear()) * 12 + d.getMonth() - sixMonthsAgo.getMonth();
     if (idx >= 0 && idx < 6) {
-      const channel = (order.externalSource || "MANUAL") as keyof Omit<MonthlyChannelData, "month">;
+      let channel = (order.externalSource || "MANUAL") as keyof Omit<MonthlyChannelData, "month">;
+      if (channel === "CGETC" && order.notes?.toLowerCase().startsWith("free gifting")) {
+        channel = "SEEDING";
+      }
       if (channel in monthly[idx]) {
         monthly[idx][channel] += Number(order.netAmount ?? order.totalAmount);
       }

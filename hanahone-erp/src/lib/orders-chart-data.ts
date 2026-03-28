@@ -9,7 +9,8 @@ export interface DailyOrderData {
 
 export async function getDailyOrderData(
   companyId: string | undefined,
-  month: string | undefined // "YYYY-MM" format
+  month: string | undefined, // "YYYY-MM" format
+  channel?: string | undefined,
 ): Promise<DailyOrderData[]> {
   const now = new Date();
   const [targetYear, targetMonth] = month
@@ -25,6 +26,18 @@ export async function getDailyOrderData(
     orderDate: { gte: monthStart, lt: monthEnd },
   };
   if (companyId) where.companyId = companyId;
+  if (channel === "SEEDING") {
+    where.externalSource = "CGETC";
+    where.notes = { startsWith: "free gifting", mode: "insensitive" };
+  } else if (channel === "CGETC") {
+    where.externalSource = "CGETC";
+    where.OR = [
+      { notes: null },
+      { NOT: { notes: { startsWith: "free gifting", mode: "insensitive" } } },
+    ];
+  } else if (channel) {
+    where.externalSource = channel;
+  }
 
   const orders = await prisma.order.findMany({
     where,

@@ -66,7 +66,7 @@ export default async function OrdersPage({
       },
       orderBy: { orderDate: "desc" },
     }),
-    getDailyOrderData(searchParams.company, searchParams.month),
+    getDailyOrderData(searchParams.company, searchParams.month, searchParams.channel),
     getUsdKrwRate(),
     prisma.company.findMany({ select: { id: true, name: true } }),
   ]);
