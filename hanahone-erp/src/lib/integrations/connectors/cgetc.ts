@@ -31,8 +31,12 @@ async function authenticate(url: string, db: string, email: string, password: st
   if (data.error) throw new Error(`CGETC auth error: ${data.error.data?.message || data.error.message}`);
   if (!data.result?.uid) throw new Error("CGETC auth failed: no uid");
 
-  const setCookie = res.headers.get("set-cookie");
-  const match = setCookie?.match(/session_id=([^;]+)/);
+  // Node.js fetch: use getSetCookie() for reliable cookie extraction
+  const cookies = res.headers.getSetCookie?.() || [];
+  const setCookie = cookies.length > 0
+    ? cookies.join("; ")
+    : res.headers.get("set-cookie") || "";
+  const match = setCookie.match(/session_id=([^;]+)/);
   if (!match) throw new Error("CGETC auth failed: no session cookie");
 
   return match[1];
