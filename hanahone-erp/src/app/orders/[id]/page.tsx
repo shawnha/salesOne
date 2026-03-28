@@ -40,6 +40,23 @@ export default async function OrderDetailPage({
 
   if (!order) return notFound();
 
+  // Get refund timeline from raw external order data
+  const externalOrder = await prisma.externalOrder.findFirst({
+    where: { mappedOrderId: order.id },
+    select: { rawData: true },
+  });
+  const rawRefunds = (externalOrder?.rawData as any)?.refunds || [];
+  const refundTimeline = rawRefunds.map((r: any) => ({
+    date: r.created_at ? new Date(r.created_at) : null,
+    note: r.note || null,
+    amount: (r.transactions || []).reduce((s: number, t: any) => s + parseFloat(t.amount || "0"), 0),
+    items: (r.refund_line_items || []).map((li: any) => ({
+      title: li.line_item?.title || "Unknown",
+      quantity: li.quantity,
+      subtotal: parseFloat(li.subtotal || "0"),
+    })),
+  }));
+
   const itemColumns = [
     {
       key: "product",
@@ -243,6 +260,53 @@ export default async function OrderDetailPage({
           <DataTable columns={itemColumns} data={order.items} />
         )}
       </Card>
+
+      {refundTimeline.length > 0 && (
+        <Card>
+          <h2 className="text-sm font-bold mb-4">Refund History</h2>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 text-[13px]">
+              <div className="w-2 h-2 rounded-full bg-teal-500" />
+              <div className="flex-1">
+                <div className="flex justify-between">
+                  <span className="font-semibold">Order Placed</span>
+                  <span className="text-[var(--text-secondary)]">
+                    {new Date(order.orderDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  </span>
+                </div>
+                <p className="text-xs text-[var(--text-tertiary)] mt-0.5">{formatUSD(Number(order.totalAmount))} paid</p>
+              </div>
+            </div>
+            {refundTimeline.map((refund: any, i: number) => (
+              <div key={i} className="flex items-start gap-3 text-[13px]">
+                <div className="w-2 h-2 rounded-full bg-red-500 mt-1.5" />
+                <div className="flex-1">
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-red-600">Refund</span>
+                    <span className="text-[var(--text-secondary)]">
+                      {refund.date ? new Date(refund.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-red-500 mt-0.5">-{formatUSD(refund.amount)}</p>
+                  {refund.note && (
+                    <p className="text-xs text-[var(--text-tertiary)] mt-0.5">{refund.note}</p>
+                  )}
+                  {refund.items.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {refund.items.map((item: any, j: number) => (
+                        <div key={j} className="text-xs text-[var(--text-secondary)] flex justify-between">
+                          <span>{item.title} x{item.quantity}</span>
+                          <span>-{formatUSD(item.subtotal)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
