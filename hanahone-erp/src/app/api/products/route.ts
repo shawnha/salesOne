@@ -60,6 +60,22 @@ export async function DELETE(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
-  await prisma.product.delete({ where: { id } });
-  return NextResponse.json({ ok: true });
+  try {
+    // Delete related records that are safe to cascade
+    await prisma.$transaction([
+      prisma.skuMapping.deleteMany({ where: { productId: id } }),
+      prisma.inventory.deleteMany({ where: { productId: id } }),
+      prisma.inventorySnapshot.deleteMany({ where: { productId: id } }),
+      prisma.product.delete({ where: { id } }),
+    ]);
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    if (err.code === "P2003") {
+      return NextResponse.json(
+        { error: "Cannot delete: product has orders or production records" },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json({ error: "Failed to delete product" }, { status: 500 });
+  }
 }

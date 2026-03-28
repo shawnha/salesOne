@@ -98,7 +98,12 @@ export function ProductDeleteButton({ product }: ProductActionsProps) {
     setDeleting(true);
     try {
       const res = await fetch(`/api/products?id=${product.id}`, { method: "DELETE" });
-      if (res.ok) window.location.reload();
+      if (res.ok) {
+        window.location.reload();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Failed to delete product");
+      }
     } finally {
       setDeleting(false);
     }

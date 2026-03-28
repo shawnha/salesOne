@@ -7,6 +7,7 @@ import { shopifyConnector } from "@/lib/integrations/connectors/shopify";
 import { amazonConnector } from "@/lib/integrations/connectors/amazon";
 import { naverConnector } from "@/lib/integrations/connectors/naver";
 import { pharmacyConnector } from "@/lib/integrations/connectors/pharmacy";
+import { cgetcConnector } from "@/lib/integrations/connectors/cgetc";
 import type { Connector } from "@/lib/integrations/types";
 
 const connectors: Record<string, Connector> = {
@@ -14,6 +15,7 @@ const connectors: Record<string, Connector> = {
   AMAZON: amazonConnector,
   NAVER: naverConnector,
   PHARMACY: pharmacyConnector,
+  CGETC: cgetcConnector,
 };
 
 export async function POST(req: NextRequest, { params }: { params: { platform: string } }) {

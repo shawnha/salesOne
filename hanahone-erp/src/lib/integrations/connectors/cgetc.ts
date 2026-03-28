@@ -23,6 +23,7 @@ async function authenticate(url: string, db: string, email: string, password: st
       method: "call",
       params: { db, login: email, password },
     }),
+    signal: AbortSignal.timeout(15000),
   });
 
   if (!res.ok) throw new Error(`CGETC auth failed: HTTP ${res.status}`);
@@ -69,6 +70,9 @@ function parsePortalProducts(html: string): CgetcProduct[] {
 }
 
 export async function fetchCgetcInventory(credentials: CgetcCredentials): Promise<CgetcProduct[]> {
+  if (!credentials.url || !credentials.db || !credentials.email || !credentials.password) {
+    throw new Error("CGETC credentials incomplete");
+  }
   const sessionId = await authenticate(
     credentials.url,
     credentials.db,
@@ -78,9 +82,30 @@ export async function fetchCgetcInventory(credentials: CgetcCredentials): Promis
 
   const res = await fetch(`${credentials.url}/portal/product`, {
     headers: { Cookie: `session_id=${sessionId}` },
+    signal: AbortSignal.timeout(30000),
   });
   if (!res.ok) throw new Error(`CGETC portal error: HTTP ${res.status}`);
 
   const html = await res.text();
   return parsePortalProducts(html);
 }
+
+// Connector interface for sync-runner
+import type { Connector, ExternalInventoryData } from "../types";
+import { Platform } from "@prisma/client";
+
+export const cgetcConnector: Connector = {
+  platform: "CGETC" as Platform,
+  async fetchOrders() {
+    // CGETC is inventory-only, no orders
+    return [];
+  },
+  async fetchInventory(credentials: CgetcCredentials): Promise<ExternalInventoryData[]> {
+    const products = await fetchCgetcInventory(credentials);
+    return products.map((p) => ({
+      sku: p.sku,
+      productName: p.name,
+      quantity: p.quantity,
+    }));
+  },
+};
