@@ -26,6 +26,7 @@ export interface CgetcSaleOrder {
   channel: string;
   amount: number;
   status: string;
+  deliveryCount: number;
   warehouseId: number;
   warehouseName: string;
 }
@@ -150,7 +151,7 @@ export async function fetchCgetcSaleOrders(
     const records = await odooRpc(credentials.url, sessionId, "sale.order", "read", [batch], {
       fields: [
         "name", "partner_id", "partner_shipping_id", "origin",
-        "date_order", "amount_total", "state", "warehouse_id",
+        "date_order", "amount_total", "state", "warehouse_id", "delivery_count",
       ],
     });
 
@@ -183,6 +184,7 @@ export async function fetchCgetcSaleOrders(
         channel,
         amount: r.amount_total || 0,
         status: r.state || "",
+        deliveryCount: r.delivery_count || 0,
         warehouseId: r.warehouse_id?.[0] || 0,
         warehouseName: r.warehouse_id?.[1] || "",
       });
@@ -403,19 +405,14 @@ export async function fetchCgetcInventory(credentials: CgetcCredentials): Promis
 import type { Connector, ExternalInventoryData, ExternalOrderData } from "../types";
 import { Platform } from "@prisma/client";
 
-function mapCgetcStatus(status: string): { fulfillment: string; financial: string } {
+function mapCgetcStatus(status: string, deliveryCount: number): { fulfillment: string; financial: string } {
   const s = status.toLowerCase().trim();
-  if (s.includes("cancel")) return { fulfillment: "cancelled", financial: "refunded" };
-  if (s.includes("return")) return { fulfillment: "returned", financial: "refunded" };
-  if (s === "done" || s.includes("deliver") || s.includes("complete"))
-    return { fulfillment: "fulfilled", financial: "paid" };
-  if (s.includes("ship") || s.includes("transit") || s.includes("sent"))
-    return { fulfillment: "shipped", financial: "paid" };
-  if (s === "sale" || s.includes("confirm") || s.includes("order"))
-    return { fulfillment: "unfulfilled", financial: "paid" };
-  if (s === "draft" || s.includes("quotation"))
-    return { fulfillment: "unfulfilled", financial: "pending" };
-  return { fulfillment: "unfulfilled", financial: "paid" };
+  if (s.includes("cancel")) return { fulfillment: "CANCELLED", financial: "REFUNDED" };
+  if (s === "done") return { fulfillment: "DELIVERED", financial: "PAID" };
+  if (s === "sale" && deliveryCount > 0) return { fulfillment: "FULFILLED", financial: "PAID" };
+  if (s === "sale") return { fulfillment: "UNFULFILLED", financial: "PAID" };
+  if (s === "draft") return { fulfillment: "UNFULFILLED", financial: "PENDING" };
+  return { fulfillment: "UNFULFILLED", financial: "PAID" };
 }
 
 function mapCgetcChannel(origin: string): { overridePlatform?: Platform; channelNote?: string; skip: boolean } {
@@ -449,7 +446,7 @@ export const cgetcConnector: Connector = {
       const channel = mapCgetcChannel(so.reference);
       if (channel.skip) continue; // Skip Shopify orders (already from Shopify API)
 
-      const statuses = mapCgetcStatus(so.status);
+      const statuses = mapCgetcStatus(so.status, so.deliveryCount);
       results.push({
         externalOrderId: String(so.id),
         externalOrderNumber: so.soNumber,
