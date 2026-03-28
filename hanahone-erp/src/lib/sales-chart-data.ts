@@ -22,7 +22,7 @@ export interface MonthlyChannelData {
 const CHANNEL_COLORS: Record<string, string> = {
   SHOPIFY: "#95BF47",
   AMAZON: "#FF9900",
-  TIKTOK: "#000000",
+  TIKTOK: "#EE1D52",
   NAVER: "#03C75A",
   PHARMACY: "#6B7280",
   CGETC: "#4F46E5",

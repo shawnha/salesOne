@@ -10,6 +10,7 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
+  ReferenceArea,
 } from "recharts";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import type { ChannelSalesData, MonthlyChannelData } from "@/lib/sales-chart-data";
@@ -52,6 +53,8 @@ export function SalesChart({ donut, monthly, currentMonth }: SalesChartProps) {
   const activeChannels = BAR_CHANNELS.filter((ch) =>
     monthly.some((m) => m[ch.key as keyof MonthlyChannelData] as number > 0)
   );
+
+  const currentMonthLabel = monthly.find((m) => m.yearMonth === currentMonth)?.month;
 
   if (donut.length === 0) return null;
 
@@ -143,6 +146,16 @@ export function SalesChart({ donut, monthly, currentMonth }: SalesChartProps) {
                 fontSize: "12px",
               }}
             />
+            {currentMonthLabel && (
+              <ReferenceArea
+                x1={currentMonthLabel}
+                x2={currentMonthLabel}
+                fill="var(--accent)"
+                fillOpacity={0.06}
+                stroke="var(--accent)"
+                strokeOpacity={0.15}
+              />
+            )}
             {activeChannels.map((ch) => (
               <Bar
                 key={ch.key}
