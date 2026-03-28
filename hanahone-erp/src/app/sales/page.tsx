@@ -8,6 +8,7 @@ import { getChannelSalesData } from "@/lib/sales-chart-data";
 import { getUsdKrwRate } from "@/lib/exchange-rate";
 import { CurrencyDisplay, getPrimaryCurrency } from "@/components/ui/currency-display";
 import Link from "next/link";
+import { ChannelFilter } from "@/components/orders/channel-filter";
 
 const formatUSD = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
@@ -32,7 +33,7 @@ function getMonthRange(monthParam?: string) {
 export default async function SalesPage({
   searchParams,
 }: {
-  searchParams: { company?: string; month?: string };
+  searchParams: { company?: string; month?: string; channel?: string };
 }) {
   const dateRange = getMonthRange(searchParams.month);
 
@@ -43,6 +44,7 @@ export default async function SalesPage({
     orderDate: dateRange,
   };
   if (searchParams.company) where.companyId = searchParams.company;
+  if (searchParams.channel) where.externalSource = searchParams.channel;
 
   const [orders, chartData, exchangeRate, companies] = await Promise.all([
     prisma.order.findMany({
@@ -124,6 +126,7 @@ export default async function SalesPage({
         <div className="flex items-center gap-4">
           <h1 className="text-xl font-bold tracking-tight">Sales</h1>
           <MonthPicker />
+          <ChannelFilter />
         </div>
         <div className="flex items-center gap-6">
           <div className="text-right">
