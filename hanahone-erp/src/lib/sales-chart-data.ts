@@ -104,9 +104,9 @@ export async function getChannelSalesData(
     }))
     .sort((a, b) => b.amount - a.amount);
 
-  // 7 months centered on selected month: -3 ... selected ... +3
-  const RANGE = 7;
-  const OFFSET = 3;
+  // 5 months centered on selected month: -2 ... selected ... +2
+  const RANGE = 5;
+  const OFFSET = 2;
   const rangeStart = new Date(targetYear, targetMonth - OFFSET, 1);
   const rangeEnd = new Date(targetYear, targetMonth + OFFSET + 1, 1);
   const monthlyWhere: any = {
