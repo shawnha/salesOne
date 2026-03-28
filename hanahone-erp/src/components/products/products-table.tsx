@@ -90,9 +90,9 @@ export function ProductsTable({ products }: { products: Product[] }) {
         {products.length === 0 ? (
           <EmptyState title="No products" description="No products found." />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
             <table className="w-full text-[13px]">
-              <thead>
+              <thead className="sticky top-0 z-10 bg-[var(--surface)]">
                 <tr className="border-b border-[var(--border)] text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
                   <th className="py-3 px-4 w-10">
                     <input

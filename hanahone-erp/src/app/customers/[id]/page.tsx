@@ -128,9 +128,9 @@ export default async function CustomerDetailPage({
         {customer.orders.length === 0 ? (
           <p className="text-xs text-[var(--text-tertiary)]">No orders yet.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
             <table className="w-full text-[13px]">
-              <thead>
+              <thead className="sticky top-0 z-10 bg-[var(--surface)]">
                 <tr className="border-b border-[var(--border)] text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
                   <th className="text-left py-3 px-4">Order #</th>
                   <th className="text-left py-3 px-4">Date</th>
