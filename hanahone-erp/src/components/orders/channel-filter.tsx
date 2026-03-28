@@ -7,7 +7,8 @@ const channels = [
   { value: "SHOPIFY", label: "Shopify", color: "text-green-600" },
   { value: "TIKTOK", label: "TikTok", color: "text-pink-600" },
   { value: "AMAZON", label: "Amazon", color: "text-orange-600" },
-  { value: "CGETC", label: "CGETC", color: "text-blue-600" },
+  { value: "SEEDING", label: "Seeding", color: "text-violet-600" },
+  { value: "CGETC", label: "CGETC", color: "text-indigo-600" },
   { value: "NAVER", label: "Naver", color: "text-emerald-600" },
   { value: "PHARMACY", label: "Pharmacy", color: "text-blue-600" },
 ];

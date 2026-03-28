@@ -45,7 +45,18 @@ export default async function SalesPage({
     orderDate: dateRange,
   };
   if (searchParams.company) where.companyId = searchParams.company;
-  if (searchParams.channel) where.externalSource = searchParams.channel;
+  if (searchParams.channel === "SEEDING") {
+    where.externalSource = "CGETC";
+    where.notes = { startsWith: "free gifting", mode: "insensitive" };
+  } else if (searchParams.channel === "CGETC") {
+    where.externalSource = "CGETC";
+    where.OR = [
+      { notes: null },
+      { NOT: { notes: { startsWith: "free gifting", mode: "insensitive" } } },
+    ];
+  } else if (searchParams.channel) {
+    where.externalSource = searchParams.channel;
+  }
 
   const [orders, chartData, exchangeRate, companies] = await Promise.all([
     prisma.order.findMany({
@@ -87,6 +98,14 @@ export default async function SalesPage({
       key: "platform",
       header: "Channel",
       render: (row: (typeof orders)[0]) => {
+        const isSeeding = row.externalSource === "CGETC" && row.notes?.toLowerCase().startsWith("free gifting");
+        if (isSeeding) {
+          return (
+            <span className="inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full text-violet-600 bg-violet-600/[0.08]">
+              Seeding
+            </span>
+          );
+        }
         const p = row.externalSource ? platformBadge[row.externalSource] : null;
         return p ? (
           <span className={`inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full ${p.color}`}>
