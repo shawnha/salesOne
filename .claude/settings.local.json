@@ -62,7 +62,8 @@
       "Bash(/Users/admin/Desktop/claude/claude_2/hanahone-erp/.env:*)",
       "Bash(/Users/admin/Desktop/claude/claude_2/hanahone-erp/.env.local:*)",
       "Bash(nslookup:*)",
-      "Bash(ping:*)"
+      "Bash(ping:*)",
+      "Bash(curl:*)"
     ]
   }
 }

@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HanahOne ERP - Project Plan</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.6; }
+
+  .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+  /* Header */
+  .header { text-align: center; padding: 48px 0 32px; }
+  .header h1 { font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, #38bdf8, #818cf8, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px; }
+  .header p { color: #94a3b8; font-size: 1.1rem; }
+
+  /* Progress Bar */
+  .progress-section { background: #1e293b; border-radius: 16px; padding: 32px; margin-bottom: 32px; border: 1px solid #334155; }
+  .progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .progress-header h2 { font-size: 1.3rem; color: #f1f5f9; }
+  .progress-pct { font-size: 2rem; font-weight: 800; color: #38bdf8; }
+  .progress-bar { height: 12px; background: #334155; border-radius: 6px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, #38bdf8, #818cf8); transition: width 0.5s; }
+  .progress-stats { display: flex; gap: 32px; margin-top: 20px; flex-wrap: wrap; }
+  .stat { text-align: center; }
+  .stat-value { font-size: 1.8rem; font-weight: 700; }
+  .stat-label { font-size: 0.85rem; color: #94a3b8; margin-top: 2px; }
+  .stat-done .stat-value { color: #34d399; }
+  .stat-progress .stat-value { color: #fbbf24; }
+  .stat-todo .stat-value { color: #f87171; }
+
+  /* Phase Grid */
+  .phases { display: grid; gap: 24px; }
+
+  .phase { background: #1e293b; border-radius: 16px; border: 1px solid #334155; overflow: hidden; }
+  .phase-header { padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+  .phase-header h3 { font-size: 1.15rem; display: flex; align-items: center; gap: 10px; }
+  .phase-badge { font-size: 0.75rem; padding: 4px 12px; border-radius: 999px; font-weight: 600; }
+  .badge-done { background: #065f46; color: #34d399; }
+  .badge-progress { background: #713f12; color: #fbbf24; }
+  .badge-todo { background: #7f1d1d; color: #f87171; }
+  .phase-body { padding: 0 24px 24px; }
+
+  /* Task List */
+  .task-group { margin-bottom: 20px; }
+  .task-group-title { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 10px; font-weight: 600; }
+  .task { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; border-radius: 8px; margin-bottom: 6px; background: #0f172a; border: 1px solid #1e293b; }
+  .task:hover { border-color: #475569; }
+  .task-icon { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; margin-top: 2px; }
+  .icon-done { background: #065f46; color: #34d399; }
+  .icon-progress { background: #713f12; color: #fbbf24; }
+  .icon-todo { background: #1e293b; border: 2px solid #475569; color: #475569; }
+  .task-content { flex: 1; }
+  .task-title { font-size: 0.95rem; color: #e2e8f0; }
+  .task-desc { font-size: 0.82rem; color: #64748b; margin-top: 2px; }
+  .task-done .task-title { color: #64748b; text-decoration: line-through; }
+
+  /* Tech Stack */
+  .tech-stack { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .tech-tag { background: #334155; color: #94a3b8; padding: 4px 12px; border-radius: 6px; font-size: 0.8rem; }
+
+  /* Company cards */
+  .company-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin: 20px 0; }
+  .company-card { background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 20px; }
+  .company-card h4 { color: #38bdf8; margin-bottom: 8px; font-size: 1rem; }
+  .company-card p { color: #94a3b8; font-size: 0.85rem; }
+
+  /* Integration table */
+  .int-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  .int-table th, .int-table td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #1e293b; font-size: 0.9rem; }
+  .int-table th { color: #64748b; font-weight: 600; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; }
+  .int-table td { color: #cbd5e1; }
+  .status-chip { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
+  .chip-done { background: #065f46; color: #34d399; }
+  .chip-partial { background: #713f12; color: #fbbf24; }
+  .chip-none { background: #7f1d1d; color: #f87171; }
+
+  /* Legend */
+  .legend { display: flex; gap: 24px; margin: 24px 0; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #94a3b8; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+
+  /* Timeline */
+  .timeline { position: relative; padding-left: 32px; }
+  .timeline::before { content: ''; position: absolute; left: 10px; top: 0; bottom: 0; width: 2px; background: #334155; }
+  .timeline-item { position: relative; margin-bottom: 24px; }
+  .timeline-item::before { content: ''; position: absolute; left: -26px; top: 6px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid #334155; background: #0f172a; }
+  .timeline-item.done::before { background: #34d399; border-color: #34d399; }
+  .timeline-item.active::before { background: #fbbf24; border-color: #fbbf24; box-shadow: 0 0 8px rgba(251,191,36,0.4); }
+  .timeline-label { font-size: 0.8rem; color: #64748b; margin-bottom: 4px; }
+  .timeline-title { font-size: 1rem; color: #e2e8f0; font-weight: 600; }
+  .timeline-desc { font-size: 0.85rem; color: #94a3b8; margin-top: 4px; }
+
+  @media (max-width: 768px) {
+    .container { padding: 16px; }
+    .header h1 { font-size: 1.8rem; }
+    .progress-stats { gap: 16px; }
+    .stat-value { font-size: 1.4rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<!-- Header -->
+<div class="header">
+  <h1>HanahOne ERP</h1>
+  <p>Multi-Company, Multi-Channel Enterprise Resource Planning System</p>
+  <div class="tech-stack" style="justify-content:center; margin-top:16px;">
+    <span class="tech-tag">Next.js 14</span>
+    <span class="tech-tag">TypeScript</span>
+    <span class="tech-tag">PostgreSQL</span>
+    <span class="tech-tag">Prisma ORM</span>
+    <span class="tech-tag">NextAuth 5</span>
+    <span class="tech-tag">TailwindCSS</span>
+  </div>
+</div>
+
+<!-- Company Overview -->
+<div style="background:#1e293b; border-radius:16px; padding:24px; margin-bottom:24px; border:1px solid #334155;">
+  <h2 style="font-size:1.15rem; margin-bottom:16px; color:#f1f5f9;">Company Structure</h2>
+  <div class="company-grid">
+    <div class="company-card">
+      <h4>HOI (HanahOne Inc.)</h4>
+      <p><strong>Type:</strong> Mother Company</p>
+      <p>Distribution, Sales, Multi-channel order management</p>
+    </div>
+    <div class="company-card">
+      <h4>HOK (HanahOne Korea)</h4>
+      <p><strong>Type:</strong> Subsidiary - Manufacturing</p>
+      <p>Production, BOM, Inter-company transfers to HOI</p>
+    </div>
+    <div class="company-card">
+      <h4>HOR (HanahOne Research)</h4>
+      <p><strong>Type:</strong> Subsidiary - Consulting</p>
+      <p>Consulting engagements, Service billing</p>
+    </div>
+  </div>
+</div>
+
+<!-- Overall Progress -->
+<div class="progress-section">
+  <div class="progress-header">
+    <h2>Overall Progress</h2>
+    <span class="progress-pct">62%</span>
+  </div>
+  <div class="progress-bar">
+    <div class="progress-fill" style="width: 62%"></div>
+  </div>
+  <div class="progress-stats">
+    <div class="stat stat-done"><div class="stat-value">38</div><div class="stat-label">Completed</div></div>
+    <div class="stat stat-progress"><div class="stat-value">5</div><div class="stat-label">In Progress</div></div>
+    <div class="stat stat-todo"><div class="stat-value">18</div><div class="stat-label">To Do</div></div>
+  </div>
+  <div class="legend" style="margin-top:20px;">
+    <div class="legend-item"><div class="legend-dot" style="background:#34d399;"></div> Completed</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#fbbf24;"></div> In Progress</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f87171;"></div> To Do</div>
+  </div>
+</div>
+
+<!-- ===== PHASE 1: Foundation ===== -->
+<div class="phases">
+
+<div class="phase">
+  <div class="phase-header">
+    <h3><span>Phase 1</span> Foundation & Infrastructure</h3>
+    <span class="phase-badge badge-done">COMPLETED</span>
+  </div>
+  <div class="phase-body">
+    <div class="task-group">
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Next.js 14 App Router project setup</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">TypeScript + TailwindCSS configuration</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Prisma ORM with PostgreSQL (Supabase Session Pooler)</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Database schema: 15+ models with enums, relations, indexes</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Seed data: 3 companies, 7 users, products, customers, inventory</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">NextAuth 5 authentication (Credentials, JWT, bcrypt)</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Middleware route protection</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Multi-tenant company hierarchy (Mother / Subsidiary)</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">AES-256-GCM credential encryption</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Reusable UI components (Card, Badge, DataTable, EmptyState)</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PHASE 2: Core Modules ===== -->
+<div class="phase">
+  <div class="phase-header">
+    <h3><span>Phase 2</span> Core Business Modules</h3>
+    <span class="phase-badge badge-done">COMPLETED</span>
+  </div>
+  <div class="phase-body">
+    <div class="task-group">
+      <div class="task-group-title">Dashboard</div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">KPI overview (sales, orders, inventory, production)</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Company breakdown cards</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Recent orders widget</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Low stock alerts</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Data freshness indicators (last sync timestamps)</div></div></div>
+    </div>
+    <div class="task-group">
+      <div class="task-group-title">Orders</div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Order list with filters (company, type, status)</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Order creation form</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Order detail page with line items</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Auto-generated order numbers per company</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">API routes (GET/POST /api/orders)</div></div></div>
+    </div>
+    <div class="task-group">
+      <div class="task-group-title">Products & Inventory</div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Product catalog (SKU, pricing, categories)</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Inventory management (stock levels, warehouse locations)</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Low-stock visual alerts</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Inventory adjustment audit trail</div></div></div>
+    </div>
+    <div class="task-group">
+      <div class="task-group-title">Other Modules</div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Customers (individual, drugstore, wholesale)</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Manufacturing / Production orders (HOK)</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Inter-company transfers (HOK &rarr; HOI)</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Consulting engagements (HOR)</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PHASE 3: Integrations ===== -->
+<div class="phase">
+  <div class="phase-header">
+    <h3><span>Phase 3</span> Platform Integrations</h3>
+    <span class="phase-badge badge-progress">IN PROGRESS</span>
+  </div>
+  <div class="phase-body">
+    <div class="task-group">
+      <div class="task-group-title">Integration Infrastructure</div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Sync runner engine (connector &rarr; mapper &rarr; DB)</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Deduplication (platform + externalOrderId)</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Integration settings UI (credentials, sync history)</div></div></div>
+      <div class="task task-done"><span class="task-icon icon-done">&#10003;</span><div class="task-content"><div class="task-title">Manual sync triggers</div></div></div>
+    </div>
+
+    <table class="int-table">
+      <thead>
+        <tr><th>Platform</th><th>Status</th><th>Auth</th><th>Orders</th><th>Inventory</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Shopify</strong></td>
+          <td><span class="status-chip chip-partial">In Progress</span></td>
+          <td>OAuth 2.0</td>
+          <td>&#10003;</td>
+          <td>Stub</td>
+          <td>OAuth callback needs testing</td>
+        </tr>
+        <tr>
+          <td><strong>Amazon SP-API</strong></td>
+          <td><span class="status-chip chip-done">Done</span></td>
+          <td>LWA Token</td>
+          <td>&#10003;</td>
+          <td>Stub</td>
+          <td>Production ready</td>
+        </tr>
+        <tr>
+          <td><strong>Naver Shop</strong></td>
+          <td><span class="status-chip chip-done">Done</span></td>
+          <td>Basic Auth</td>
+          <td>&#10003;</td>
+          <td>Via API</td>
+          <td>Production ready</td>
+        </tr>
+        <tr>
+          <td><strong>TikTok (CSV)</strong></td>
+          <td><span class="status-chip chip-done">Done</span></td>
+          <td>N/A</td>
+          <td>&#10003;</td>
+          <td>N/A</td>
+          <td>CSV upload</td>
+        </tr>
+        <tr>
+          <td><strong>Pharmacy ERP</strong></td>
+          <td><span class="status-chip chip-done">Done</span></td>
+          <td>API Key</td>
+          <td>&#10003;</td>
+          <td>Via API</td>
+          <td>Generic REST connector</td>
+        </tr>
+        <tr>
+          <td><strong>CGETC</strong></td>
+          <td><span class="status-chip chip-partial">Stub</span></td>
+          <td>Defined</td>
+          <td>Stub</td>
+          <td>Stub</td>
+          <td>Awaiting API discovery</td>
+        </tr>
+        <tr>
+          <td><strong>OrderDesk</strong></td>
+          <td><span class="status-chip chip-none">Not Started</span></td>
+          <td>-</td>
+          <td>-</td>
+          <td>-</td>
+          <td>Enum exists, no connector</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===== PHASE 4: To Do ===== -->
+<div class="phase">
+  <div class="phase-header">
+    <h3><span>Phase 4</span> Advanced Features & Business Logic</h3>
+    <span class="phase-badge badge-todo">TO DO</span>
+  </div>
+  <div class="phase-body">
+    <div class="task-group">
+      <div class="task-group-title">Sales & Reports</div>
+      <div class="task"><span class="task-icon icon-todo"></span><div class="task-content"><div class="task-title">Sales analytics dashboard</div><div class="task-desc">Revenue by period, channel, product. Charts and trend lines.</div></div></div>
+      <div class="task"><span class="task-icon icon-todo"></span><div class="task-content"><div class="task-title">Reports page with exportable data</div><div class="task-desc">Profit margin reports, channel performance, inventory turnover.</div></div></div>
+      <div class="task"><span class="task-icon icon-todo"></span><div class="task-content"><div class="task-title">Margin/profit calculation (costAmount, marginAmount)</div><div class="task-desc">Auto-calculate margins on order creation based on cost prices.</div></div></div>
+    </div>
+    <div class="task-group">
+      <div class="task-group-title">Inventory Intelligence</div>
+      <div class="task"><span class="task-icon icon-todo"></span><div class="task-content"><div class="task-title">Inventory auto-adjustment on order sync</div><div class="task-desc">When orders are synced/created, automatically deduct inventory.</div></div></div>
+      <div class="task"><span class="task-icon icon-todo"></span><div class="task-content"><div class="task-title">Inventory snapshot reconciliation</div><div class="task-desc">Compare calculated vs actual inventory, highlight discrepancies.</div></div></div>
+      <div class="task"><span class="task-icon icon-todo"></span><div class="task-content"><div class="task-title">Reorder alerts and purchase order suggestions</div><div class="task-desc">When stock hits reorder level, suggest PO creation.</div></div></div>
+    </div>
+    <div class="task-group">
+      <div class="task-group-title">Order Processing</div>
+      <div class="task"><span class="task-icon icon-todo"></span><div class="task-content"><div class="task-title">Customer auto-creation during sync</div><div class="task-desc">Create customer records from external order data when they don't exist.</div></div></div>
+      <div class="task"><span class="task-icon icon-todo"></span><div class="task-content"><div class="task-title">Order status workflow automation</div><div class="task-desc">PENDING &rarr; PROCESSING &rarr; SHIPPED &rarr; DELIVERED with triggers.</div></div></div>
+      <div class="task"><span class="task-icon icon-todo"></span><div class="task-content"><div class="task-title">Brokerage order flow (HOI on behalf of customers)</div><div class="task-desc">Full brokerage order workflow with commission tracking.</div></div></div>
+    </div>
+    <div class="task-group">
+      <div class="task-group-title">Manufacturing (HOK)</div>
+      <div class="task"><span class="task-icon icon-todo"></span><div class="task-content"><div class="task-title">BOM-based material consumption tracking</div><div class="task-desc">Deduct raw materials from inventory based on BOM when production starts.</div></div></div>
+      <div class="task"><span class="task-icon icon-todo"></span><div class="task-content"><div class="task-title">Production completion &rarr; inventory increase</div><div class="task-desc">Add finished goods to inventory when production order completes.</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PHASE 5: To Do ===== -->
+<div class="phase">
+  <div class="phase-header">
+    <h3><span>Phase 5</span> Scheduled Sync & Automation</h3>
+    <span class="phase-badge badge-todo">TO DO</span>
+  </div>
+  <div class="phase-body">
+    <div class="task-group">
+      <div class="task"><span class="task-icon icon-todo"></span><div class="task-content"><div class="task-title">Cron-based scheduled sync</div><div class="task-desc">Use syncIntervalMinutes to auto-trigger syncs (Next.js cron or external).</div></div></div>
+      <div class="task"><span class="task-icon icon-todo"></span><div class="task-content"><div class="task-title">Webhook receivers for real-time updates</div><div class="task-desc">Shopify webhooks, Amazon notifications for instant order ingestion.</div></div></div>
+      <div class="task"><span class="task-icon icon-todo"></span><div class="task-content"><div class="task-title">Email/Slack notifications</div><div class="task-desc">Alert on sync failures, low stock, large orders.</div></div></div>
+      <div class="task"><span class="task-icon icon-todo"></span><div class="task-content"><div class="task-title">CGETC Phase 2: Full API implementation</div><div class="task-desc">Reverse-engineer CGETC API, implement login + order/inventory fetch.</div></div></div>
+      <div class="task"><span class="task-icon icon-todo"></span><div class="task-content"><div class="task-title">OrderDesk connector</div><div class="task-desc">Build full connector for OrderDesk platform.</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PHASE 6: To Do ===== -->
+<div class="phase">
+  <div class="phase-header">
+    <h3><span>Phase 6</span> Polish, Security & Deployment</h3>
+    <span class="phase-badge badge-todo">TO DO</span>
+  </div>
+  <div class="phase-body">
+    <div class="task-group">
+      <div class="task"><span class="task-icon icon-todo"></span><div class="task-content"><div class="task-title">Role-based access control (RBAC) enforcement</div><div class="task-desc">ADMIN/MANAGER/STAFF permissions on UI and API routes.</div></div></div>
+      <div class="task"><span class="task-icon icon-todo"></span><div class="task-content"><div class="task-title">Company-scoped data isolation</div><div class="task-desc">Ensure all queries filter by user's company context.</div></div></div>
+      <div class="task"><span class="task-icon icon-todo"></span><div class="task-content"><div class="task-title">Error handling & loading states</div><div class="task-desc">Consistent error boundaries, skeleton loaders, toast notifications.</div></div></div>
+      <div class="task"><span class="task-icon icon-todo"></span><div class="task-content"><div class="task-title">Responsive design / mobile optimization</div><div class="task-desc">Ensure all pages work well on tablets and mobile.</div></div></div>
+      <div class="task"><span class="task-icon icon-todo"></span><div class="task-content"><div class="task-title">Production deployment (Vercel / Docker)</div><div class="task-desc">CI/CD pipeline, environment configuration, health checks.</div></div></div>
+      <div class="task"><span class="task-icon icon-todo"></span><div class="task-content"><div class="task-title">Testing (unit + integration)</div><div class="task-desc">Vitest tests for connectors, mappers, API routes.</div></div></div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /phases -->
+
+<!-- Timeline -->
+<div style="background:#1e293b; border-radius:16px; padding:32px; margin-top:32px; border:1px solid #334155;">
+  <h2 style="font-size:1.15rem; margin-bottom:24px; color:#f1f5f9;">Suggested Execution Order (Next Steps)</h2>
+  <div class="timeline">
+    <div class="timeline-item active">
+      <div class="timeline-label">Priority 1 - Now</div>
+      <div class="timeline-title">Shopify OAuth flow finalization & testing</div>
+      <div class="timeline-desc">Complete the Shopify callback, test credential storage, verify order sync</div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-label">Priority 2</div>
+      <div class="timeline-title">Inventory auto-adjustment on order creation/sync</div>
+      <div class="timeline-desc">Core business logic: orders must update stock levels automatically</div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-label">Priority 3</div>
+      <div class="timeline-title">Sales analytics dashboard & reports</div>
+      <div class="timeline-desc">Revenue charts, channel breakdown, profit margins - key for business decisions</div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-label">Priority 4</div>
+      <div class="timeline-title">Customer auto-creation + order status workflow</div>
+      <div class="timeline-desc">Automate the full order lifecycle from sync to delivery</div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-label">Priority 5</div>
+      <div class="timeline-title">Manufacturing BOM consumption & production flow</div>
+      <div class="timeline-desc">HOK production pipeline: raw material deduction, finished goods creation</div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-label">Priority 6</div>
+      <div class="timeline-title">Scheduled sync, webhooks, notifications</div>
+      <div class="timeline-desc">Real-time data flow and operational alerting</div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-label">Priority 7</div>
+      <div class="timeline-title">RBAC, security hardening, deployment</div>
+      <div class="timeline-desc">Production-grade access control and deployment pipeline</div>
+    </div>
+  </div>
+</div>
+
+<!-- Footer -->
+<div style="text-align:center; padding:40px 0 24px; color:#475569; font-size:0.85rem;">
+  <p>HanahOne ERP Project Plan &mdash; Generated 2026-03-26</p>
+  <p style="margin-top:4px;">Total: 19 pages &bull; 77 source files &bull; 15+ DB models &bull; 7 platform connectors</p>
+</div>
+
+</div><!-- /container -->
+</body>
+</html>

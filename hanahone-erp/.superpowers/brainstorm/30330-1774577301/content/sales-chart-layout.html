@@ -1,0 +1,177 @@
+<h2>Sales 페이지 차트 레이아웃</h2>
+<p class="subtitle">채널별 매출 차트를 어디에, 어떤 형태로 배치할까요?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>KPI 아래 미니 차트 바</h3>
+      <p>현재 KPI (주문 수, 매출액) 아래에 채널별 도넛 차트 + 채널별 막대 차트를 한 줄로 배치</p>
+      <div class="mockup" style="margin-top:12px">
+        <div class="mockup-body" style="padding:16px">
+          <div style="display:flex;gap:8px;margin-bottom:12px;justify-content:flex-end">
+            <div style="background:#f0fdf4;padding:6px 12px;border-radius:6px;font-size:13px"><strong>32</strong> orders</div>
+            <div style="background:#f0fdf4;padding:6px 12px;border-radius:6px;font-size:13px"><strong>₩12,450,000</strong></div>
+          </div>
+          <div style="display:flex;gap:16px;align-items:center">
+            <div style="width:140px;height:140px;border-radius:50%;background:conic-gradient(#5B21B6 0% 45%, #F59E0B 45% 70%, #10B981 70% 85%, #3B82F6 85% 95%, #6B7280 95%);display:flex;align-items:center;justify-content:center">
+              <div style="width:80px;height:80px;border-radius:50%;background:#1a1a2e;display:flex;align-items:center;justify-content:center;font-size:11px;color:#ccc">채널별</div>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+                <span style="color:#5B21B6">■</span> Shopify
+                <div style="flex:1;background:#2a2a3e;border-radius:4px;height:16px;overflow:hidden"><div style="width:45%;height:100%;background:#5B21B6;border-radius:4px"></div></div>
+                <span style="color:#aaa">₩5.6M</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+                <span style="color:#F59E0B">■</span> Amazon
+                <div style="flex:1;background:#2a2a3e;border-radius:4px;height:16px;overflow:hidden"><div style="width:25%;height:100%;background:#F59E0B;border-radius:4px"></div></div>
+                <span style="color:#aaa">₩3.1M</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+                <span style="color:#10B981">■</span> Naver
+                <div style="flex:1;background:#2a2a3e;border-radius:4px;height:16px;overflow:hidden"><div style="width:15%;height:100%;background:#10B981;border-radius:4px"></div></div>
+                <span style="color:#aaa">₩1.9M</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+                <span style="color:#3B82F6">■</span> TikTok
+                <div style="flex:1;background:#2a2a3e;border-radius:4px;height:16px;overflow:hidden"><div style="width:10%;height:100%;background:#3B82F6;border-radius:4px"></div></div>
+                <span style="color:#aaa">₩1.2M</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+                <span style="color:#6B7280">■</span> Pharmacy
+                <div style="flex:1;background:#2a2a3e;border-radius:4px;height:16px;overflow:hidden"><div style="width:5%;height:100%;background:#6B7280;border-radius:4px"></div></div>
+                <span style="color:#aaa">₩0.6M</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:8px">
+        <div class="pros"><h4>장점</h4><ul><li>한눈에 비율 파악</li><li>테이블과 함께 볼 수 있음</li></ul></div>
+        <div class="cons"><h4>단점</h4><ul><li>월별 트렌드 파악 어려움</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>탭 전환 (테이블 / 차트 뷰)</h3>
+      <p>테이블 뷰와 차트 뷰를 탭으로 전환. 차트 뷰에서는 월별 추이 + 채널별 비교를 큰 차트로 표시</p>
+      <div class="mockup" style="margin-top:12px">
+        <div class="mockup-body" style="padding:16px">
+          <div style="display:flex;gap:0;margin-bottom:16px">
+            <div style="padding:8px 20px;background:#2a2a3e;border-radius:6px 0 0 6px;font-size:13px;color:#888">📊 테이블</div>
+            <div style="padding:8px 20px;background:#5B21B6;border-radius:0 6px 6px 0;font-size:13px;color:white">📈 차트</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+            <div style="background:#2a2a3e;border-radius:8px;padding:16px">
+              <div style="font-size:12px;color:#888;margin-bottom:8px">월별 매출 추이</div>
+              <div style="display:flex;align-items:flex-end;gap:4px;height:100px">
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+                  <div style="width:100%;height:40px;background:#5B21B6;border-radius:3px 3px 0 0"></div>
+                  <span style="font-size:9px;color:#888">1월</span>
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+                  <div style="width:100%;height:55px;background:#5B21B6;border-radius:3px 3px 0 0"></div>
+                  <span style="font-size:9px;color:#888">2월</span>
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+                  <div style="width:100%;height:80px;background:#5B21B6;border-radius:3px 3px 0 0"></div>
+                  <span style="font-size:9px;color:#888">3월</span>
+                </div>
+              </div>
+            </div>
+            <div style="background:#2a2a3e;border-radius:8px;padding:16px">
+              <div style="font-size:12px;color:#888;margin-bottom:8px">채널별 매출</div>
+              <div style="display:flex;align-items:flex-end;gap:8px;height:100px">
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+                  <div style="width:100%;height:80px;background:#5B21B6;border-radius:3px 3px 0 0"></div>
+                  <span style="font-size:9px;color:#888">Shopify</span>
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+                  <div style="width:100%;height:50px;background:#F59E0B;border-radius:3px 3px 0 0"></div>
+                  <span style="font-size:9px;color:#888">Amazon</span>
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+                  <div style="width:100%;height:30px;background:#10B981;border-radius:3px 3px 0 0"></div>
+                  <span style="font-size:9px;color:#888">Naver</span>
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+                  <div style="width:100%;height:20px;background:#3B82F6;border-radius:3px 3px 0 0"></div>
+                  <span style="font-size:9px;color:#888">TikTok</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:8px">
+        <div class="pros"><h4>장점</h4><ul><li>큰 차트로 트렌드 분석 가능</li><li>테이블 뷰 깔끔하게 유지</li></ul></div>
+        <div class="cons"><h4>단점</h4><ul><li>차트/테이블 동시에 못 봄</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>상단 차트 + 하단 테이블</h3>
+      <p>페이지 상단에 채널별 도넛 + 월별 추이 차트를 나란히 배치, 아래에 기존 테이블 유지</p>
+      <div class="mockup" style="margin-top:12px">
+        <div class="mockup-body" style="padding:16px">
+          <div style="display:grid;grid-template-columns:200px 1fr;gap:16px;margin-bottom:16px">
+            <div style="background:#2a2a3e;border-radius:8px;padding:16px;display:flex;flex-direction:column;align-items:center">
+              <div style="font-size:12px;color:#888;margin-bottom:8px">채널 비율</div>
+              <div style="width:120px;height:120px;border-radius:50%;background:conic-gradient(#5B21B6 0% 45%, #F59E0B 45% 70%, #10B981 70% 85%, #3B82F6 85% 95%, #6B7280 95%);display:flex;align-items:center;justify-content:center">
+                <div style="width:60px;height:60px;border-radius:50%;background:#1a1a2e"></div>
+              </div>
+            </div>
+            <div style="background:#2a2a3e;border-radius:8px;padding:16px">
+              <div style="font-size:12px;color:#888;margin-bottom:8px">월별 채널 매출 추이 (Stacked)</div>
+              <div style="display:flex;align-items:flex-end;gap:4px;height:100px">
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:0">
+                  <div style="width:100%;height:15px;background:#6B7280"></div>
+                  <div style="width:100%;height:10px;background:#3B82F6"></div>
+                  <div style="width:100%;height:15px;background:#10B981"></div>
+                  <div style="width:100%;height:20px;background:#F59E0B"></div>
+                  <div style="width:100%;height:30px;background:#5B21B6;border-radius:3px 3px 0 0"></div>
+                  <span style="font-size:9px;color:#888">1월</span>
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:0">
+                  <div style="width:100%;height:10px;background:#6B7280"></div>
+                  <div style="width:100%;height:15px;background:#3B82F6"></div>
+                  <div style="width:100%;height:20px;background:#10B981"></div>
+                  <div style="width:100%;height:25px;background:#F59E0B"></div>
+                  <div style="width:100%;height:35px;background:#5B21B6;border-radius:3px 3px 0 0"></div>
+                  <span style="font-size:9px;color:#888">2월</span>
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:0">
+                  <div style="width:100%;height:12px;background:#6B7280"></div>
+                  <div style="width:100%;height:18px;background:#3B82F6"></div>
+                  <div style="width:100%;height:22px;background:#10B981"></div>
+                  <div style="width:100%;height:28px;background:#F59E0B"></div>
+                  <div style="width:100%;height:40px;background:#5B21B6;border-radius:3px 3px 0 0"></div>
+                  <span style="font-size:9px;color:#888">3월</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="background:#2a2a3e;border-radius:8px;padding:12px;font-size:11px;color:#888">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:8px;padding:4px 0;border-bottom:1px solid #333">
+              <span>주문번호</span><span>고객</span><span>채널</span><span>금액</span><span>날짜</span>
+            </div>
+            <div style="padding:4px 0;color:#666">주문 테이블 데이터...</div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:8px">
+        <div class="pros"><h4>장점</h4><ul><li>차트와 테이블 동시 확인</li><li>월별 트렌드 + 비율 모두 표시</li></ul></div>
+        <div class="cons"><h4>단점</h4><ul><li>페이지가 길어짐</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:16px">💡 추천: <strong>C (상단 차트 + 하단 테이블)</strong> — 매출 분석과 상세 데이터를 한 페이지에서 볼 수 있어 가장 실용적입니다.</p>
