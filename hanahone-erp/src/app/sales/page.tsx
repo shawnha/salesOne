@@ -18,6 +18,7 @@ const platformBadge: Record<string, { label: string; color: string }> = {
   TIKTOK: { label: "TikTok", color: "text-pink-600 bg-pink-600/[0.08]" },
   NAVER: { label: "Naver", color: "text-emerald-600 bg-emerald-600/[0.08]" },
   PHARMACY: { label: "Pharmacy", color: "text-blue-600 bg-blue-600/[0.08]" },
+  CGETC: { label: "CGETC", color: "text-indigo-600 bg-indigo-600/[0.08]" },
 };
 
 function getMonthRange(monthParam?: string) {
