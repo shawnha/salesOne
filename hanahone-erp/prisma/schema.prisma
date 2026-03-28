@@ -202,6 +202,7 @@ model Customer {
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
+  @@unique([name, companyId])
   @@index([companyId])
   @@map("customers")
   @@schema("salesone")

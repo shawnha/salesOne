@@ -16,9 +16,11 @@ interface Customer {
   companyName: string;
 }
 
-export function CustomersTable({ customers }: { customers: Customer[] }) {
+export function CustomersTable({ customers, companyId }: { customers: Customer[]; companyId?: string }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [fetchingDetails, setFetchingDetails] = useState(false);
+  const [fetchResult, setFetchResult] = useState<string | null>(null);
 
   const allSelected = customers.length > 0 && selected.size === customers.length;
 
@@ -62,8 +64,50 @@ export function CustomersTable({ customers }: { customers: Customer[] }) {
     window.location.reload();
   }
 
+  async function handleFetchCgetcDetails() {
+    if (!companyId) return;
+    setFetchingDetails(true);
+    setFetchResult(null);
+    try {
+      const res = await fetch("/api/customers/fetch-cgetc-details", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setFetchResult(`Error: ${data.error}`);
+      } else if (data.updated === 0) {
+        setFetchResult(data.message || "No customers to update");
+      } else {
+        setFetchResult(`Updated ${data.updated}/${data.total} customers`);
+        setTimeout(() => window.location.reload(), 1500);
+      }
+    } catch {
+      setFetchResult("Failed to fetch details");
+    } finally {
+      setFetchingDetails(false);
+    }
+  }
+
   return (
     <>
+      {companyId && (
+        <div className="flex items-center gap-3">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleFetchCgetcDetails}
+            disabled={fetchingDetails}
+          >
+            {fetchingDetails ? "Fetching..." : "Fetch CGETC Details"}
+          </Button>
+          {fetchResult && (
+            <span className="text-xs text-[var(--text-secondary)]">{fetchResult}</span>
+          )}
+        </div>
+      )}
+
       {selected.size > 0 && (
         <div className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-accent/[0.06] border border-accent/[0.15]">
           <span className="text-xs font-semibold text-accent">

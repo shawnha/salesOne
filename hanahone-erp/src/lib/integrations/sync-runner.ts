@@ -34,6 +34,9 @@ export async function runSync(connector: Connector, companyId: string): Promise<
 
     for (const extOrder of externalOrders) {
       try {
+        // Use overridePlatform if set (e.g. CGETC order tagged as TIKTOK/AMAZON)
+        const effectivePlatform = extOrder.overridePlatform || connector.platform;
+
         const existing = await prisma.externalOrder.findUnique({
           where: {
             platform_externalOrderId: {
@@ -82,8 +85,8 @@ export async function runSync(connector: Connector, companyId: string): Promise<
 
         if (existing) { processed++; continue; }
 
-        // New order
-        const mappedOrder = await mapExternalOrder(extOrder, companyId, connector.platform);
+        // New order — use effectivePlatform so CGETC orders tagged as TIKTOK/AMAZON get correct externalSource
+        const mappedOrder = await mapExternalOrder(extOrder, companyId, effectivePlatform);
 
         await prisma.externalOrder.create({
           data: {

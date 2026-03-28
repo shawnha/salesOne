@@ -35,6 +35,7 @@ async function findOrCreateCustomer(
 ) {
   if (!name && !email) return null;
 
+  // Try email match first (most reliable identifier)
   if (email) {
     const existing = await prisma.customer.findFirst({
       where: { email, companyId },
@@ -42,10 +43,19 @@ async function findOrCreateCustomer(
     if (existing) return existing.id;
   }
 
-  const customer = await prisma.customer.create({
-    data: {
+  const customerName = name || "Unknown";
+
+  // Upsert by unique (name, companyId) to prevent duplicates
+  const customer = await prisma.customer.upsert({
+    where: {
+      name_companyId: { name: customerName, companyId },
+    },
+    update: {
+      ...(email ? { email } : {}),
+    },
+    create: {
       companyId,
-      name: name || "Unknown",
+      name: customerName,
       email: email || null,
       type: "INDIVIDUAL",
     },
@@ -107,6 +117,7 @@ export async function mapExternalOrder(
         deliveredAt: fulfillmentStatus === "DELIVERED" ? new Date(extOrder.orderDate) : null,
         externalSource: platform,
         externalOrderNumber: extOrder.externalOrderNumber,
+        notes: extOrder.channelNote || null,
         items: validItems.length > 0 ? {
           create: validItems.map((item) => ({
             productId: item.productId!,

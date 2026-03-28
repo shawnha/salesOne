@@ -418,14 +418,39 @@ function mapCgetcStatus(status: string): { fulfillment: string; financial: strin
   return { fulfillment: "unfulfilled", financial: "paid" };
 }
 
+function mapCgetcChannel(origin: string): { overridePlatform?: Platform; channelNote?: string; skip: boolean } {
+  const o = (origin || "").toLowerCase().trim();
+  // Shopify — already synced from Shopify API
+  if (o.includes("shopify")) return { skip: true };
+  // TikTok — "TTS #...", "TTO #...", or bare 18-digit TTS order IDs
+  if (o.includes("tts") || o.includes("tto") || o.includes("tiktok")) return { overridePlatform: "TIKTOK" as Platform, skip: false };
+  if (/^\d{15,20}$/.test(o)) return { overridePlatform: "TIKTOK" as Platform, skip: false }; // bare TTS ID
+  if (/^\d{15,20}\/\d{15,20}/.test(o)) return { overridePlatform: "TIKTOK" as Platform, skip: false }; // double TTS ID
+  // Amazon
+  if (o.includes("amazon")) return { overridePlatform: "AMAZON" as Platform, skip: false };
+  // Promotion / seeding / gifting / sample — internal CGETC operations
+  if (o.includes("gift") || o.includes("seeding") || o.includes("시딩") || o.includes("sample") || o.includes("sponsored") || o.includes("influencer") || o.includes("인플루언서") || o.includes("giveaway") || o.includes("event")) {
+    return { channelNote: origin.trim(), skip: false };
+  }
+  // PO# — wholesale/retail orders
+  if (o.includes("po#")) return { channelNote: origin.trim(), skip: false };
+  // Everything else
+  if (o) return { channelNote: "기타", skip: false };
+  return { channelNote: "기타", skip: false };
+}
+
 export const cgetcConnector: Connector = {
   platform: "CGETC" as Platform,
   async fetchOrders(credentials: CgetcCredentials, since: Date | null): Promise<ExternalOrderData[]> {
     const saleOrders = await fetchCgetcSaleOrders(credentials, since);
 
-    return saleOrders.map((so) => {
+    const results: ExternalOrderData[] = [];
+    for (const so of saleOrders) {
+      const channel = mapCgetcChannel(so.reference);
+      if (channel.skip) continue; // Skip Shopify orders (already from Shopify API)
+
       const statuses = mapCgetcStatus(so.status);
-      return {
+      results.push({
         externalOrderId: String(so.id),
         externalOrderNumber: so.soNumber,
         rawData: so,
@@ -435,8 +460,11 @@ export const cgetcConnector: Connector = {
         totalAmount: so.amount,
         customerName: so.customerName || undefined,
         items: [],
-      };
-    });
+        overridePlatform: channel.overridePlatform,
+        channelNote: channel.channelNote,
+      });
+    }
+    return results;
   },
   async fetchInventory(credentials: CgetcCredentials): Promise<ExternalInventoryData[]> {
     const products = await fetchCgetcInventory(credentials);

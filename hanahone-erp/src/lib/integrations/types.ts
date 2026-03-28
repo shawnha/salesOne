@@ -19,6 +19,10 @@ export interface ExternalOrderData {
   customerName?: string;
   customerEmail?: string;
   items: ExternalOrderItemData[];
+  /** Override the connector's platform for this order (e.g. CGETC order tagged as TIKTOK) */
+  overridePlatform?: Platform;
+  /** Channel label from source (e.g. "free gifting", "기타") */
+  channelNote?: string;
 }
 
 export interface ExternalOrderItemData {
