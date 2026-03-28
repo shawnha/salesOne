@@ -7,6 +7,7 @@ import Link from "next/link";
 import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 import { OrdersChart } from "@/components/orders/OrdersChart";
 import { TopCustomersCard } from "@/components/orders/TopCustomersCard";
+import { ChannelFilter } from "@/components/orders/channel-filter";
 import { getDailyOrderData } from "@/lib/orders-chart-data";
 import { getUsdKrwRate } from "@/lib/exchange-rate";
 import { CurrencyDisplay, getPrimaryCurrency } from "@/components/ui/currency-display";
@@ -34,13 +35,14 @@ function getMonthRange(monthParam?: string) {
 export default async function OrdersPage({
   searchParams,
 }: {
-  searchParams: { company?: string; type?: string; month?: string };
+  searchParams: { company?: string; type?: string; month?: string; channel?: string };
 }) {
   const dateRange = getMonthRange(searchParams.month);
 
   const where: any = { orderDate: dateRange };
   if (searchParams.company) where.companyId = searchParams.company;
   if (searchParams.type) where.type = searchParams.type;
+  if (searchParams.channel) where.externalSource = searchParams.channel;
 
   const [orders, chartData, exchangeRate, companies] = await Promise.all([
     prisma.order.findMany({
@@ -159,6 +161,7 @@ export default async function OrdersPage({
         <div className="flex items-center gap-4">
           <h1 className="text-xl font-bold tracking-tight">Orders</h1>
           <MonthPicker />
+          <ChannelFilter />
         </div>
         <div className="flex items-center gap-6">
           <div className="text-right">

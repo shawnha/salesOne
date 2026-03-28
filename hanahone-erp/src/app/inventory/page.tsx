@@ -156,6 +156,19 @@ export default async function InventoryPage({
 
   const lowStockCount = inventories.filter((inv) => inv.quantity <= inv.reorderLevel).length;
 
+  // Group view: separate sections per company
+  const isGroupView = !searchParams.company;
+  const companyGroups = isGroupView
+    ? Array.from(
+        rows.reduce((map, r) => {
+          const group = map.get(r.company) || { rows: [] as InventoryRow[] };
+          group.rows.push(r);
+          map.set(r.company, group);
+          return map;
+        }, new Map<string, { rows: InventoryRow[] }>())
+      ).sort(([a], [b]) => a.localeCompare(b))
+    : null;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -179,13 +192,30 @@ export default async function InventoryPage({
           CGETC sync error: {cgetcError}
         </div>
       )}
-      <Card>
-        {rows.length === 0 ? (
-          <EmptyState title="No inventory" description="No inventory records found." />
-        ) : (
-          <DataTable columns={columns} data={rows} />
-        )}
-      </Card>
+      {companyGroups ? (
+        companyGroups.map(([companyName, group]) => (
+          <div key={companyName} className="space-y-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+              {companyName} <span className="text-[var(--text-quaternary)]">({group.rows.length})</span>
+            </h2>
+            <Card>
+              {group.rows.length === 0 ? (
+                <EmptyState title="No inventory" description="No inventory records found." />
+              ) : (
+                <DataTable columns={columns} data={group.rows} />
+              )}
+            </Card>
+          </div>
+        ))
+      ) : (
+        <Card>
+          {rows.length === 0 ? (
+            <EmptyState title="No inventory" description="No inventory records found." />
+          ) : (
+            <DataTable columns={columns} data={rows} />
+          )}
+        </Card>
+      )}
     </div>
   );
 }
