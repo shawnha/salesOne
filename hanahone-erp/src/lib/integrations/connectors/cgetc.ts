@@ -14,6 +14,14 @@ export interface CgetcProduct {
   available: number;
 }
 
+export interface CgetcLineItem {
+  productName: string;
+  sku: string | null;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+}
+
 export interface CgetcSaleOrder {
   id: number;
   soNumber: string;
@@ -29,6 +37,7 @@ export interface CgetcSaleOrder {
   deliveryCount: number;
   warehouseId: number;
   warehouseName: string;
+  lineItems: CgetcLineItem[];
 }
 
 export interface CgetcOrderDetail {
@@ -151,25 +160,61 @@ export async function fetchCgetcSaleOrders(
     const records = await odooRpc(credentials.url, sessionId, "sale.order", "read", [batch], {
       fields: [
         "name", "partner_id", "partner_shipping_id", "origin",
-        "date_order", "amount_total", "state", "warehouse_id", "delivery_count",
+        "date_order", "amount_total", "state", "warehouse_id", "delivery_count", "order_line",
       ],
     });
 
     if (!Array.isArray(records)) continue;
 
+    // Collect all line IDs for batch fetch
+    const batchLineIds: number[] = [];
+    const batchRecords: typeof records = [];
+
     for (const r of records) {
+      // Filter by since date if provided
+      if (since) {
+        const orderTime = new Date(r.date_order || 0).getTime();
+        if (orderTime < since.getTime()) continue;
+      }
+      batchRecords.push(r);
+      if (r.order_line?.length > 0) batchLineIds.push(...r.order_line);
+    }
+
+    // Fetch line items for this batch
+    const lineDataMap = new Map<number, any>();
+    if (batchLineIds.length > 0) {
+      const lineRecords = await odooRpc(credentials.url, sessionId, "sale.order.line", "read", [batchLineIds], {
+        fields: ["product_id", "name", "product_uom_qty", "price_unit", "price_subtotal"],
+      });
+      if (Array.isArray(lineRecords)) {
+        for (const line of lineRecords) lineDataMap.set(line.id, line);
+      }
+    }
+
+    for (const r of batchRecords) {
       const orderDate = r.date_order ? r.date_order.split(" ")[0] : "";
-      // Determine channel from origin
       let channel = "";
       const origin = (r.origin || "") as string;
       if (origin.toLowerCase().includes("shopify")) channel = "shopify";
       else if (origin.toLowerCase().includes("tts")) channel = "tiktok_shop";
       else if (origin.toLowerCase().includes("amazon")) channel = "amazon";
 
-      // Filter by since date if provided
-      if (since) {
-        const orderTime = new Date(r.date_order || 0).getTime();
-        if (orderTime < since.getTime()) continue;
+      // Build line items
+      const lineItems: CgetcLineItem[] = [];
+      for (const lineId of (r.order_line || [])) {
+        const line = lineDataMap.get(lineId);
+        if (!line) continue;
+        const productName = line.product_id?.[1] || line.name || "";
+        if (productName.toLowerCase().includes("delivery product")) continue;
+        if (line.price_unit === 0 && line.price_subtotal === 0) continue;
+        const skuMatch = productName.match(/\[([^\]]+)\]/);
+        lineItems.push({
+          productName: productName.replace(/\[[^\]]+\]\s*/, "").trim(),
+          sku: skuMatch ? skuMatch[1] : null,
+          quantity: Math.round(line.product_uom_qty || 1),
+          unitPrice: line.price_unit || 0,
+          subtotal: line.price_subtotal || 0,
+        });
       }
 
       allOrders.push({
@@ -187,6 +232,7 @@ export async function fetchCgetcSaleOrders(
         deliveryCount: r.delivery_count || 0,
         warehouseId: r.warehouse_id?.[0] || 0,
         warehouseName: r.warehouse_id?.[1] || "",
+        lineItems,
       });
     }
   }
@@ -456,7 +502,13 @@ export const cgetcConnector: Connector = {
         financialStatus: statuses.financial,
         totalAmount: so.amount,
         customerName: so.customerName || undefined,
-        items: [],
+        items: so.lineItems.map((li) => ({
+          externalItemId: `${so.id}-${li.sku || li.productName}`,
+          productName: li.productName,
+          sku: li.sku || "",
+          quantity: li.quantity,
+          unitPrice: li.unitPrice,
+        })),
         overridePlatform: channel.overridePlatform,
         channelNote: channel.channelNote,
       });
