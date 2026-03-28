@@ -28,3 +28,39 @@ export async function POST(req: NextRequest) {
   const customer = await prisma.customer.create({ data: body });
   return NextResponse.json(customer, { status: 201 });
 }
+
+export async function DELETE(req: NextRequest) {
+  const { error } = await requireAuth();
+  if (error) return error;
+
+  const id = req.nextUrl.searchParams.get("id");
+  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+
+  try {
+    // Check if customer has orders (either as customer or brokerage customer)
+    const orderCount = await prisma.order.count({
+      where: { OR: [{ customerId: id }, { onBehalfOfCustomerId: id }] },
+    });
+    if (orderCount > 0) {
+      return NextResponse.json(
+        { error: "Cannot delete: customer has orders" },
+        { status: 409 },
+      );
+    }
+
+    // Delete related records that are safe to cascade, then the customer
+    await prisma.$transaction([
+      prisma.consultingEngagement.deleteMany({ where: { customerId: id } }),
+      prisma.customer.delete({ where: { id } }),
+    ]);
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    if (err.code === "P2003") {
+      return NextResponse.json(
+        { error: "Cannot delete: customer has orders" },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json({ error: "Failed to delete customer" }, { status: 500 });
+  }
+}

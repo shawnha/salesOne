@@ -1,9 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { DataTable } from "@/components/ui/table";
-import { EmptyState } from "@/components/ui/empty-state";
-import Link from "next/link";
+import { CustomersTable } from "@/components/customers/customers-table";
 
 export default async function CustomersPage({
   searchParams,
@@ -18,52 +14,22 @@ export default async function CustomersPage({
     orderBy: { name: "asc" },
   });
 
-  const columns = [
-    {
-      key: "name",
-      header: "Name",
-      render: (row: (typeof customers)[0]) => (
-        <Link href={`/customers/${row.id}`} className="font-semibold text-accent hover:underline">
-          {row.name}
-        </Link>
-      ),
-    },
-    {
-      key: "type",
-      header: "Type",
-      render: (row: (typeof customers)[0]) => <Badge status={row.type} />,
-    },
-    {
-      key: "contact",
-      header: "Contact",
-      render: (row: (typeof customers)[0]) => {
-        const info = row.contactInfo as Record<string, string> | null;
-        return (
-          <span className="text-[var(--text-secondary)]">
-            {info?.email || info?.phone || "—"}
-          </span>
-        );
-      },
-    },
-    {
-      key: "company",
-      header: "Company",
-      render: (row: (typeof customers)[0]) => (
-        <span className="text-[var(--text-secondary)]">{row.company.name}</span>
-      ),
-    },
-  ];
+  const data = customers.map((c) => {
+    const info = c.contactInfo as Record<string, string> | null;
+    return {
+      id: c.id,
+      name: c.name,
+      type: c.type,
+      email: info?.email || null,
+      phone: info?.phone || null,
+      companyName: c.company.name,
+    };
+  });
 
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-bold tracking-tight">Customers</h1>
-      <Card>
-        {customers.length === 0 ? (
-          <EmptyState title="No customers" description="No customers found for the selected company." />
-        ) : (
-          <DataTable columns={columns} data={customers} />
-        )}
-      </Card>
+      <CustomersTable customers={data} />
     </div>
   );
 }
