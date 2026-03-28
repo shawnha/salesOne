@@ -12,8 +12,8 @@ interface DataTableProps<T> {
 
 export function DataTable<T>({ columns, data }: DataTableProps<T>) {
   return (
-    <div>
-      <div className="grid gap-x-4" style={{ gridTemplateColumns: `repeat(${columns.length}, 1fr)` }}>
+    <div className="max-h-[70vh] overflow-y-auto">
+      <div className="grid gap-x-4 sticky top-0 z-10 bg-[var(--surface)]" style={{ gridTemplateColumns: `repeat(${columns.length}, 1fr)` }}>
         {columns.map((col) => (
           <div key={col.key} className={`text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)] pb-3 border-b border-[var(--border)] ${col.align === "right" ? "text-right" : ""}`}>
             {col.header}

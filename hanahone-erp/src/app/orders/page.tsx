@@ -1,10 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { Card } from "@/components/ui/card";
-import { DataTable } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/empty-state";
+import { OrdersTable } from "@/components/orders/orders-table";
 import { MonthPicker } from "@/components/ui/month-picker";
-import Link from "next/link";
-import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 import { OrdersChart } from "@/components/orders/OrdersChart";
 import { TopCustomersCard } from "@/components/orders/TopCustomersCard";
 import { ChannelFilter } from "@/components/orders/channel-filter";
@@ -13,15 +11,6 @@ import { getUsdKrwRate } from "@/lib/exchange-rate";
 import { CurrencyDisplay, getPrimaryCurrency } from "@/components/ui/currency-display";
 
 const formatUSD = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
-
-const platformBadge: Record<string, { label: string; color: string }> = {
-  SHOPIFY: { label: "Shopify", color: "text-green-600 bg-green-600/[0.08]" },
-  AMAZON: { label: "Amazon", color: "text-orange-600 bg-orange-600/[0.08]" },
-  TIKTOK: { label: "TikTok", color: "text-pink-600 bg-pink-600/[0.08]" },
-  NAVER: { label: "Naver", color: "text-emerald-600 bg-emerald-600/[0.08]" },
-  PHARMACY: { label: "Pharmacy", color: "text-blue-600 bg-blue-600/[0.08]" },
-  CGETC: { label: "CGETC", color: "text-indigo-600 bg-indigo-600/[0.08]" },
-};
 
 function getMonthRange(monthParam?: string) {
   const now = new Date();
@@ -60,7 +49,7 @@ export default async function OrdersPage({
     prisma.order.findMany({
       where,
       include: {
-        customer: { select: { name: true } },
+        customer: { select: { id: true, name: true } },
         company: { select: { name: true } },
         transfer: true,
       },
@@ -95,85 +84,21 @@ export default async function OrdersPage({
     .sort((a, b) => b.count - a.count)
     .slice(0, 3);
 
-  const columns = [
-    {
-      key: "orderNumber",
-      header: "Order #",
-      render: (row: (typeof orders)[0]) => (
-        <Link href={`/orders/${row.id}`} className="font-semibold text-accent hover:underline">
-          {row.externalOrderNumber || row.orderNumber}
-        </Link>
-      ),
-    },
-    {
-      key: "customer",
-      header: "Customer",
-      render: (row: (typeof orders)[0]) => (
-        <span className="text-[var(--text-secondary)]">
-          {row.customer?.name ?? "—"}
-        </span>
-      ),
-    },
-    {
-      key: "platform",
-      header: "Channel",
-      render: (row: (typeof orders)[0]) => {
-        const isSeeding = row.externalSource === "CGETC" && row.notes?.toLowerCase().startsWith("free gifting");
-        if (isSeeding) {
-          return (
-            <span className="inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full text-violet-600 bg-violet-600/[0.08]">
-              Seeding
-            </span>
-          );
-        }
-        const p = row.externalSource ? platformBadge[row.externalSource] : null;
-        return p ? (
-          <span className={`inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full ${p.color}`}>
-            {p.label}
-          </span>
-        ) : <span className="text-[var(--text-tertiary)]">Manual</span>;
-      },
-    },
-    {
-      key: "status",
-      header: "Status",
-      render: (row: (typeof orders)[0]) => (
-        <OrderStatusBadge
-          fulfillmentStatus={row.fulfillmentStatus}
-          financialStatus={row.financialStatus}
-        />
-      ),
-    },
-    {
-      key: "totalAmount",
-      header: "Amount",
-      align: "right" as const,
-      render: (row: (typeof orders)[0]) => {
-        const hasRefund = row.refundAmount && Number(row.refundAmount) > 0;
-        return (
-          <div className="text-right">
-            <span className={`font-semibold ${hasRefund ? "line-through text-[var(--text-tertiary)]" : ""}`}>
-              {formatUSD(Number(row.totalAmount))}
-            </span>
-            {hasRefund && (
-              <div className="text-[11px] text-red-500">
-                Net: {formatUSD(Number(row.netAmount ?? row.totalAmount))}
-              </div>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      key: "orderDate",
-      header: "Date",
-      render: (row: (typeof orders)[0]) => (
-        <span className="text-[var(--text-secondary)]">
-          {new Date(row.orderDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-        </span>
-      ),
-    },
-  ];
+  const orderRows = orders.map((o) => ({
+    id: o.id,
+    orderNumber: o.orderNumber,
+    externalOrderNumber: o.externalOrderNumber,
+    customerName: o.customer?.name ?? null,
+    customerId: o.customer?.id ?? null,
+    externalSource: o.externalSource,
+    fulfillmentStatus: o.fulfillmentStatus,
+    financialStatus: o.financialStatus,
+    totalAmount: Number(o.totalAmount),
+    refundAmount: o.refundAmount ? Number(o.refundAmount) : null,
+    netAmount: o.netAmount ? Number(o.netAmount) : null,
+    orderDate: o.orderDate.toISOString(),
+    notes: o.notes,
+  }));
 
   return (
     <div className="space-y-6">
@@ -230,7 +155,7 @@ export default async function OrdersPage({
         {orders.length === 0 ? (
           <EmptyState title="No orders" description="No orders found for this month." />
         ) : (
-          <DataTable columns={columns} data={orders} />
+          <OrdersTable orders={orderRows} />
         )}
       </Card>
     </div>
