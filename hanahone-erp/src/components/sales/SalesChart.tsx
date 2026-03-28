@@ -41,8 +41,8 @@ export function SalesChart({ donut, monthly }: SalesChartProps) {
   const total = donut.reduce((sum, d) => sum + d.amount, 0);
 
   function handleBarClick(data: any) {
-    if (!data?.activePayload?.[0]?.payload?.yearMonth) return;
-    const yearMonth = data.activePayload[0].payload.yearMonth;
+    const yearMonth = data?.payload?.yearMonth || data?.yearMonth;
+    if (!yearMonth) return;
     const params = new URLSearchParams(searchParams.toString());
     params.set("month", yearMonth);
     router.push(`${pathname}?${params.toString()}`);
@@ -105,7 +105,7 @@ export function SalesChart({ donut, monthly }: SalesChartProps) {
       <div>
         <p className="text-xs text-[var(--text-secondary)] mb-2">Monthly Trend (6 months)</p>
         <ResponsiveContainer width="100%" height={220}>
-          <BarChart data={monthly} margin={{ top: 0, right: 0, left: 0, bottom: 0 }} onClick={handleBarClick} style={{ cursor: "pointer" }}>
+          <BarChart data={monthly} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
             <XAxis
               dataKey="month"
               tick={{ fontSize: 11, fill: "var(--text-secondary)" }}
@@ -136,6 +136,8 @@ export function SalesChart({ donut, monthly }: SalesChartProps) {
                 stackId="sales"
                 fill={CHANNEL_COLORS[ch.key]}
                 radius={ch.key === activeChannels[activeChannels.length - 1].key ? [3, 3, 0, 0] : [0, 0, 0, 0]}
+                onClick={handleBarClick}
+                cursor="pointer"
               />
             ))}
           </BarChart>
