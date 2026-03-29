@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/cgetc-sync",
       "schedule": "0 17 * * *"
+    },
+    {
+      "path": "/api/cron/naver-sync",
+      "schedule": "0 18 * * *"
     }
   ]
 }
