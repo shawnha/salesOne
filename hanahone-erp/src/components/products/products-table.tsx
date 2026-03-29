@@ -18,8 +18,16 @@ interface Product {
   companyName: string;
 }
 
-const formatPrice = (n: number) =>
+const formatUSD = (n: number) =>
   n === 0 ? "—" : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+const formatKRW = (n: number) =>
+  n === 0 ? "—" : `₩${Math.round(n).toLocaleString("ko-KR")}`;
+
+const KRW_COMPANIES = new Set(["HOK", "HOR"]);
+
+function formatPrice(n: number, companyName: string) {
+  return KRW_COMPANIES.has(companyName) ? formatKRW(n) : formatUSD(n);
+}
 
 export function ProductsTable({ products }: { products: Product[] }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -104,7 +112,7 @@ export function ProductsTable({ products }: { products: Product[] }) {
                   </th>
                   <th className="text-left py-3 px-4">Name</th>
                   <th className="text-left py-3 px-4">SKU</th>
-                  <th className="text-left py-3 px-4">Category</th>
+                  <th className="text-left py-3 px-4">Source</th>
                   <th className="text-right py-3 px-4">Base Price</th>
                   <th className="text-right py-3 px-4">Cost Price</th>
                   <th className="text-left py-3 px-4">Company</th>
@@ -132,8 +140,8 @@ export function ProductsTable({ products }: { products: Product[] }) {
                     <td className="py-3 px-4 font-semibold">{row.name}</td>
                     <td className="py-3 px-4 text-[var(--text-secondary)] font-mono text-xs">{row.sku}</td>
                     <td className="py-3 px-4 text-[var(--text-secondary)]">{row.category}</td>
-                    <td className="py-3 px-4 text-right font-semibold">{formatPrice(row.basePrice)}</td>
-                    <td className="py-3 px-4 text-right text-[var(--text-secondary)]">{formatPrice(row.costPrice)}</td>
+                    <td className="py-3 px-4 text-right font-semibold">{formatPrice(row.basePrice, row.companyName)}</td>
+                    <td className="py-3 px-4 text-right text-[var(--text-secondary)]">{formatPrice(row.costPrice, row.companyName)}</td>
                     <td className="py-3 px-4 text-[var(--text-secondary)]">{row.companyName}</td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center gap-1 justify-end">

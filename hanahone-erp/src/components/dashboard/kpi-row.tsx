@@ -3,11 +3,12 @@ import { KpiCard } from "@/components/ui/kpi-card";
 interface KpiData {
   totalSalesKRW: number;
   totalSalesUSD: number;
-  openOrders: number;
+  totalOrders: number;
+  fulfilledOrders: number;
+  pendingOrders: number;
   inventoryValue: number;
   productionRuns: number;
   salesChange: number;
-  pendingShipments: number;
   lowStockCount: number;
   newProductionRuns: number;
 }
@@ -34,7 +35,12 @@ export function KpiRow({ data }: { data: KpiData }) {
         change={{ value: `${data.salesChange >= 0 ? "+" : ""}${data.salesChange}%`, direction: data.salesChange >= 0 ? "up" : "down" }}
         subtitle="vs previous period"
       />
-      <KpiCard label="Open orders" value={data.openOrders.toString()} change={{ value: `${data.pendingShipments} pending shipment`, direction: "neutral" }} subtitle="across all entities" />
+      <KpiCard
+        label="Orders"
+        value={data.totalOrders.toString()}
+        change={{ value: `${data.fulfilledOrders} fulfilled · ${data.pendingOrders} pending`, direction: "neutral" }}
+        subtitle="for this period"
+      />
       <KpiCard label="Inventory value" value={fmtKRW(data.inventoryValue)} change={{ value: `${data.lowStockCount} below reorder`, direction: data.lowStockCount > 0 ? "down" : "neutral" }} subtitle="combined warehouse stock" />
       <KpiCard label="Production runs" value={data.productionRuns.toString()} change={{ value: `${data.newProductionRuns} active`, direction: "up" }} subtitle="HOK manufacturing" />
     </div>

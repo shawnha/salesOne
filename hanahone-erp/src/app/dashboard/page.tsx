@@ -89,13 +89,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
   const inventoryValue = filteredInventory.reduce((sum, inv) => sum + inv.quantity * Number(inv.product.costPrice), 0)
     + cgetcProducts.reduce((sum, p) => sum + p.quantity * 0, 0); // CGETC products have no costPrice yet
 
-  const [salesOrders, openOrders, pendingShipments, latestSyncs, exchangeRate] = await Promise.all([
+  const [salesOrders, totalOrderCount, fulfilledCount, pendingCount, latestSyncs, exchangeRate] = await Promise.all([
     prisma.order.findMany({
       where: { ...companyFilter, ...dateFilter, type: { in: ["SALE", "BROKERAGE"] } },
       select: { totalAmount: true, externalSource: true },
     }),
-    prisma.order.count({ where: { ...companyFilter, ...dateFilter, fulfillmentStatus: { in: ["UNFULFILLED", "PARTIALLY_FULFILLED", "FULFILLED"] } } }),
-    prisma.order.count({ where: { ...companyFilter, ...dateFilter, fulfillmentStatus: "UNFULFILLED", financialStatus: "PAID" } }),
+    prisma.order.count({ where: { ...companyFilter, ...dateFilter } }),
+    prisma.order.count({ where: { ...companyFilter, ...dateFilter, fulfillmentStatus: { in: ["FULFILLED", "DELIVERED"] } } }),
+    prisma.order.count({ where: { ...companyFilter, ...dateFilter, fulfillmentStatus: { in: ["UNFULFILLED", "PARTIALLY_FULFILLED"] } } }),
     prisma.syncJob.findMany({
       where: { status: "SUCCESS" },
       orderBy: { completedAt: "desc" },
@@ -144,7 +145,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
         </div>
       </div>
       <div className="space-y-4">
-        <KpiRow data={{ totalSalesKRW, totalSalesUSD, openOrders, inventoryValue, productionRuns: productionOrders, salesChange: 0, pendingShipments, lowStockCount: lowStock.length, newProductionRuns: 0 }} />
+        <KpiRow data={{ totalSalesKRW, totalSalesUSD, totalOrders: totalOrderCount, fulfilledOrders: fulfilledCount, pendingOrders: pendingCount, inventoryValue, productionRuns: productionOrders, salesChange: 0, lowStockCount: lowStock.length, newProductionRuns: 0 }} />
         {latestSyncs.length > 0 && (
           <div className="flex gap-3 flex-wrap">
             {latestSyncs.map((sync) => (
