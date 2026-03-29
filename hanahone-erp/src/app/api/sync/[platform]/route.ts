@@ -5,7 +5,8 @@ import { runSync } from "@/lib/integrations/sync-runner";
 import { recalculateHokInventory } from "@/lib/integrations/inventory-calculator";
 import { shopifyConnector } from "@/lib/integrations/connectors/shopify";
 import { amazonConnector } from "@/lib/integrations/connectors/amazon";
-import { naverConnector } from "@/lib/integrations/connectors/naver";
+import { naverConnector } from "@/lib/integrations/naver";
+import { decrypt } from "@/lib/integrations/encryption";
 import { pharmacyConnector } from "@/lib/integrations/connectors/pharmacy";
 import { cgetcConnector } from "@/lib/integrations/connectors/cgetc";
 import type { Connector } from "@/lib/integrations/types";
@@ -30,6 +31,21 @@ export async function POST(req: NextRequest, { params }: { params: { platform: s
   if (!companyId) return NextResponse.json({ error: "companyId required" }, { status: 400 });
 
   const result = await runSync(connector, companyId);
+
+  // Naver: sync ExternalInventory separately (not via Connector.fetchInventory)
+  if (platform === "NAVER") {
+    try {
+      const config = await prisma.integrationConfig.findUnique({
+        where: { companyId_platform: { companyId, platform: "NAVER" } },
+      });
+      if (config) {
+        const credentials = JSON.parse(decrypt(config.credentials));
+        await naverConnector.syncInventory(credentials, companyId);
+      }
+    } catch (err) {
+      console.error("Naver inventory sync failed:", (err as Error).message);
+    }
+  }
 
   // Trigger HOK inventory recalculation for Naver/Pharmacy
   if (["NAVER", "PHARMACY"].includes(platform)) {
