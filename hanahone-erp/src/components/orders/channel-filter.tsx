@@ -2,22 +2,35 @@
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 
-const channels = [
+type Channel = { value: string; label: string; color?: string };
+
+const ALL_CHANNELS: Channel[] = [
   { value: "", label: "All" },
   { value: "SHOPIFY", label: "Shopify", color: "text-green-600" },
   { value: "TIKTOK", label: "TikTok", color: "text-pink-600" },
   { value: "AMAZON", label: "Amazon", color: "text-orange-600" },
-  { value: "SEEDING", label: "Seeding", color: "text-violet-600" },
-  { value: "CGETC", label: "CGETC", color: "text-indigo-600" },
   { value: "NAVER", label: "Naver", color: "text-emerald-600" },
   { value: "PHARMACY", label: "Pharmacy", color: "text-blue-600" },
 ];
 
-export function ChannelFilter() {
+// Company-specific channel keys (excluding "All" which is always shown)
+const COMPANY_CHANNELS: Record<string, string[]> = {
+  HOI: ["SHOPIFY", "TIKTOK", "AMAZON"],
+  HOK: ["NAVER", "PHARMACY"],
+  HOR: ["PHARMACY"],
+};
+
+export function ChannelFilter({ companyName }: { companyName?: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const current = searchParams.get("channel") || "";
+
+  // Filter channels based on selected company
+  const allowedKeys = companyName ? COMPANY_CHANNELS[companyName] : null;
+  const channels = allowedKeys
+    ? ALL_CHANNELS.filter((ch) => ch.value === "" || allowedKeys.includes(ch.value))
+    : ALL_CHANNELS;
 
   function handleClick(value: string) {
     const params = new URLSearchParams(searchParams.toString());

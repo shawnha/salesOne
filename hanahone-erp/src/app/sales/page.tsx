@@ -160,7 +160,7 @@ export default async function SalesPage({
         <div className="flex items-center gap-4">
           <h1 className="text-xl font-bold tracking-tight">Sales</h1>
           <MonthPicker />
-          <ChannelFilter />
+          <ChannelFilter companyName={companies.find((c) => c.id === searchParams.company)?.name} />
         </div>
         <div className="flex items-center gap-6">
           <div className="text-right">

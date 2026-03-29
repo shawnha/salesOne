@@ -44,10 +44,11 @@ export default async function InventoryPage({
     prisma.inventoryBaseline.findMany(),
   ]);
 
-  // Fetch CGETC inventory in real-time
+  // Fetch CGETC inventory only when viewing HOI or Group (all)
+  const showCgetc = !searchParams.company || searchParams.company === cgetcConfig?.companyId;
   let cgetcProducts: CgetcProduct[] = [];
   let cgetcError: string | null = null;
-  if (cgetcConfig) {
+  if (cgetcConfig && showCgetc) {
     try {
       const credentials = JSON.parse(decrypt(cgetcConfig.credentials));
       cgetcProducts = await fetchCgetcInventory(credentials);
