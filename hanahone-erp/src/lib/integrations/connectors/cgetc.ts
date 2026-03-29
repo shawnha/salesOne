@@ -161,6 +161,7 @@ export async function fetchCgetcSaleOrders(
       fields: [
         "name", "partner_id", "partner_shipping_id", "origin",
         "date_order", "amount_total", "state", "warehouse_id", "delivery_count", "order_line",
+        "write_date",
       ],
     });
 
@@ -171,10 +172,12 @@ export async function fetchCgetcSaleOrders(
     const batchRecords: typeof records = [];
 
     for (const r of records) {
-      // Filter by since date if provided
       if (since) {
         const orderTime = new Date(r.date_order || 0).getTime();
-        if (orderTime < since.getTime()) continue;
+        const writeTime = new Date(r.write_date || 0).getTime();
+        const sinceTime = since.getTime();
+        // Include if created OR modified after lastSyncAt
+        if (orderTime < sinceTime && writeTime < sinceTime) continue;
       }
       batchRecords.push(r);
       if (r.order_line?.length > 0) batchLineIds.push(...r.order_line);
