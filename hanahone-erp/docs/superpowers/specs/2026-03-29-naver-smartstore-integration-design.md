@@ -214,7 +214,7 @@ GET /external/v2/products?
 - Naver 재고는 참고용이며, 실제 재고는 3PL 업체가 관리
 - warehouse 라벨도 "CGETC"로 잘못 설정되는 문제 방지
 
-**구현**: naver/index.ts의 `fetchInventory()`가 데이터를 반환하되, sync-runner에서 Naver 플랫폼일 때 SkuMapping → Inventory upsert 단계를 건너뛰도록 처리. 또는 `fetchInventory()`를 반환하지 않고 별도 로직으로 ExternalInventory만 upsert.
+**구현**: Connector 인터페이스의 `fetchInventory()`는 구현하지 않는다. 대신 naver/index.ts 내부에서 별도 함수로 ExternalInventory만 직접 upsert한다. 이렇게 하면 sync-runner.ts를 수정할 필요가 없고, 플랫폼별 분기가 sync-runner에 들어가지 않는다.
 
 ---
 
