@@ -18,6 +18,9 @@ export interface ExternalOrderData {
   marginAmount?: number;
   customerName?: string;
   customerEmail?: string;
+  shippingAddress?: string;
+  recipientName?: string;
+  recipientPhone?: string;
   items: ExternalOrderItemData[];
   /** Override the connector's platform for this order (e.g. CGETC order tagged as TIKTOK) */
   overridePlatform?: Platform;

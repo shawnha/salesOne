@@ -118,6 +118,9 @@ export async function mapExternalOrder(
         externalSource: platform,
         externalOrderNumber: extOrder.externalOrderNumber,
         notes: extOrder.channelNote || null,
+        shippingAddress: extOrder.shippingAddress || null,
+        recipientName: extOrder.recipientName || null,
+        recipientPhone: extOrder.recipientPhone || null,
         items: validItems.length > 0 ? {
           create: validItems.map((item) => ({
             productId: item.productId!,
