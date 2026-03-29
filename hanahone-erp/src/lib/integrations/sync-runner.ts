@@ -4,6 +4,25 @@ import { SyncStatus } from "@prisma/client";
 import type { Connector, SyncResult } from "./types";
 import { mapExternalOrder, mapFulfillmentStatus, mapFinancialStatus } from "./mappers/order-mapper";
 
+const STALE_JOB_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
+
+export async function cleanupStaleJobs(companyId: string, platform: string) {
+  const threshold = new Date(Date.now() - STALE_JOB_THRESHOLD_MS);
+  await prisma.syncJob.updateMany({
+    where: {
+      companyId,
+      platform: platform as any,
+      status: "RUNNING",
+      startedAt: { lt: threshold },
+    },
+    data: {
+      status: "FAILED",
+      completedAt: new Date(),
+      errorMessage: "Timed out — marked stale by cleanup",
+    },
+  });
+}
+
 export async function runSync(connector: Connector, companyId: string): Promise<SyncResult> {
   const config = await prisma.integrationConfig.findUnique({
     where: { companyId_platform: { companyId, platform: connector.platform } },
@@ -12,6 +31,9 @@ export async function runSync(connector: Connector, companyId: string): Promise<
   if (!config || !config.isActive) {
     return { recordsProcessed: 0, recordsFailed: 0, errorMessage: "Integration not active" };
   }
+
+  // Clean up stale RUNNING jobs (e.g. from Vercel timeout)
+  await cleanupStaleJobs(companyId, connector.platform);
 
   // Concurrency guard
   const runningJob = await prisma.syncJob.findFirst({
