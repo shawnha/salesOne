@@ -34,6 +34,12 @@ export default async function CustomerDetailPage({
           netAmount: true,
           fulfillmentStatus: true,
           financialStatus: true,
+          items: {
+            select: {
+              quantity: true,
+              product: { select: { name: true } },
+            },
+          },
         },
       },
     },
@@ -55,6 +61,16 @@ export default async function CustomerDetailPage({
   );
   const netRevenue = customer.orders.reduce((s, o) => s + Number(o.netAmount ?? o.totalAmount), 0);
   const totalRefunded = refundedOrders.reduce((s, o) => s + Number(o.refundAmount || o.totalAmount), 0);
+
+  // Product purchase summary
+  const productCounts = new Map<string, number>();
+  for (const order of customer.orders) {
+    for (const item of order.items) {
+      const name = item.product?.name || "Unknown";
+      productCounts.set(name, (productCounts.get(name) || 0) + item.quantity);
+    }
+  }
+  const topProducts = Array.from(productCounts.entries()).sort((a, b) => b[1] - a[1]);
 
   return (
     <div className="space-y-6">
@@ -127,6 +143,22 @@ export default async function CustomerDetailPage({
               <span className="text-[var(--text-secondary)]">Net Revenue</span>
               <span className="font-bold text-base">{formatAmount(netRevenue, currency)}</span>
             </div>
+            {topProducts.length > 0 && (
+              <>
+                <div className="border-t border-[var(--border)] my-2" />
+                <div>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Products Purchased</span>
+                  <div className="mt-2 space-y-1.5">
+                    {topProducts.map(([name, qty]) => (
+                      <div key={name} className="flex justify-between">
+                        <span className="text-[var(--text-secondary)]">{name}</span>
+                        <span className="font-semibold">{qty}x</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </Card>
       </div>
@@ -142,6 +174,7 @@ export default async function CustomerDetailPage({
                 <tr className="border-b border-[var(--border)] text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
                   <th className="text-left py-3 px-4">Order #</th>
                   <th className="text-left py-3 px-4">Date</th>
+                  <th className="text-left py-3 px-4">Products</th>
                   <th className="text-left py-3 px-4">Channel</th>
                   <th className="text-left py-3 px-4">Status</th>
                   <th className="text-right py-3 px-4">Amount</th>
@@ -159,6 +192,17 @@ export default async function CustomerDetailPage({
                       </td>
                       <td className="py-3 px-4 text-[var(--text-secondary)]">
                         {new Date(order.orderDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      </td>
+                      <td className="py-3 px-4 text-[var(--text-secondary)]">
+                        {order.items.length > 0 ? (
+                          <div className="space-y-0.5">
+                            {order.items.map((item, i) => (
+                              <div key={i} className="text-xs">
+                                {item.product?.name || "Unknown"}{item.quantity > 1 ? ` x${item.quantity}` : ""}
+                              </div>
+                            ))}
+                          </div>
+                        ) : "—"}
                       </td>
                       <td className="py-3 px-4 text-[var(--text-secondary)]">
                         {order.externalSource || "Manual"}
