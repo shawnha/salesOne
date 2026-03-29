@@ -11,6 +11,17 @@ import { getUsdKrwRate } from "@/lib/exchange-rate";
 import { CurrencyDisplay, getPrimaryCurrency } from "@/components/ui/currency-display";
 
 const formatUSD = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+const formatKRW = (n: number) => `₩${Math.round(n).toLocaleString("ko-KR")}`;
+
+const KRW_PLATFORMS = new Set(["NAVER", "PHARMACY"]);
+
+function formatOrderAmount(amount: number, platform: string | null) {
+  return KRW_PLATFORMS.has(platform || "") ? formatKRW(amount) : formatUSD(amount);
+}
+
+function toUSD(amount: number, platform: string | null, exchangeRate: number) {
+  return KRW_PLATFORMS.has(platform || "") ? amount / exchangeRate : amount;
+}
 
 function getMonthRange(monthParam?: string) {
   const now = new Date();
@@ -63,7 +74,7 @@ export default async function OrdersPage({
   const primaryCurrency = getPrimaryCurrency(searchParams.company, companies);
 
   const totalOrders = orders.length;
-  const totalAmount = orders.reduce((sum, o) => sum + Number(o.totalAmount), 0);
+  const totalAmount = orders.reduce((sum, o) => sum + toUSD(Number(o.totalAmount), o.externalSource, exchangeRate.rate), 0);
   const paidCount = orders.filter(o => o.financialStatus === "PAID" || o.financialStatus === "PARTIALLY_PAID").length;
   const refundedCount = orders.filter(o => o.financialStatus === "REFUNDED" || o.financialStatus === "PARTIALLY_REFUNDED").length;
   const fulfilledCount = orders.filter(o => o.fulfillmentStatus === "FULFILLED" || o.fulfillmentStatus === "DELIVERED").length;

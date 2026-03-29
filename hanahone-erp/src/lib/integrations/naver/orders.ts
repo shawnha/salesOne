@@ -145,7 +145,7 @@ export async function fetchNaverOrders(
         {
           externalItemId: productOrder.productOrderId,
           productName: productOrder.productName,
-          sku: productOrder.sellerProductCode || productOrder.optionCode,
+          sku: productOrder.sellerProductCode || productOrder.optionCode || "",
           quantity: productOrder.quantity,
           unitPrice: productOrder.unitPrice,
         },
