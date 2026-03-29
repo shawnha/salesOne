@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { runSync } from "@/lib/integrations/sync-runner";
 import { cgetcConnector } from "@/lib/integrations/connectors/cgetc";
@@ -9,7 +10,10 @@ export function validateCronSecret(authHeader: string | null): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
   if (!authHeader) return false;
-  return authHeader === `Bearer ${secret}`;
+  const expected = Buffer.from(`Bearer ${secret}`);
+  const provided = Buffer.from(authHeader);
+  if (expected.length !== provided.length) return false;
+  return timingSafeEqual(expected, provided);
 }
 
 export async function GET(req: NextRequest) {
