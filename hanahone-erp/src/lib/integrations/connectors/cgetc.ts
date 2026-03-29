@@ -51,7 +51,7 @@ export interface CgetcOrderDetail {
 
 // ─── Auth ───────────────────────────────────────────────────
 
-async function authenticate(url: string, db: string, email: string, password: string): Promise<string> {
+export async function authenticate(url: string, db: string, email: string, password: string): Promise<string> {
   const res = await fetch(`${url}/web/session/authenticate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -103,7 +103,7 @@ async function authenticate(url: string, db: string, email: string, password: st
 
 // ─── JSON-RPC helper ────────────────────────────────────────
 
-async function odooRpc(
+export async function odooRpc(
   url: string,
   sessionId: string,
   model: string,
