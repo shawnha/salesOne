@@ -127,9 +127,24 @@ POST /external/v1/pay-order/seller/product-orders/query
 - `totalPaymentAmount`: 결제 금액
 - `productName`, `quantity`, `unitPrice`
 - `sellerProductCode`: SKU
-- `shippingAddress`: 배송지 정보 (수취인명, 주소, 전화번호)
+- `shippingAddress`: 배송지 정보 (수취인명, 주소, 전화번호) → **Order 모델 필드에 저장**
 - `ordererName`, `ordererTel`: 주문자 정보
 - `claimType`, `claimStatus`: 클레임(취소/반품/교환) 정보
+
+### DB 스키마 변경 (Order 모델)
+
+배송지/연락처 저장을 위해 Order 테이블에 필드 추가:
+
+```prisma
+model Order {
+  // ... 기존 필드 ...
+  shippingAddress   String?   // 배송지 주소
+  recipientName     String?   // 수취인명
+  recipientPhone    String?   // 수취인 전화번호
+}
+```
+
+Naver 외 다른 플랫폼(Shopify 등)에서도 활용 가능한 범용 필드. nullable이므로 기존 데이터에 영향 없음.
 
 ### 상태 매핑
 
@@ -188,13 +203,18 @@ GET /external/v2/products?
 }
 ```
 
-기존 sync-runner.ts의 재고 처리 로직(ExternalInventory upsert → SkuMapping 확인 → Inventory 업데이트)을 그대로 활용.
+기존 sync-runner.ts의 ExternalInventory upsert 로직을 활용하되, **Inventory 테이블 직접 업데이트는 건너뛴다.**
 
 ### HOK 재고 계산과의 관계
 
 현재 HOK 재고는 `InventorySnapshot` 기반 계산(초기수량 - 판매량 + 조정량).
 
-Naver 상품 API에서 재고를 가져오면 이 계산과 별개로 `ExternalInventory`에 저장된다. 실제 재고 관리는 3PL 업체가 하므로, API 재고는 참고용으로 활용. 기존 계산 방식은 유지.
+**Naver 재고는 ExternalInventory에만 저장하고, SkuMapping이 있어도 Inventory 직접 업데이트는 하지 않는다.** sync-runner의 기본 동작(SkuMapping → Inventory upsert)을 Naver에서는 건너뛰어야 한다. 이유:
+- HOK은 InventorySnapshot 기반 계산을 사용하므로 직접 덮어쓰면 충돌
+- Naver 재고는 참고용이며, 실제 재고는 3PL 업체가 관리
+- warehouse 라벨도 "CGETC"로 잘못 설정되는 문제 방지
+
+**구현**: naver/index.ts의 `fetchInventory()`가 데이터를 반환하되, sync-runner에서 Naver 플랫폼일 때 SkuMapping → Inventory upsert 단계를 건너뛰도록 처리. 또는 `fetchInventory()`를 반환하지 않고 별도 로직으로 ExternalInventory만 upsert.
 
 ---
 
@@ -206,6 +226,7 @@ Naver 상품 API에서 재고를 가져오면 이 계산과 별개로 `ExternalI
 
 - 매일 03:00 KST (CGETC 02:00 이후)
 - `vercel.json` cron schedule 추가
+- `maxDuration = 300` (Vercel Pro 플랜, 5분)
 - CRON_SECRET 검증 (기존 `validateCronSecret()` 재사용)
 - HOK의 active NAVER IntegrationConfig를 찾아 실행
 - 동기화 후 `recalculateHokInventory()` 호출
@@ -248,6 +269,13 @@ Naver API는 Token Bucket 방식 rate limit을 적용한다.
 - 토큰 캐시에 만료 시간 저장
 - API 호출 전 만료 확인, 5분 이내면 재발급
 - 토큰 발급 실패 시 즉시 sync 중단
+- **보안**: 에러 throw 시 상태코드만 포함, 응답 본문/토큰/서명값은 절대 에러 메시지에 포함하지 않음
+
+### Fetch 실패 처리
+
+- 모든 API 호출에서 응답 상태코드와 간략한 에러 메시지를 포함하여 throw
+- sync-runner의 catch-all이 SyncJob에 FAILED로 기록
+- 상세 조회(product-orders/query) 시 300건 단위로 배치 처리
 
 ### IP Whitelist
 
@@ -310,6 +338,7 @@ Naver Commerce API는 등록된 IP에서만 호출 가능. Vercel Serverless는 
 | `src/app/api/sync/[platform]/route.ts` | naverConnector import 경로 변경 |
 | `vercel.json` | naver-sync cron schedule 추가 |
 | `package.json` | `bcryptjs` 의존성 추가 |
+| `prisma/schema.prisma` | Order 모델에 shippingAddress, recipientName, recipientPhone 추가 |
 
 ### 삭제
 
@@ -373,7 +402,18 @@ Naver Commerce API는 등록된 IP에서만 호출 가능. Vercel Serverless는 
 
 ---
 
-## 12. Future Considerations (2단계)
+## 12. Known Issues (기존 코드, 이번 스펙 범위 밖)
+
+Codex 리뷰에서 발견된 기존 sync-runner/inventory-calculator 이슈:
+
+1. **취소/반품 주문 재고 차감**: `recalculateHokInventory`가 CANCELLED 주문도 판매량에 포함. `financialStatus`가 VOIDED/REFUNDED인 주문은 제외해야 함.
+2. **refundAmount 변경 감지 누락**: sync-runner의 needsUpdate 조건에 refundAmount가 없어 환불 금액 업데이트가 누락될 수 있음.
+3. **ExternalOrder unique 제약**: `(platform, externalOrderId)`이므로 동일 플랫폼에 여러 회사가 사용하면 충돌. HOR 확장 시 `(companyId, platform, externalOrderId)`로 변경 필요.
+4. **IntegrationConfig 활성화 경로**: credentials 저장 시 isActive가 자동 활성화되는지 확인 필요.
+
+---
+
+## 13. Future Considerations (2단계)
 
 추후 Push 기능 추가 시 고려 사항:
 
