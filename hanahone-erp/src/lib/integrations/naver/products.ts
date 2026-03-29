@@ -24,10 +24,12 @@ export async function fetchNaverInventory(
     const products: NaverProduct[] = data?.contents || [];
 
     for (const product of products) {
+      const channel = product.channelProducts?.[0];
+      if (!channel) continue;
       results.push({
-        sku: product.sellerManagementCode || String(product.originProductNo),
-        productName: product.name,
-        quantity: product.stockQuantity || 0,
+        sku: channel.sellerManagementCode || String(product.originProductNo),
+        productName: channel.name,
+        quantity: channel.stockQuantity || 0,
       });
     }
 

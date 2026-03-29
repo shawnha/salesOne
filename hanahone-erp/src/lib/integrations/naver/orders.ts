@@ -1,4 +1,4 @@
-import type { NaverCredentials, NaverProductOrder } from "./types";
+import type { NaverCredentials, NaverOrderDetail } from "./types";
 import type { ExternalOrderData } from "../types";
 import { naverFetch } from "./auth";
 
@@ -69,8 +69,8 @@ async function fetchChangedOrderIds(
 async function fetchOrderDetails(
   credentials: NaverCredentials,
   productOrderIds: string[],
-): Promise<NaverProductOrder[]> {
-  const results: NaverProductOrder[] = [];
+): Promise<NaverOrderDetail[]> {
+  const results: NaverOrderDetail[] = [];
   const BATCH_SIZE = 300;
 
   for (let i = 0; i < productOrderIds.length; i += BATCH_SIZE) {
@@ -89,8 +89,8 @@ async function fetchOrderDetails(
     }
 
     const json = await res.json();
-    const orders: NaverProductOrder[] = json?.data || [];
-    results.push(...orders);
+    const details: NaverOrderDetail[] = json?.data || [];
+    results.push(...details);
   }
 
   return results;
@@ -118,22 +118,23 @@ export async function fetchNaverOrders(
   }
 
   // Fetch full details
-  const orders = await fetchOrderDetails(credentials, Array.from(allIds));
+  const details = await fetchOrderDetails(credentials, Array.from(allIds));
 
   // Map to ExternalOrderData
-  return orders.map((order) => {
-    const { fulfillment, financial } = mapNaverStatus(order.productOrderStatus);
-    const addr = order.shippingAddress;
+  return details.map((detail) => {
+    const { order, productOrder } = detail;
+    const { fulfillment, financial } = mapNaverStatus(productOrder.productOrderStatus);
+    const addr = productOrder.shippingAddress;
 
     return {
-      externalOrderId: order.productOrderId,
+      externalOrderId: productOrder.productOrderId,
       externalOrderNumber: order.orderId,
-      rawData: order,
+      rawData: detail,
       orderDate: new Date(order.orderDate || order.paymentDate),
       fulfillmentStatus: fulfillment,
       financialStatus: financial,
-      totalAmount: order.totalPaymentAmount,
-      refundAmount: order.claimPrice && order.claimPrice > 0 ? order.claimPrice : undefined,
+      totalAmount: productOrder.totalPaymentAmount,
+      refundAmount: productOrder.claimPrice && productOrder.claimPrice > 0 ? productOrder.claimPrice : undefined,
       customerName: order.ordererName,
       shippingAddress: addr
         ? [addr.baseAddress, addr.detailAddress].filter(Boolean).join(" ")
@@ -142,11 +143,11 @@ export async function fetchNaverOrders(
       recipientPhone: addr?.tel1,
       items: [
         {
-          externalItemId: order.productOrderId,
-          productName: order.productName,
-          sku: order.sellerProductCode,
-          quantity: order.quantity,
-          unitPrice: order.unitPrice,
+          externalItemId: productOrder.productOrderId,
+          productName: productOrder.productName,
+          sku: productOrder.sellerProductCode || productOrder.optionCode,
+          quantity: productOrder.quantity,
+          unitPrice: productOrder.unitPrice,
         },
       ],
     };
