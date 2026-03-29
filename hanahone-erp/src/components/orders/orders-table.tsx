@@ -5,6 +5,10 @@ import Link from "next/link";
 import { OrderStatusBadge } from "./order-status-badge";
 
 const formatUSD = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+const formatKRW = (n: number) => `₩${Math.round(n).toLocaleString("ko-KR")}`;
+const KRW_PLATFORMS = new Set(["NAVER", "PHARMACY"]);
+const fmt = (n: number, platform: string | null) =>
+  KRW_PLATFORMS.has(platform || "") ? formatKRW(n) : formatUSD(n);
 
 const platformBadge: Record<string, { label: string; color: string }> = {
   SHOPIFY: { label: "Shopify", color: "text-green-600 bg-green-600/[0.08]" },
@@ -143,14 +147,14 @@ export function OrdersTable({ orders }: { orders: OrderRow[] }) {
                     {hasRefund ? (
                       <div>
                         <span className="font-semibold line-through text-[var(--text-tertiary)]">
-                          {formatUSD(row.totalAmount)}
+                          {fmt(row.totalAmount, row.externalSource)}
                         </span>
                         <div className="text-[11px] text-red-500">
-                          Net: {formatUSD(row.netAmount ?? row.totalAmount)}
+                          Net: {fmt(row.netAmount ?? row.totalAmount, row.externalSource)}
                         </div>
                       </div>
                     ) : (
-                      <span className="font-semibold">{formatUSD(row.totalAmount)}</span>
+                      <span className="font-semibold">{fmt(row.totalAmount, row.externalSource)}</span>
                     )}
                   </td>
                   <td className="py-3 px-4 text-[var(--text-secondary)]">
@@ -202,7 +206,7 @@ function ExpandedRow({
           <span className="text-[var(--text-secondary)]">
             {new Date(row.orderDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
             {" — "}
-            {formatUSD(row.totalAmount)}
+            {fmt(row.totalAmount, row.externalSource)}
           </span>
         </div>
       </div>
@@ -216,7 +220,7 @@ function ExpandedRow({
                 <span className="font-semibold text-red-600">Refund</span>
                 <span className="text-[var(--text-secondary)]">
                   {refund.date ? new Date(refund.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}
-                  {" — "}-{formatUSD(refund.amount)}
+                  {" — "}-{fmt(refund.amount, row.externalSource)}
                 </span>
               </div>
               {refund.note && (
@@ -240,7 +244,7 @@ function ExpandedRow({
           <div className="flex-1 flex justify-between">
             <span className="font-semibold text-red-600">Refunded</span>
             <span className="text-[var(--text-secondary)]">
-              -{formatUSD(row.refundAmount || row.totalAmount)}
+              -{fmt(row.refundAmount || row.totalAmount, row.externalSource)}
             </span>
           </div>
         </div>

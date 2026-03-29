@@ -11,6 +11,17 @@ import Link from "next/link";
 import { ChannelFilter } from "@/components/orders/channel-filter";
 
 const formatUSD = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+const formatKRW = (n: number) => `₩${Math.round(n).toLocaleString("ko-KR")}`;
+
+const KRW_PLATFORMS = new Set(["NAVER", "PHARMACY"]);
+
+function formatOrderAmount(amount: number, platform: string | null) {
+  return KRW_PLATFORMS.has(platform || "") ? formatKRW(amount) : formatUSD(amount);
+}
+
+function toUSD(amount: number, platform: string | null, exchangeRate: number) {
+  return KRW_PLATFORMS.has(platform || "") ? amount / exchangeRate : amount;
+}
 
 const platformBadge: Record<string, { label: string; color: string }> = {
   SHOPIFY: { label: "Shopify", color: "text-green-600 bg-green-600/[0.08]" },
@@ -68,13 +79,16 @@ export default async function SalesPage({
       orderBy: { orderDate: "desc" },
     }),
     getChannelSalesData(searchParams.company, searchParams.month, searchParams.channel),
-    getUsdKrwRate(),
+    getUsdKrwRate(dateRange.lt > new Date() ? undefined : new Date(dateRange.lt.getTime() - 1)),
     prisma.company.findMany({ select: { id: true, name: true } }),
   ]);
 
   const primaryCurrency = getPrimaryCurrency(searchParams.company, companies);
 
-  const totalRevenue = orders.reduce((sum, o) => sum + Number(o.netAmount ?? o.totalAmount), 0);
+  const totalRevenue = orders.reduce((sum, o) => {
+    const amount = Number(o.netAmount ?? o.totalAmount);
+    return sum + toUSD(amount, o.externalSource, exchangeRate.rate);
+  }, 0);
   const orderCount = orders.length;
 
   const columns = [
@@ -126,7 +140,7 @@ export default async function SalesPage({
       header: "Net Amount",
       align: "right" as const,
       render: (row: (typeof orders)[0]) => (
-        <span className="font-semibold">{formatUSD(Number(row.netAmount ?? row.totalAmount))}</span>
+        <span className="font-semibold">{formatOrderAmount(Number(row.netAmount ?? row.totalAmount), row.externalSource)}</span>
       ),
     },
     {
@@ -146,7 +160,7 @@ export default async function SalesPage({
         <div className="flex items-center gap-4">
           <h1 className="text-xl font-bold tracking-tight">Sales</h1>
           <MonthPicker />
-          <ChannelFilter />
+          <ChannelFilter companyName={companies.find((c) => c.id === searchParams.company)?.name} />
         </div>
         <div className="flex items-center gap-6">
           <div className="text-right">

@@ -9,19 +9,23 @@ export interface NaverTokenResponse {
   token_type: string; // "Bearer"
 }
 
-export interface NaverProductOrder {
-  productOrderId: string;
+export interface NaverOrderInfo {
   orderId: string;
   orderDate: string;
   paymentDate: string;
+  ordererName: string;
+  ordererTel?: string;
+}
+
+export interface NaverProductOrderInfo {
+  productOrderId: string;
   productOrderStatus: string;
   totalPaymentAmount: number;
   productName: string;
   quantity: number;
   unitPrice: number;
-  sellerProductCode: string;
-  ordererName: string;
-  ordererTel?: string;
+  sellerProductCode?: string;
+  optionCode?: string;
   shippingAddress?: {
     name: string;
     tel1: string;
@@ -34,32 +38,23 @@ export interface NaverProductOrder {
   claimPrice?: number;
 }
 
-export interface NaverLastChangedStatusesResponse {
-  data: {
-    lastChangeStatuses: Array<{
-      productOrderId: string;
-      orderId: string;
-      lastChangedDate: string;
-      lastChangedType: string;
-    }>;
-  };
+export interface NaverOrderDetail {
+  order: NaverOrderInfo;
+  productOrder: NaverProductOrderInfo;
 }
 
-export interface NaverProductOrdersResponse {
-  data: NaverProductOrder[];
+export interface NaverChannelProduct {
+  channelProductNo: number;
+  name: string;
+  statusType: string;
+  salePrice: number;
+  stockQuantity: number;
+  sellerManagementCode?: string;
 }
 
 export interface NaverProduct {
   originProductNo: number;
-  name: string;
-  salePrice: number;
-  stockQuantity: number;
-  sellerManagementCode?: string;
-  channelProducts?: Array<{
-    channelProductNo: number;
-    name: string;
-    statusType: string;
-  }>;
+  channelProducts: NaverChannelProduct[];
 }
 
 export interface NaverProductsResponse {

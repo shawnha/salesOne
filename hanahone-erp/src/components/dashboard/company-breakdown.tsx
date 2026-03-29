@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 interface CompanyData {
   name: string;
   color: string;
-  stats: { label: string; value: string }[];
+  stats: { label: string; value: string; subValue?: string }[];
 }
 
 export function CompanyBreakdown({ companies }: { companies: CompanyData[] }) {
@@ -16,7 +16,12 @@ export function CompanyBreakdown({ companies }: { companies: CompanyData[] }) {
           {c.stats.map((s) => (
             <div key={s.label} className="flex justify-between items-baseline py-2 border-b border-[var(--border)] last:border-b-0">
               <span className="text-[13px] text-[var(--text-secondary)]">{s.label}</span>
-              <span className="text-sm font-semibold">{s.value}</span>
+              <div className="text-right">
+                <span className="text-sm font-semibold">{s.value}</span>
+                {s.subValue && (
+                  <span className="text-[11px] text-[var(--text-tertiary)] ml-1.5">{s.subValue}</span>
+                )}
+              </div>
             </div>
           ))}
         </Card>

@@ -8,6 +8,10 @@ import Link from "next/link";
 import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 
 const formatUSD = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+const formatKRW = (n: number) => `₩${Math.round(n).toLocaleString("ko-KR")}`;
+const KRW_PLATFORMS = new Set(["NAVER", "PHARMACY"]);
+const fmt = (n: number, platform: string | null) =>
+  KRW_PLATFORMS.has(platform || "") ? formatKRW(n) : formatUSD(n);
 
 const platformLabels: Record<string, string> = {
   SHOPIFY: "Shopify",
@@ -85,7 +89,7 @@ export default async function OrderDetailPage({
       header: "Unit Price",
       align: "right" as const,
       render: (row: (typeof order.items)[0]) => (
-        <span className="text-[var(--text-secondary)]">{formatUSD(Number(row.unitPrice))}</span>
+        <span className="text-[var(--text-secondary)]">{fmt(Number(row.unitPrice), order.externalSource)}</span>
       ),
     },
     {
@@ -93,7 +97,7 @@ export default async function OrderDetailPage({
       header: "Subtotal",
       align: "right" as const,
       render: (row: (typeof order.items)[0]) => (
-        <span className="font-semibold">{formatUSD(Number(row.subtotal))}</span>
+        <span className="font-semibold">{fmt(Number(row.subtotal), order.externalSource)}</span>
       ),
     },
   ];
@@ -198,31 +202,31 @@ export default async function OrderDetailPage({
             <div className="border-t border-[var(--border)] my-2" />
             <div className="flex justify-between">
               <span className="text-[var(--text-secondary)]">Total Amount</span>
-              <span className="font-semibold">{formatUSD(Number(order.totalAmount))}</span>
+              <span className="font-semibold">{fmt(Number(order.totalAmount), order.externalSource)}</span>
             </div>
             {order.refundAmount && Number(order.refundAmount) > 0 && (
               <div className="flex justify-between">
                 <span className="text-[var(--text-secondary)]">Refund</span>
-                <span className="font-semibold text-red-500">-{formatUSD(Number(order.refundAmount))}</span>
+                <span className="font-semibold text-red-500">-{fmt(Number(order.refundAmount), order.externalSource)}</span>
               </div>
             )}
             <div className="flex justify-between">
               <span className="text-[var(--text-secondary)]">Net Amount</span>
-              <span className="font-bold text-base">{formatUSD(Number(order.netAmount ?? order.totalAmount))}</span>
+              <span className="font-bold text-base">{fmt(Number(order.netAmount ?? order.totalAmount), order.externalSource)}</span>
             </div>
             {order.costAmount && (
               <>
                 <div className="border-t border-[var(--border)] my-2" />
                 <div className="flex justify-between">
                   <span className="text-[var(--text-secondary)]">Cost</span>
-                  <span className="font-semibold">{formatUSD(Number(order.costAmount))}</span>
+                  <span className="font-semibold">{fmt(Number(order.costAmount), order.externalSource)}</span>
                 </div>
               </>
             )}
             {order.marginAmount && (
               <div className="flex justify-between">
                 <span className="text-[var(--text-secondary)]">Margin</span>
-                <span className="font-semibold">{formatUSD(Number(order.marginAmount))}</span>
+                <span className="font-semibold">{fmt(Number(order.marginAmount), order.externalSource)}</span>
               </div>
             )}
           </div>
@@ -274,7 +278,7 @@ export default async function OrderDetailPage({
                     {new Date(order.orderDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                   </span>
                 </div>
-                <p className="text-xs text-[var(--text-tertiary)] mt-0.5">{formatUSD(Number(order.totalAmount))} paid</p>
+                <p className="text-xs text-[var(--text-tertiary)] mt-0.5">{fmt(Number(order.totalAmount), order.externalSource)} paid</p>
               </div>
             </div>
             {refundTimeline.map((refund: any, i: number) => (
@@ -287,7 +291,7 @@ export default async function OrderDetailPage({
                       {refund.date ? new Date(refund.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}
                     </span>
                   </div>
-                  <p className="text-xs text-red-500 mt-0.5">-{formatUSD(refund.amount)}</p>
+                  <p className="text-xs text-red-500 mt-0.5">-{fmt(refund.amount, order.externalSource)}</p>
                   {refund.note && (
                     <p className="text-xs text-[var(--text-tertiary)] mt-0.5">{refund.note}</p>
                   )}
@@ -296,7 +300,7 @@ export default async function OrderDetailPage({
                       {refund.items.map((item: any, j: number) => (
                         <div key={j} className="text-xs text-[var(--text-secondary)] flex justify-between">
                           <span>{item.title} x{item.quantity}</span>
-                          <span>-{formatUSD(item.subtotal)}</span>
+                          <span>-{fmt(item.subtotal, order.externalSource)}</span>
                         </div>
                       ))}
                     </div>

@@ -5,37 +5,54 @@ interface ExchangeRateCache {
 }
 
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
-let cache: ExchangeRateCache | null = null;
+const cacheMap = new Map<string, ExchangeRateCache>(); // key: "YYYY-MM" or "current"
 
 export interface ExchangeRate {
   rate: number; // KRW per 1 USD
   date: string; // "2026-03-27"
 }
 
-export async function getUsdKrwRate(): Promise<ExchangeRate> {
-  // Return cache if valid
-  if (cache && Date.now() - cache.fetchedAt < CACHE_TTL_MS) {
-    return { rate: cache.rate, date: cache.date };
+/**
+ * Fetch USD/KRW exchange rate.
+ * - No args or asOf in current month → today's rate (cached 1hr)
+ * - asOf in past month → closing rate of that month (last business day, cached indefinitely)
+ */
+export async function getUsdKrwRate(asOf?: Date): Promise<ExchangeRate> {
+  const now = new Date();
+  const target = asOf || now;
+  const isCurrentMonth = target.getFullYear() === now.getFullYear() && target.getMonth() === now.getMonth();
+  const cacheKey = isCurrentMonth ? "current" : `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, "0")}`;
+
+  const cached = cacheMap.get(cacheKey);
+  if (cached) {
+    // Current month: honor TTL. Past months: cache forever (rate won't change)
+    if (!isCurrentMonth || Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+      return { rate: cached.rate, date: cached.date };
+    }
   }
 
   const apiKey = process.env.KOREAEXIM_API_KEY;
   if (!apiKey) {
-    // Fallback if no API key configured
-    return cache
-      ? { rate: cache.rate, date: cache.date }
+    return cached
+      ? { rate: cached.rate, date: cached.date }
       : { rate: 1450, date: "N/A" };
   }
 
-  // Try today first, then previous days (weekends/holidays return null)
-  for (let daysBack = 0; daysBack < 5; daysBack++) {
-    const d = new Date();
+  // For past months, start from last day of that month. For current, start from today.
+  const startDate = isCurrentMonth
+    ? now
+    : new Date(target.getFullYear(), target.getMonth() + 1, 0); // last day of month
+
+  // Try up to 10 days back (covers weekends + holidays)
+  for (let daysBack = 0; daysBack < 10; daysBack++) {
+    const d = new Date(startDate);
     d.setDate(d.getDate() - daysBack);
     const searchDate = d.toISOString().slice(0, 10).replace(/-/g, "");
 
     try {
       const res = await fetch(
         `https://oapi.koreaexim.go.kr/site/program/financial/exchangeJSON?authkey=${apiKey}&searchdate=${searchDate}&data=AP01`,
-        { next: { revalidate: 3600 } }
+        { next: { revalidate: isCurrentMonth ? 3600 : 86400 * 30 } }
       );
 
       if (!res.ok) continue;
@@ -46,22 +63,20 @@ export async function getUsdKrwRate(): Promise<ExchangeRate> {
       const usd = data.find((item: any) => item.cur_unit === "USD");
       if (!usd || usd.result !== 1) continue;
 
-      // deal_bas_r has commas: "1,506.2" → 1506.2
       const rate = parseFloat(usd.deal_bas_r.replace(/,/g, ""));
       if (isNaN(rate)) continue;
 
       const dateStr = `${searchDate.slice(0, 4)}-${searchDate.slice(4, 6)}-${searchDate.slice(6, 8)}`;
 
-      cache = { rate, date: dateStr, fetchedAt: Date.now() };
+      cacheMap.set(cacheKey, { rate, date: dateStr, fetchedAt: Date.now() });
       return { rate, date: dateStr };
     } catch {
       continue;
     }
   }
 
-  // All attempts failed — return cache or fallback
-  return cache
-    ? { rate: cache.rate, date: cache.date }
+  return cached
+    ? { rate: cached.rate, date: cached.date }
     : { rate: 1450, date: "N/A" };
 }
 

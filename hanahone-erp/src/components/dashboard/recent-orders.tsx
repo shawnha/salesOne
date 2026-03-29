@@ -8,12 +8,21 @@ interface RecentOrder {
   customerName: string;
   status: string;
   totalAmount: number;
+  externalSource?: string | null;
   isTransfer?: boolean;
   transferLabel?: string;
 }
 
+const KRW_PLATFORMS = new Set(["NAVER", "PHARMACY"]);
+
+function formatAmount(n: number, platform: string | null | undefined) {
+  if (KRW_PLATFORMS.has(platform || "")) {
+    return n >= 1_000_000 ? `₩${(n / 1_000_000).toFixed(1)}M` : `₩${n.toLocaleString()}`;
+  }
+  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+}
+
 export function RecentOrders({ orders }: { orders: RecentOrder[] }) {
-  const formatWon = (n: number) => n >= 1_000_000 ? `₩${(n / 1_000_000).toFixed(1)}M` : `₩${n.toLocaleString()}`;
   return (
     <Card>
       <div className="flex justify-between items-center mb-4">
@@ -25,7 +34,7 @@ export function RecentOrders({ orders }: { orders: RecentOrder[] }) {
           <span className="font-semibold">{order.orderNumber}</span>
           <span className={order.isTransfer ? "text-accent" : "text-[var(--text-secondary)]"}>{order.isTransfer ? order.transferLabel : order.customerName}</span>
           <span><Badge status={order.status} /></span>
-          <span className="font-semibold text-right">{formatWon(order.totalAmount)}</span>
+          <span className="font-semibold text-right">{formatAmount(order.totalAmount, order.externalSource)}</span>
         </div>
       ))}
     </Card>
