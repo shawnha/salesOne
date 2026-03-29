@@ -1,10 +1,9 @@
-// src/app/api/reconciliation/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/api-guard";
 import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/integrations/encryption";
-import { authenticate, odooRpc } from "@/lib/integrations/connectors/cgetc";
-import { calculateExpectedStock } from "@/lib/reconciliation";
+import { fetchCgetcInventory } from "@/lib/integrations/connectors/cgetc";
+import { calculateExpectedStock, buildBaselineRows } from "@/lib/reconciliation";
 
 export async function GET(req: NextRequest) {
   const { error } = await requireAuth();
@@ -13,7 +12,73 @@ export async function GET(req: NextRequest) {
   const companyId = req.nextUrl.searchParams.get("companyId");
   if (!companyId) return NextResponse.json({ error: "companyId required" }, { status: 400 });
 
-  // 1. Get PO line items (purchased quantities by SKU)
+  // Check if baselines exist
+  const baselines = await prisma.inventoryBaseline.findMany({
+    where: { companyId },
+  });
+
+  // Get CGETC actual stock (same source as page — fetchCgetcInventory)
+  let actualBySku: Record<string, number> = {};
+  try {
+    const config = await prisma.integrationConfig.findFirst({
+      where: { companyId, platform: "CGETC", isActive: true },
+    });
+    if (config) {
+      const creds = JSON.parse(decrypt(config.credentials));
+      const products = await fetchCgetcInventory(creds);
+      for (const p of products) {
+        if (p.sku) actualBySku[p.sku] = p.quantity;
+      }
+    }
+  } catch {
+    // CGETC fetch failed — actualBySku stays empty
+  }
+
+  // Baseline mode
+  if (baselines.length > 0) {
+    const earliestSetAt = baselines.reduce(
+      (earliest, b) => (b.setAt < earliest ? b.setAt : earliest),
+      baselines[0].setAt
+    );
+
+    const [orderItems, adjustments] = await Promise.all([
+      prisma.orderItem.findMany({
+        where: { order: { companyId, orderDate: { gt: earliestSetAt } } },
+        include: {
+          order: { select: { externalSource: true, orderDate: true } },
+          product: { select: { sku: true } },
+        },
+      }),
+      prisma.reconciliationAdjustment.findMany({ where: { companyId } }),
+    ]);
+
+    const orderItemData = orderItems
+      .filter((item) => item.product?.sku)
+      .map((item) => ({
+        sku: item.product.sku,
+        quantity: item.quantity,
+        orderDate: item.order.orderDate,
+        channel: item.order.externalSource || "OTHER",
+      }));
+
+    const adjustmentData = adjustments.map((adj) => ({
+      sku: adj.sku,
+      quantity: adj.quantity,
+      createdAt: adj.createdAt,
+    }));
+
+    const rows = buildBaselineRows(baselines, orderItemData, adjustmentData, actualBySku);
+
+    return NextResponse.json(
+      rows.map((r) => ({
+        ...r,
+        mode: "baseline" as const,
+        status: r.reconciled ? "RECONCILED" : "UNRECONCILED",
+      }))
+    );
+  }
+
+  // Legacy PO-based mode (fallback)
   const poLines = await prisma.purchaseOrderLine.findMany({
     where: { purchaseOrder: { companyId, platform: "CGETC" } },
     select: { sku: true, productName: true, quantity: true },
@@ -26,7 +91,6 @@ export async function GET(req: NextRequest) {
     purchasedBySku[line.sku].qty += Number(line.quantity);
   }
 
-  // 2. Get sold quantities by SKU (from order items)
   const orderItems = await prisma.orderItem.findMany({
     where: { order: { companyId } },
     include: { product: { select: { sku: true } } },
@@ -38,44 +102,12 @@ export async function GET(req: NextRequest) {
     soldBySku[sku] = (soldBySku[sku] || 0) + item.quantity;
   }
 
-  // 3. Get reconciliation adjustments by SKU
-  const adjustments = await prisma.reconciliationAdjustment.findMany({
-    where: { companyId },
-  });
-
+  const adjustments = await prisma.reconciliationAdjustment.findMany({ where: { companyId } });
   const adjustedBySku: Record<string, number> = {};
   for (const adj of adjustments) {
     adjustedBySku[adj.sku] = (adjustedBySku[adj.sku] || 0) + adj.quantity;
   }
 
-  // 4. Get CGETC actual stock via stock.quant API
-  const actualBySku: Record<string, number> = {};
-  try {
-    const config = await prisma.integrationConfig.findFirst({
-      where: { companyId, platform: "CGETC", isActive: true },
-    });
-    if (config) {
-      const creds = JSON.parse(decrypt(config.credentials));
-      const sessionId = await authenticate(creds.url, creds.db, creds.email, creds.password);
-      const quants = await odooRpc(creds.url, sessionId, "stock.quant", "search_read",
-        [[["quantity", ">", 0], ["location_id.usage", "=", "internal"]]],
-        { fields: ["product_id", "quantity"] },
-      );
-      if (Array.isArray(quants)) {
-        for (const q of quants) {
-          const name = q.product_id?.[1] || "";
-          const sku = name.match(/^\[([^\]]+)\]/)?.[1];
-          if (sku) {
-            actualBySku[sku] = (actualBySku[sku] || 0) + (q.quantity || 0);
-          }
-        }
-      }
-    }
-  } catch {
-    // stock.quant fetch failed — actualBySku stays empty
-  }
-
-  // 5. Build comparison for tracked SKUs (those with PO data)
   const skus = Object.keys(purchasedBySku);
   const result = skus.map((sku) => {
     const purchased = purchasedBySku[sku]?.qty || 0;
@@ -88,6 +120,7 @@ export async function GET(req: NextRequest) {
     return {
       sku,
       productName: purchasedBySku[sku]?.name || sku,
+      mode: "legacy" as const,
       purchased,
       sold,
       adjusted,
