@@ -6,7 +6,7 @@ import { LowStockAlerts } from "@/components/dashboard/low-stock-alerts";
 import { DateFilter } from "@/components/ui/date-filter";
 import { fetchCgetcInventory, type CgetcProduct } from "@/lib/integrations/connectors/cgetc";
 import { decrypt } from "@/lib/integrations/encryption";
-import { getUsdKrwRate, convertUsdToKrw } from "@/lib/exchange-rate";
+import { getUsdKrwRate, convertUsdToKrw, convertKrwToUsd } from "@/lib/exchange-rate";
 
 const KRW_PLATFORMS = new Set(["NAVER", "PHARMACY"]);
 
@@ -22,12 +22,48 @@ function timeAgo(date: Date | null): string {
   return `${days} days ago`;
 }
 
-export default async function DashboardPage({ searchParams }: { searchParams: { company?: string } }) {
+function getDateRange(month?: string, year?: string): { gte: Date; lt: Date } {
+  const now = new Date();
+  if (year) {
+    const y = parseInt(year);
+    return { gte: new Date(y, 0, 1), lt: new Date(y + 1, 0, 1) };
+  }
+  if (month) {
+    const [y, m] = [parseInt(month.split("-")[0]), parseInt(month.split("-")[1]) - 1];
+    return { gte: new Date(y, m, 1), lt: new Date(y, m + 1, 1) };
+  }
+  // Default: current month
+  return { gte: new Date(now.getFullYear(), now.getMonth(), 1), lt: new Date(now.getFullYear(), now.getMonth() + 1, 1) };
+}
+
+function toKRW(amount: number, platform: string | null, rate: number): number {
+  return KRW_PLATFORMS.has(platform || "") ? amount : convertUsdToKrw(amount, rate);
+}
+
+function toUSD(amount: number, platform: string | null, rate: number): number {
+  return KRW_PLATFORMS.has(platform || "") ? convertKrwToUsd(amount, rate) : amount;
+}
+
+const formatWon = (n: number) => {
+  if (n >= 1_000_000_000) return `₩${(n / 1_000_000_000).toFixed(2)}B`;
+  if (n >= 1_000_000) return `₩${(n / 1_000_000).toFixed(1)}M`;
+  return `₩${Math.round(n).toLocaleString()}`;
+};
+
+const formatUSD = (n: number) => {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
+  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+};
+
+export default async function DashboardPage({ searchParams }: { searchParams: { company?: string; month?: string; year?: string } }) {
   const companyId = searchParams.company || null;
   const companyFilter = companyId ? { companyId } : {};
+  const dateRange = getDateRange(searchParams.month, searchParams.year);
+  const dateFilter = { orderDate: dateRange };
 
   const [orders, allInventory, companies, productionOrders, cgetcConfig] = await Promise.all([
-    prisma.order.findMany({ where: companyFilter, take: 5, orderBy: { orderDate: "desc" }, include: { customer: { select: { name: true } }, company: { select: { name: true } }, transfer: { include: { fromCompany: { select: { name: true } }, toCompany: { select: { name: true } } } } } }),
+    prisma.order.findMany({ where: { ...companyFilter, ...dateFilter }, take: 5, orderBy: { orderDate: "desc" }, include: { customer: { select: { name: true } }, company: { select: { name: true } }, transfer: { include: { fromCompany: { select: { name: true } }, toCompany: { select: { name: true } } } } } }),
     prisma.inventory.findMany({ where: companyFilter, include: { product: { select: { name: true, sku: true, costPrice: true } }, company: { select: { name: true } } }, orderBy: { quantity: "asc" } }),
     prisma.company.findMany({ select: { id: true, name: true } }),
     prisma.productionOrder.count({ where: { ...companyFilter, status: { in: ["PLANNED", "IN_PROGRESS"] } } }),
@@ -55,11 +91,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
 
   const [salesOrders, openOrders, pendingShipments, latestSyncs, exchangeRate] = await Promise.all([
     prisma.order.findMany({
-      where: { ...companyFilter, type: { in: ["SALE", "BROKERAGE"] } },
+      where: { ...companyFilter, ...dateFilter, type: { in: ["SALE", "BROKERAGE"] } },
       select: { totalAmount: true, externalSource: true },
     }),
-    prisma.order.count({ where: { ...companyFilter, fulfillmentStatus: { in: ["UNFULFILLED", "PARTIALLY_FULFILLED", "FULFILLED"] } } }),
-    prisma.order.count({ where: { ...companyFilter, fulfillmentStatus: "UNFULFILLED", financialStatus: "PAID" } }),
+    prisma.order.count({ where: { ...companyFilter, ...dateFilter, fulfillmentStatus: { in: ["UNFULFILLED", "PARTIALLY_FULFILLED", "FULFILLED"] } } }),
+    prisma.order.count({ where: { ...companyFilter, ...dateFilter, fulfillmentStatus: "UNFULFILLED", financialStatus: "PAID" } }),
     prisma.syncJob.findMany({
       where: { status: "SUCCESS" },
       orderBy: { completedAt: "desc" },
@@ -70,32 +106,24 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
     getUsdKrwRate(),
   ]);
 
-  // Convert all sales to KRW for consistent dashboard totals
-  const totalSalesKRW = salesOrders.reduce((sum, o) => {
-    const amount = Number(o.totalAmount);
-    return sum + (KRW_PLATFORMS.has(o.externalSource || "") ? amount : convertUsdToKrw(amount, exchangeRate.rate));
-  }, 0);
+  const rate = exchangeRate.rate;
+
+  // Dual currency totals
+  const totalSalesKRW = salesOrders.reduce((sum, o) => sum + toKRW(Number(o.totalAmount), o.externalSource, rate), 0);
+  const totalSalesUSD = salesOrders.reduce((sum, o) => sum + toUSD(Number(o.totalAmount), o.externalSource, rate), 0);
 
   const companyBreakdowns = await Promise.all(
     companies.map(async (c) => {
       const companyOrders = await prisma.order.findMany({
-        where: { companyId: c.id, type: { in: ["SALE", "BROKERAGE"] } },
+        where: { companyId: c.id, ...dateFilter, type: { in: ["SALE", "BROKERAGE"] } },
         select: { totalAmount: true, externalSource: true },
       });
-      const orderCount = await prisma.order.count({ where: { companyId: c.id } });
-      const revenue = companyOrders.reduce((sum, o) => {
-        const amount = Number(o.totalAmount);
-        return sum + (KRW_PLATFORMS.has(o.externalSource || "") ? amount : convertUsdToKrw(amount, exchangeRate.rate));
-      }, 0);
-      return { ...c, revenue, orderCount };
+      const orderCount = await prisma.order.count({ where: { companyId: c.id, ...dateFilter } });
+      const revenueKRW = companyOrders.reduce((sum, o) => sum + toKRW(Number(o.totalAmount), o.externalSource, rate), 0);
+      const revenueUSD = companyOrders.reduce((sum, o) => sum + toUSD(Number(o.totalAmount), o.externalSource, rate), 0);
+      return { ...c, revenueKRW, revenueUSD, orderCount };
     })
   );
-
-  const formatWon = (n: number) => {
-    if (n >= 1_000_000_000) return `₩${(n / 1_000_000_000).toFixed(2)}B`;
-    if (n >= 1_000_000) return `₩${(n / 1_000_000).toFixed(1)}M`;
-    return `₩${n.toLocaleString()}`;
-  };
 
   return (
     <div>
@@ -108,10 +136,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
           <h1 className="text-3xl font-bold tracking-tighter">{companyId ? companies.find((c) => c.id === companyId)?.name : "Group"} dashboard</h1>
           <p className="text-sm text-[var(--text-secondary)] mt-1">{companyId ? "" : "HanahOne Group — consolidated across all entities"}</p>
         </div>
-        <DateFilter />
+        <div className="flex flex-col items-end gap-2">
+          <DateFilter />
+          <p className="text-[10px] text-[var(--text-tertiary)]">
+            ₩{rate.toLocaleString()}/$ ({exchangeRate.date})
+          </p>
+        </div>
       </div>
       <div className="space-y-4">
-        <KpiRow data={{ totalSales: totalSalesKRW, openOrders, inventoryValue, productionRuns: productionOrders, salesChange: 0, pendingShipments, lowStockCount: lowStock.length, newProductionRuns: 0 }} />
+        <KpiRow data={{ totalSalesKRW, totalSalesUSD, openOrders, inventoryValue, productionRuns: productionOrders, salesChange: 0, pendingShipments, lowStockCount: lowStock.length, newProductionRuns: 0 }} />
         {latestSyncs.length > 0 && (
           <div className="flex gap-3 flex-wrap">
             {latestSyncs.map((sync) => (
@@ -126,7 +159,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
           <CompanyBreakdown companies={companyBreakdowns.map((c) => ({
             name: c.name,
             color: c.name === "HOI" ? "#0d9488" : c.name === "HOK" ? "#6366f1" : "#d97706",
-            stats: [{ label: "Revenue", value: formatWon(c.revenue) }, { label: "Orders", value: c.orderCount.toString() }],
+            stats: [
+              { label: "Revenue", value: formatWon(c.revenueKRW), subValue: formatUSD(c.revenueUSD) },
+              { label: "Orders", value: c.orderCount.toString() },
+            ],
           }))} />
         )}
         <div className="grid grid-cols-12 gap-4">
