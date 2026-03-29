@@ -43,6 +43,9 @@ model Company {
   inventorySnapshots     InventorySnapshot[]
   externalInventories    ExternalInventory[]
   skuMappings            SkuMapping[]
+  purchaseOrders              PurchaseOrder[]
+  shippingCosts               ShippingCost[]
+  reconciliationAdjustments   ReconciliationAdjustment[]
 
   @@map("companies")
   @@schema("public")
@@ -60,6 +63,7 @@ model User {
 
   appRoles             UserAppRole[]
   inventoryAdjustments InventoryAdjustment[]
+  reconciliationAdjustments ReconciliationAdjustment[]
 
   @@map("users")
   @@schema("public")
@@ -282,6 +286,7 @@ model Order {
 
   items     OrderItem[]
   transfer  InterCompanyTransfer?
+  shippingCost  ShippingCost?
 
   externalSource    Platform?  @map("external_source")
   externalOrders    ExternalOrder[]
@@ -512,5 +517,78 @@ model SkuMapping {
   @@index([companyId, platform])
   @@index([productId])
   @@map("sku_mappings")
+  @@schema("salesone")
+}
+
+model PurchaseOrder {
+  id            String              @id @default(uuid())
+  companyId     String              @map("company_id")
+  company       Company             @relation(fields: [companyId], references: [id])
+  platform      Platform
+  externalPoId  String              @map("external_po_id")
+  poNumber      String              @map("po_number")
+  supplierName  String              @map("supplier_name")
+  orderDate     DateTime            @map("order_date")
+  totalAmount   Decimal             @map("total_amount")
+  state         String
+  rawData       Json                @map("raw_data")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+  lineItems     PurchaseOrderLine[]
+
+  @@unique([companyId, platform, externalPoId])
+  @@map("purchase_orders")
+  @@schema("salesone")
+}
+
+model PurchaseOrderLine {
+  id              String        @id @default(uuid())
+  purchaseOrderId String        @map("purchase_order_id")
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productName     String        @map("product_name")
+  sku             String?
+  quantity        Decimal
+  unitPrice       Decimal       @map("unit_price")
+  subtotal        Decimal
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  @@index([purchaseOrderId])
+  @@map("purchase_order_lines")
+  @@schema("salesone")
+}
+
+model ShippingCost {
+  id          String   @id @default(uuid())
+  companyId   String   @map("company_id")
+  company     Company  @relation(fields: [companyId], references: [id])
+  orderId     String?  @unique @map("order_id")
+  order       Order?   @relation(fields: [orderId], references: [id])
+  soNumber    String   @map("so_number")
+  invoiceDate DateTime @map("invoice_date")
+  amount      Decimal
+  currency    String   @default("USD")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([companyId, soNumber])
+  @@index([orderId])
+  @@map("shipping_costs")
+  @@schema("salesone")
+}
+
+model ReconciliationAdjustment {
+  id          String   @id @default(uuid())
+  companyId   String   @map("company_id")
+  company     Company  @relation(fields: [companyId], references: [id])
+  sku         String
+  productName String   @map("product_name")
+  quantity    Int
+  reason      String
+  memo        String?
+  createdBy   String   @map("created_by")
+  createdByUser User   @relation(fields: [createdBy], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([companyId, sku])
+  @@map("reconciliation_adjustments")
   @@schema("salesone")
 }
