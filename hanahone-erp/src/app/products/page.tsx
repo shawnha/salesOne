@@ -26,18 +26,56 @@ export default async function ProductsPage({
     companyName: p.company.name,
   }));
 
-  // Group view: separate sections per company
   const isGroupView = !searchParams.company;
-  const companyGroups = isGroupView
-    ? Array.from(
-        mapped.reduce((map, p) => {
-          const group = map.get(p.companyId) || { name: p.companyName, products: [] };
-          group.products.push(p);
-          map.set(p.companyId, group);
-          return map;
-        }, new Map<string, { name: string; products: typeof mapped }>())
-      ).sort(([, a], [, b]) => a.name.localeCompare(b.name))
-    : null;
+
+  // Group view: company → source sections inside each company
+  // Company view: source sections only
+  type ProductRow = typeof mapped[number];
+
+  function groupBySource(items: ProductRow[]) {
+    const sourceMap = new Map<string, ProductRow[]>();
+    for (const p of items) {
+      const source = p.category || "Other";
+      const group = sourceMap.get(source) || [];
+      group.push(p);
+      sourceMap.set(source, group);
+    }
+    return Array.from(sourceMap.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }
+
+  if (isGroupView) {
+    // Group by company first, then by source within each company
+    const companyMap = new Map<string, { name: string; products: ProductRow[] }>();
+    for (const p of mapped) {
+      const group = companyMap.get(p.companyId) || { name: p.companyName, products: [] };
+      group.products.push(p);
+      companyMap.set(p.companyId, group);
+    }
+    const companyGroups = Array.from(companyMap.entries()).sort(([, a], [, b]) => a.name.localeCompare(b.name));
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold tracking-tight">Products</h1>
+          <span className="text-xs text-[var(--text-tertiary)]">{products.length} products</span>
+        </div>
+        {companyGroups.map(([companyId, group]) => {
+          const sourceGroups = groupBySource(group.products);
+          return (
+            <div key={companyId} className="space-y-3">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+                {group.name} <span className="text-[var(--text-quaternary)]">({group.products.length})</span>
+              </h2>
+              <ProductsTable products={group.products} sourceGroups={sourceGroups} />
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Company view: group by source
+  const sourceGroups = groupBySource(mapped);
 
   return (
     <div className="space-y-6">
@@ -45,18 +83,14 @@ export default async function ProductsPage({
         <h1 className="text-xl font-bold tracking-tight">Products</h1>
         <span className="text-xs text-[var(--text-tertiary)]">{products.length} products</span>
       </div>
-      {companyGroups ? (
-        companyGroups.map(([companyId, group]) => (
-          <div key={companyId} className="space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
-              {group.name} <span className="text-[var(--text-quaternary)]">({group.products.length})</span>
-            </h2>
-            <ProductsTable products={group.products} />
-          </div>
-        ))
-      ) : (
-        <ProductsTable products={mapped} />
-      )}
+      {sourceGroups.map(([source, items]) => (
+        <div key={source} className="space-y-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+            {source} <span className="text-[var(--text-quaternary)]">({items.length})</span>
+          </h2>
+          <ProductsTable products={items} />
+        </div>
+      ))}
     </div>
   );
 }

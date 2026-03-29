@@ -29,7 +29,55 @@ function formatPrice(n: number, companyName: string) {
   return KRW_COMPANIES.has(companyName) ? formatKRW(n) : formatUSD(n);
 }
 
-export function ProductsTable({ products }: { products: Product[] }) {
+interface ProductsTableProps {
+  products: Product[];
+  sourceGroups?: [string, Product[]][];
+  showCompany?: boolean;
+}
+
+function ProductRow({
+  row,
+  selected,
+  onToggle,
+  showCompany,
+}: {
+  row: Product;
+  selected: boolean;
+  onToggle: () => void;
+  showCompany?: boolean;
+}) {
+  return (
+    <tr
+      className={`border-b border-[var(--border)] last:border-b-0 transition-colors ${
+        selected
+          ? "bg-accent/[0.04]"
+          : "hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
+      }`}
+    >
+      <td className="py-3 px-4">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggle}
+          className="rounded border-[var(--border)] accent-accent"
+        />
+      </td>
+      <td className="py-3 px-4 font-semibold">{row.name}</td>
+      <td className="py-3 px-4 text-[var(--text-secondary)] font-mono text-xs">{row.sku}</td>
+      <td className="py-3 px-4 text-right font-semibold">{formatPrice(row.basePrice, row.companyName)}</td>
+      <td className="py-3 px-4 text-right text-[var(--text-secondary)]">{formatPrice(row.costPrice, row.companyName)}</td>
+      {showCompany && <td className="py-3 px-4 text-[var(--text-secondary)]">{row.companyName}</td>}
+      <td className="py-3 px-4 text-right">
+        <div className="flex items-center gap-1 justify-end">
+          <ProductEditButton product={row} />
+          <ProductDeleteButton product={row} />
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+export function ProductsTable({ products, sourceGroups, showCompany = false }: ProductsTableProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
 
@@ -75,6 +123,25 @@ export function ProductsTable({ products }: { products: Product[] }) {
     window.location.reload();
   }
 
+  const headerCols = (
+    <tr className="border-b border-[var(--border)] text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+      <th className="py-3 px-4 w-10">
+        <input
+          type="checkbox"
+          checked={allSelected}
+          onChange={toggleAll}
+          className="rounded border-[var(--border)] accent-accent"
+        />
+      </th>
+      <th className="text-left py-3 px-4">Name</th>
+      <th className="text-left py-3 px-4">SKU</th>
+      <th className="text-right py-3 px-4">Base Price</th>
+      <th className="text-right py-3 px-4">Cost Price</th>
+      {showCompany && <th className="text-left py-3 px-4">Company</th>}
+      <th className="text-right py-3 px-4"></th>
+    </tr>
+  );
+
   return (
     <>
       {selected.size > 0 && (
@@ -101,56 +168,44 @@ export function ProductsTable({ products }: { products: Product[] }) {
           <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
             <table className="w-full text-[13px]">
               <thead className="sticky top-0 z-10 bg-[var(--surface)]">
-                <tr className="border-b border-[var(--border)] text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
-                  <th className="py-3 px-4 w-10">
-                    <input
-                      type="checkbox"
-                      checked={allSelected}
-                      onChange={toggleAll}
-                      className="rounded border-[var(--border)] accent-accent"
-                    />
-                  </th>
-                  <th className="text-left py-3 px-4">Name</th>
-                  <th className="text-left py-3 px-4">SKU</th>
-                  <th className="text-left py-3 px-4">Source</th>
-                  <th className="text-right py-3 px-4">Base Price</th>
-                  <th className="text-right py-3 px-4">Cost Price</th>
-                  <th className="text-left py-3 px-4">Company</th>
-                  <th className="text-right py-3 px-4"></th>
-                </tr>
+                {headerCols}
               </thead>
               <tbody>
-                {products.map((row) => (
-                  <tr
-                    key={row.id}
-                    className={`border-b border-[var(--border)] last:border-b-0 transition-colors ${
-                      selected.has(row.id)
-                        ? "bg-accent/[0.04]"
-                        : "hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
-                    }`}
-                  >
-                    <td className="py-3 px-4">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(row.id)}
-                        onChange={() => toggle(row.id)}
-                        className="rounded border-[var(--border)] accent-accent"
-                      />
-                    </td>
-                    <td className="py-3 px-4 font-semibold">{row.name}</td>
-                    <td className="py-3 px-4 text-[var(--text-secondary)] font-mono text-xs">{row.sku}</td>
-                    <td className="py-3 px-4 text-[var(--text-secondary)]">{row.category}</td>
-                    <td className="py-3 px-4 text-right font-semibold">{formatPrice(row.basePrice, row.companyName)}</td>
-                    <td className="py-3 px-4 text-right text-[var(--text-secondary)]">{formatPrice(row.costPrice, row.companyName)}</td>
-                    <td className="py-3 px-4 text-[var(--text-secondary)]">{row.companyName}</td>
-                    <td className="py-3 px-4 text-right">
-                      <div className="flex items-center gap-1 justify-end">
-                        <ProductEditButton product={row} />
-                        <ProductDeleteButton product={row} />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {sourceGroups ? (
+                  // Group view: show source dividers within the table
+                  sourceGroups.map(([source, items]) => (
+                    <>
+                      <tr key={`divider-${source}`}>
+                        <td colSpan={showCompany ? 7 : 6} className="py-2 px-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-tertiary)]">{source}</span>
+                            <span className="text-[10px] text-[var(--text-quaternary)]">({items.length})</span>
+                            <div className="flex-1 h-px bg-[var(--border)]" />
+                          </div>
+                        </td>
+                      </tr>
+                      {items.map((row) => (
+                        <ProductRow
+                          key={row.id}
+                          row={row}
+                          selected={selected.has(row.id)}
+                          onToggle={() => toggle(row.id)}
+                          showCompany={showCompany}
+                        />
+                      ))}
+                    </>
+                  ))
+                ) : (
+                  products.map((row) => (
+                    <ProductRow
+                      key={row.id}
+                      row={row}
+                      selected={selected.has(row.id)}
+                      onToggle={() => toggle(row.id)}
+                      showCompany={showCompany}
+                    />
+                  ))
+                )}
               </tbody>
             </table>
           </div>
