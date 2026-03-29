@@ -6,6 +6,11 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 
 const formatUSD = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+const formatKRW = (n: number) => `₩${Math.round(n).toLocaleString("ko-KR")}`;
+
+function formatAmount(n: number, currency: "USD" | "KRW") {
+  return currency === "KRW" ? formatKRW(n) : formatUSD(n);
+}
 
 export default async function CustomerDetailPage({
   params,
@@ -35,6 +40,9 @@ export default async function CustomerDetailPage({
   });
 
   if (!customer) return notFound();
+
+  const companyName = customer.company.name.toLowerCase();
+  const currency: "USD" | "KRW" = (companyName.includes("hoi") || companyName.includes("international")) ? "USD" : "KRW";
 
   const contactInfo = customer.contactInfo as Record<string, string> | null;
 
@@ -111,13 +119,13 @@ export default async function CustomerDetailPage({
             {totalRefunded > 0 && (
               <div className="flex justify-between">
                 <span className="text-[var(--text-secondary)]">Total Refunded</span>
-                <span className="font-semibold text-red-500">-{formatUSD(totalRefunded)}</span>
+                <span className="font-semibold text-red-500">-{formatAmount(totalRefunded, currency)}</span>
               </div>
             )}
             <div className="border-t border-[var(--border)] my-2" />
             <div className="flex justify-between">
               <span className="text-[var(--text-secondary)]">Net Revenue</span>
-              <span className="font-bold text-base">{formatUSD(netRevenue)}</span>
+              <span className="font-bold text-base">{formatAmount(netRevenue, currency)}</span>
             </div>
           </div>
         </Card>
@@ -164,11 +172,11 @@ export default async function CustomerDetailPage({
                       <td className="py-3 px-4 text-right">
                         {hasRefund ? (
                           <div>
-                            <span className="line-through text-[var(--text-tertiary)]">{formatUSD(Number(order.totalAmount))}</span>
-                            <div className="text-[11px] text-red-500">-{formatUSD(Number(order.refundAmount))}</div>
+                            <span className="line-through text-[var(--text-tertiary)]">{formatAmount(Number(order.totalAmount), currency)}</span>
+                            <div className="text-[11px] text-red-500">-{formatAmount(Number(order.refundAmount), currency)}</div>
                           </div>
                         ) : (
-                          <span className="font-semibold">{formatUSD(Number(order.totalAmount))}</span>
+                          <span className="font-semibold">{formatAmount(Number(order.totalAmount), currency)}</span>
                         )}
                       </td>
                     </tr>
