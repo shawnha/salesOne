@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
       select: { customerId: true },
     });
 
-    const customerIds = [...new Set(orders.map((o) => o.customerId).filter(Boolean))] as string[];
+    const customerIds = Array.from(new Set(orders.map((o) => o.customerId).filter(Boolean))) as string[];
 
     for (const customerId of customerIds) {
       const contactInfo: Record<string, string> = {};

@@ -51,7 +51,7 @@ export function ProductsTable({ products }: { products: Product[] }) {
     setDeleting(true);
     const errors: string[] = [];
 
-    for (const id of selected) {
+    for (const id of Array.from(selected)) {
       const res = await fetch(`/api/products?id=${id}`, { method: "DELETE" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));

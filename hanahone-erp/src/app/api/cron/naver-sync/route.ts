@@ -4,7 +4,7 @@ import { runSync } from "@/lib/integrations/sync-runner";
 import { recalculateHokInventory } from "@/lib/integrations/inventory-calculator";
 import { naverConnector } from "@/lib/integrations/naver";
 import { decrypt } from "@/lib/integrations/encryption";
-import { validateCronSecret } from "../cgetc-sync/route";
+import { validateCronSecret } from "@/lib/cron-auth";
 
 export const maxDuration = 300;
 

@@ -258,7 +258,7 @@ async function fetchPortalSaleOrderIds(url: string, sessionId: string): Promise<
     if (!res.ok) break;
 
     const html = await res.text();
-    const matches = [...html.matchAll(/href="\/portal\/sale\/(\d+)"/g)];
+    const matches = Array.from(html.matchAll(/href="\/portal\/sale\/(\d+)"/g));
 
     // Filter out non-numeric links (like /portal/sale/create, /portal/sale/page/N)
     const pageIds = matches.map((m) => parseInt(m[1])).filter((n) => !isNaN(n));
