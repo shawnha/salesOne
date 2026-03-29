@@ -58,45 +58,46 @@ export async function DELETE(req: NextRequest) {
   if (error) return error;
 
   const id = req.nextUrl.searchParams.get("id");
-  const force = req.nextUrl.searchParams.get("force") === "true";
+  const mergeInto = req.nextUrl.searchParams.get("mergeInto");
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
-  // Check what's linked to this product
+  // Check what's linked
   const [orderItems, productionOrders, bom] = await Promise.all([
     prisma.orderItem.count({ where: { productId: id } }),
     prisma.productionOrder.count({ where: { productId: id } }),
     prisma.billOfMaterials.count({ where: { OR: [{ finishedProductId: id }, { rawMaterialId: id }] } }),
   ]);
 
-  const deps = [];
-  if (orderItems > 0) deps.push(`${orderItems} order items`);
-  if (productionOrders > 0) deps.push(`${productionOrders} production orders`);
-  if (bom > 0) deps.push(`${bom} BOM records`);
+  const hasRefs = orderItems > 0 || productionOrders > 0 || bom > 0;
 
-  if (deps.length > 0 && !force) {
+  if (hasRefs && !mergeInto) {
+    const deps = [];
+    if (orderItems > 0) deps.push(`${orderItems} order items`);
+    if (productionOrders > 0) deps.push(`${productionOrders} production orders`);
+    if (bom > 0) deps.push(`${bom} BOM records`);
     return NextResponse.json(
-      { error: `Product has: ${deps.join(", ")}. Use force delete to remove all.`, deps },
+      { error: `Product has linked records: ${deps.join(", ")}. Choose a product to merge into.`, deps, needsMerge: true },
       { status: 409 },
     );
   }
 
   try {
     await prisma.$transaction([
-      ...(force ? [
-        prisma.orderItem.deleteMany({ where: { productId: id } }),
-        prisma.productionOrder.deleteMany({ where: { productId: id } }),
-        prisma.billOfMaterials.deleteMany({ where: { OR: [{ finishedProductId: id }, { rawMaterialId: id }] } }),
+      // If merging, reassign all references to the target product
+      ...(mergeInto ? [
+        prisma.orderItem.updateMany({ where: { productId: id }, data: { productId: mergeInto } }),
+        prisma.productionOrder.updateMany({ where: { productId: id }, data: { productId: mergeInto } }),
       ] : []),
       prisma.skuMapping.deleteMany({ where: { productId: id } }),
       prisma.inventory.deleteMany({ where: { productId: id } }),
       prisma.inventorySnapshot.deleteMany({ where: { productId: id } }),
       prisma.product.delete({ where: { id } }),
     ]);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, merged: !!mergeInto });
   } catch (err: any) {
     if (err.code === "P2003") {
       return NextResponse.json(
-        { error: "Cannot delete: product has dependent records that were not cleaned up" },
+        { error: "Cannot delete: product still has dependent records" },
         { status: 409 },
       );
     }

@@ -108,19 +108,18 @@ export function ProductDeleteButton({ product }: ProductActionsProps) {
       }
 
       const data = await res.json().catch(() => ({}));
-      if (res.status === 409 && data.deps) {
-        // Has dependent records — ask for force delete
-        const forceConfirm = confirm(
-          `"${product.name}" has linked records:\n${data.deps.map((d: string) => `  - ${d}`).join("\n")}\n\nForce delete? This will remove all linked records.`
+      if (res.status === 409 && data.needsMerge) {
+        const mergeId = prompt(
+          `"${product.name}" has linked records:\n${data.deps.map((d: string) => `  - ${d}`).join("\n")}\n\nTo delete, these records will be moved to another product.\nPaste the target product ID to merge into (find it via Edit on the target product):`
         );
-        if (forceConfirm) {
-          const forceRes = await fetch(`/api/products?id=${product.id}&force=true`, { method: "DELETE" });
-          if (forceRes.ok) {
+        if (mergeId?.trim()) {
+          const mergeRes = await fetch(`/api/products?id=${product.id}&mergeInto=${mergeId.trim()}`, { method: "DELETE" });
+          if (mergeRes.ok) {
             window.location.reload();
             return;
           }
-          const forceData = await forceRes.json().catch(() => ({}));
-          alert(forceData.error || "Force delete failed");
+          const mergeData = await mergeRes.json().catch(() => ({}));
+          alert(mergeData.error || "Merge failed");
         }
       } else {
         alert(data.error || "Failed to delete product");
