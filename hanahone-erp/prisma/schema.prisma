@@ -283,6 +283,9 @@ model Order {
   deliveredAt           DateTime?   @map("delivered_at")
   externalOrderNumber   String?     @map("external_order_number")
   notes                 String?
+  shippingAddress       String?   @map("shipping_address")
+  recipientName         String?   @map("recipient_name")
+  recipientPhone        String?   @map("recipient_phone")
 
   items     OrderItem[]
   transfer  InterCompanyTransfer?
