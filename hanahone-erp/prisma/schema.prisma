@@ -46,6 +46,7 @@ model Company {
   purchaseOrders              PurchaseOrder[]
   shippingCosts               ShippingCost[]
   reconciliationAdjustments   ReconciliationAdjustment[]
+  inventoryBaselines          InventoryBaseline[]
 
   @@map("companies")
   @@schema("public")
@@ -64,6 +65,7 @@ model User {
   appRoles             UserAppRole[]
   inventoryAdjustments InventoryAdjustment[]
   reconciliationAdjustments ReconciliationAdjustment[]
+  inventoryBaselines        InventoryBaseline[]
 
   @@map("users")
   @@schema("public")
@@ -575,6 +577,23 @@ model ShippingCost {
   @@unique([companyId, soNumber])
   @@index([orderId])
   @@map("shipping_costs")
+  @@schema("salesone")
+}
+
+model InventoryBaseline {
+  id          String   @id @default(uuid())
+  companyId   String   @map("company_id")
+  company     Company  @relation(fields: [companyId], references: [id])
+  sku         String
+  productName String   @map("product_name")
+  quantity    Int
+  setAt       DateTime @map("set_at")
+  setBy       String   @map("set_by")
+  setByUser   User     @relation(fields: [setBy], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([companyId, sku])
+  @@map("inventory_baselines")
   @@schema("salesone")
 }
 
