@@ -6,6 +6,7 @@ import { KpiCard } from "@/components/ui/kpi-card";
 import { fetchCgetcInventory, type CgetcProduct } from "@/lib/integrations/connectors/cgetc";
 import { decrypt } from "@/lib/integrations/encryption";
 import { calculateExpectedStock } from "@/lib/reconciliation";
+import { ReconciliationTable } from "@/components/reconciliation/reconciliation-table";
 
 type ReconciliationRow = {
   sku: string;
@@ -137,98 +138,6 @@ export default async function ReconciliationPage() {
     memo: adj.memo,
   }));
 
-  const reconColumns = [
-    {
-      key: "sku",
-      header: "SKU",
-      render: (row: ReconciliationRow) => (
-        <span className="font-semibold">{row.sku}</span>
-      ),
-    },
-    {
-      key: "productName",
-      header: "Product",
-      render: (row: ReconciliationRow) => (
-        <span className="text-[var(--text-secondary)]">{row.productName}</span>
-      ),
-    },
-    {
-      key: "purchased",
-      header: "Purchased",
-      align: "right" as const,
-      render: (row: ReconciliationRow) => (
-        <span className="font-semibold">{row.purchased}</span>
-      ),
-    },
-    {
-      key: "sold",
-      header: "Sold",
-      align: "right" as const,
-      render: (row: ReconciliationRow) => (
-        <span className="font-semibold">{row.sold}</span>
-      ),
-    },
-    {
-      key: "adjusted",
-      header: "Adjusted",
-      align: "right" as const,
-      render: (row: ReconciliationRow) => (
-        <span className={`font-semibold ${row.adjusted !== 0 ? "text-amber-500" : "text-[var(--text-tertiary)]"}`}>
-          {row.adjusted}
-        </span>
-      ),
-    },
-    {
-      key: "expected",
-      header: "Expected",
-      align: "right" as const,
-      render: (row: ReconciliationRow) => (
-        <span className="font-semibold">{row.expected}</span>
-      ),
-    },
-    {
-      key: "actual",
-      header: "Actual",
-      align: "right" as const,
-      render: (row: ReconciliationRow) => (
-        <span className="font-semibold">{row.actual}</span>
-      ),
-    },
-    {
-      key: "diff",
-      header: "Diff",
-      align: "right" as const,
-      render: (row: ReconciliationRow) => (
-        <span
-          className={`font-semibold ${
-            row.diff === 0
-              ? "text-teal-600"
-              : row.diff < 0
-              ? "text-rose-500"
-              : "text-amber-500"
-          }`}
-        >
-          {row.diff > 0 ? `+${row.diff}` : row.diff}
-        </span>
-      ),
-    },
-    {
-      key: "status",
-      header: "Status",
-      render: (row: ReconciliationRow) =>
-        row.reconciled ? (
-          <span className="text-teal-600 text-[11px] font-semibold">Reconciled</span>
-        ) : (
-          <div className="flex items-center gap-2">
-            <span className="text-rose-500 text-[11px] font-semibold">Unreconciled</span>
-            <span className="text-[11px] text-accent cursor-pointer hover:underline">
-              Adjust
-            </span>
-          </div>
-        ),
-    },
-  ];
-
   const adjColumns = [
     {
       key: "date",
@@ -333,7 +242,7 @@ export default async function ReconciliationPage() {
             description="No tracked products. Sync purchase orders first."
           />
         ) : (
-          <DataTable columns={reconColumns} data={rows} />
+          <ReconciliationTable rows={rows} companyId={cgetcConfig?.companyId || ""} />
         )}
       </Card>
 
