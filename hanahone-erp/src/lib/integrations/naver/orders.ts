@@ -46,16 +46,13 @@ async function fetchChangedOrderIds(
   from: string,
   to: string,
 ): Promise<string[]> {
+  const params = new URLSearchParams({
+    lastChangedFrom: from,
+    lastChangedTo: to,
+  });
   const res = await naverFetch(
     credentials,
-    "/v1/pay-order/seller/orders/last-changed-statuses",
-    {
-      method: "POST",
-      body: JSON.stringify({
-        lastChangedFrom: from,
-        lastChangedTo: to,
-      }),
-    },
+    `/v1/pay-order/seller/product-orders/last-changed-statuses?${params.toString()}`,
   );
 
   if (!res.ok) {

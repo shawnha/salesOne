@@ -4,7 +4,7 @@ import { DataTable } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { fetchCgetcInventory, type CgetcProduct } from "@/lib/integrations/connectors/cgetc";
 import { decrypt } from "@/lib/integrations/encryption";
-import { calculateExpectedStock } from "@/lib/reconciliation";
+import { buildBaselineRows } from "@/lib/reconciliation";
 
 type InventoryRow = {
   id: string;
@@ -29,7 +29,7 @@ export default async function InventoryPage({
 }) {
   const where = searchParams.company ? { companyId: searchParams.company } : {};
 
-  const [inventories, cgetcConfig, poLines, orderItems, adjustments] = await Promise.all([
+  const [inventories, cgetcConfig, baselines] = await Promise.all([
     prisma.inventory.findMany({
       where,
       include: {
@@ -41,16 +41,7 @@ export default async function InventoryPage({
     prisma.integrationConfig.findFirst({
       where: { platform: "CGETC", isActive: true },
     }),
-    prisma.purchaseOrderLine.findMany({
-      where: { sku: { not: null } },
-      select: { sku: true, quantity: true },
-    }),
-    prisma.orderItem.findMany({
-      include: { product: { select: { sku: true } } },
-    }),
-    prisma.reconciliationAdjustment.findMany({
-      select: { sku: true, quantity: true },
-    }),
+    prisma.inventoryBaseline.findMany(),
   ]);
 
   // Fetch CGETC inventory in real-time
@@ -88,21 +79,48 @@ export default async function InventoryPage({
     (inv) => !(inv.warehouseLocation === "CGETC" && inv.product.sku && cgetcSkus.has(inv.product.sku))
   );
 
-  // Build reconciliation maps for CGETC comparison columns
-  const purchasedBySku = new Map<string, number>();
-  for (const line of poLines) {
-    if (!line.sku) continue;
-    purchasedBySku.set(line.sku, (purchasedBySku.get(line.sku) || 0) + Number(line.quantity));
-  }
-  const soldBySku = new Map<string, number>();
-  for (const item of orderItems) {
-    const sku = item.product?.sku;
-    if (!sku) continue;
-    soldBySku.set(sku, (soldBySku.get(sku) || 0) + item.quantity);
-  }
-  const adjustedBySku = new Map<string, number>();
-  for (const adj of adjustments) {
-    adjustedBySku.set(adj.sku, (adjustedBySku.get(adj.sku) || 0) + adj.quantity);
+  // Build baseline-forward reconciliation data for CGETC comparison columns
+  const hasBaselines = baselines.length > 0;
+  let baselineExpectedBySku = new Map<string, number>();
+
+  if (hasBaselines) {
+    const companyId = cgetcConfig?.companyId || "";
+    const earliestSetAt = baselines.reduce(
+      (earliest, b) => (b.setAt < earliest ? b.setAt : earliest),
+      baselines[0].setAt
+    );
+
+    const [orderItems, adjustments] = await Promise.all([
+      prisma.orderItem.findMany({
+        where: { order: { companyId, orderDate: { gt: earliestSetAt } } },
+        include: {
+          order: { select: { externalSource: true, orderDate: true } },
+          product: { select: { sku: true } },
+        },
+      }),
+      prisma.reconciliationAdjustment.findMany({ where: { companyId } }),
+    ]);
+
+    const actualBySku: Record<string, number> = {};
+    for (const p of cgetcProducts) {
+      if (p.sku) actualBySku[p.sku] = p.quantity;
+    }
+
+    const baselineRows = buildBaselineRows(
+      baselines,
+      orderItems.filter((i) => i.product?.sku).map((i) => ({
+        sku: i.product.sku,
+        quantity: i.quantity,
+        orderDate: i.order.orderDate,
+        channel: i.order.externalSource || "OTHER",
+      })),
+      adjustments.map((a) => ({ sku: a.sku, quantity: a.quantity, createdAt: a.createdAt })),
+      actualBySku,
+    );
+
+    for (const row of baselineRows) {
+      baselineExpectedBySku.set(row.sku, row.expected);
+    }
   }
 
   const rows: InventoryRow[] = [
@@ -122,11 +140,7 @@ export default async function InventoryPage({
       diff: null,
     })),
     ...cgetcProducts.map((p) => {
-      const purchased = purchasedBySku.get(p.sku) || 0;
-      const sold = soldBySku.get(p.sku) || 0;
-      const adjusted = adjustedBySku.get(p.sku) || 0;
-      const hasPo = purchased > 0;
-      const expected = hasPo ? calculateExpectedStock({ purchased, sold, adjusted }) : null;
+      const expected = baselineExpectedBySku.get(p.sku) ?? null;
       const actual = p.quantity;
       const diff = expected !== null ? actual - expected : null;
       return {
