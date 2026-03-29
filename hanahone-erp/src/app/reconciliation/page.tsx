@@ -1,24 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { Card } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/table";
-import { EmptyState } from "@/components/ui/empty-state";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { fetchCgetcInventory, type CgetcProduct } from "@/lib/integrations/connectors/cgetc";
 import { decrypt } from "@/lib/integrations/encryption";
-import { calculateExpectedStock } from "@/lib/reconciliation";
+import { buildBaselineRows } from "@/lib/reconciliation";
+import type { ReconciliationRow } from "@/lib/reconciliation";
 import { ReconciliationTable } from "@/components/reconciliation/reconciliation-table";
-
-type ReconciliationRow = {
-  sku: string;
-  productName: string;
-  purchased: number;
-  sold: number;
-  adjusted: number;
-  expected: number;
-  actual: number;
-  diff: number;
-  reconciled: boolean;
-};
+import { SetBaselineButton } from "@/components/reconciliation/set-baseline-button";
 
 type AdjustmentRow = {
   id: string;
@@ -30,105 +19,102 @@ type AdjustmentRow = {
 };
 
 export default async function ReconciliationPage() {
-  // Fetch all data in parallel
-  const [poLines, orderItems, adjustments, cgetcConfig] = await Promise.all([
-    prisma.purchaseOrderLine.findMany({
-      where: { sku: { not: null } },
-      select: { sku: true, productName: true, quantity: true },
-    }),
-    prisma.orderItem.findMany({
-      include: {
-        product: { select: { sku: true } },
-      },
-    }),
+  const cgetcConfig = await prisma.integrationConfig.findFirst({
+    where: { platform: "CGETC", isActive: true },
+  });
+  const companyId = cgetcConfig?.companyId || "";
+
+  const [baselines, adjustments] = await Promise.all([
+    prisma.inventoryBaseline.findMany({ where: { companyId } }),
     prisma.reconciliationAdjustment.findMany({
+      where: { companyId },
       orderBy: { createdAt: "desc" },
-    }),
-    prisma.integrationConfig.findFirst({
-      where: { platform: "CGETC", isActive: true },
     }),
   ]);
 
-  // Fetch CGETC actual stock
   let cgetcProducts: CgetcProduct[] = [];
   let cgetcError: string | null = null;
   if (cgetcConfig) {
     try {
-      const credentials = JSON.parse(decrypt(cgetcConfig.credentials));
-      cgetcProducts = await fetchCgetcInventory(credentials);
-    } catch (err: any) {
-      cgetcError = err.message || "Failed to fetch CGETC inventory";
+      const creds = JSON.parse(decrypt(cgetcConfig.credentials));
+      cgetcProducts = await fetchCgetcInventory(creds);
+    } catch (e: any) {
+      cgetcError = e.message || "Failed to fetch CGETC inventory";
     }
   }
 
-  // Build purchased qty by SKU
-  const purchasedBySku = new Map<string, { qty: number; name: string }>();
-  for (const line of poLines) {
-    if (!line.sku) continue;
-    const existing = purchasedBySku.get(line.sku);
-    if (existing) {
-      existing.qty += Number(line.quantity);
-    } else {
-      purchasedBySku.set(line.sku, { qty: Number(line.quantity), name: line.productName });
-    }
+  const hasBaselines = baselines.length > 0;
+
+  if (!hasBaselines) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold tracking-tight">Reconciliation</h1>
+        </div>
+        <Card>
+          <div className="flex flex-col items-center justify-center py-16 space-y-4">
+            <div className="text-center space-y-2">
+              <h2 className="text-lg font-semibold">Set Inventory Baseline</h2>
+              <p className="text-sm text-[var(--text-secondary)] max-w-md">
+                Capture current CGETC inventory as your starting point. All future sales will be
+                tracked against this baseline to detect discrepancies.
+              </p>
+            </div>
+            <SetBaselineButton companyId={companyId} />
+          </div>
+        </Card>
+      </div>
+    );
   }
 
-  // Build sold qty by SKU
-  const soldBySku = new Map<string, number>();
-  for (const item of orderItems) {
-    const sku = item.product?.sku;
-    if (!sku) continue;
-    soldBySku.set(sku, (soldBySku.get(sku) || 0) + item.quantity);
-  }
+  const earliestSetAt = baselines.reduce(
+    (earliest, b) => (b.setAt < earliest ? b.setAt : earliest),
+    baselines[0].setAt
+  );
 
-  // Build adjusted qty by SKU
-  const adjustedBySku = new Map<string, number>();
-  for (const adj of adjustments) {
-    adjustedBySku.set(adj.sku, (adjustedBySku.get(adj.sku) || 0) + adj.quantity);
-  }
+  const allOrderItems = await prisma.orderItem.findMany({
+    where: {
+      order: {
+        companyId,
+        orderDate: { gt: earliestSetAt },
+      },
+    },
+    include: {
+      order: { select: { externalSource: true, orderDate: true } },
+      product: { select: { sku: true } },
+    },
+  });
 
-  // Build actual stock by SKU from CGETC
-  const actualBySku = new Map<string, number>();
+  const orderItemData = allOrderItems
+    .filter((item) => item.product?.sku)
+    .map((item) => ({
+      sku: item.product.sku,
+      quantity: item.quantity,
+      orderDate: item.order.orderDate,
+      channel: item.order.externalSource || "OTHER",
+    }));
+
+  const adjustmentData = adjustments.map((adj) => ({
+    sku: adj.sku,
+    quantity: adj.quantity,
+    createdAt: adj.createdAt,
+  }));
+
+  const actualBySku: Record<string, number> = {};
   for (const p of cgetcProducts) {
-    if (p.sku) actualBySku.set(p.sku, p.quantity);
+    if (p.sku) actualBySku[p.sku] = p.quantity;
   }
 
-  // Collect all tracked SKUs (those that appear in PO lines)
-  const trackedSkus = Array.from(purchasedBySku.keys());
-
-  // Build reconciliation rows
-  const rows: ReconciliationRow[] = trackedSkus.map((sku) => {
-    const purchased = purchasedBySku.get(sku)?.qty || 0;
-    const productName = purchasedBySku.get(sku)?.name || sku;
-    const sold = soldBySku.get(sku) || 0;
-    const adjusted = adjustedBySku.get(sku) || 0;
-    const expected = calculateExpectedStock({ purchased, sold, adjusted });
-    const actual = actualBySku.get(sku) ?? 0;
-    const diff = actual - expected;
-
-    return {
-      sku,
-      productName,
-      purchased,
-      sold,
-      adjusted,
-      expected,
-      actual,
-      diff,
-      reconciled: diff === 0,
-    };
-  });
-
-  // Sort: unreconciled first, then by absolute diff descending
-  rows.sort((a, b) => {
-    if (a.reconciled !== b.reconciled) return a.reconciled ? 1 : -1;
-    return Math.abs(b.diff) - Math.abs(a.diff);
-  });
+  const rows = buildBaselineRows(baselines, orderItemData, adjustmentData, actualBySku);
 
   const totalDiff = rows.reduce((sum, r) => sum + r.diff, 0);
   const unreconciledCount = rows.filter((r) => !r.reconciled).length;
 
-  // Adjustment history rows
+  const baselineSkus = new Set(baselines.map((b) => b.sku));
+  const unbaselinedProducts = cgetcProducts.filter(
+    (p) => p.sku && !baselineSkus.has(p.sku) && p.quantity > 0
+  );
+
   const adjustmentRows: AdjustmentRow[] = adjustments.map((adj) => ({
     id: adj.id,
     date: adj.createdAt.toISOString(),
@@ -155,9 +141,7 @@ export default async function ReconciliationPage() {
     {
       key: "sku",
       header: "SKU",
-      render: (row: AdjustmentRow) => (
-        <span className="font-semibold">{row.sku}</span>
-      ),
+      render: (row: AdjustmentRow) => <span className="font-semibold">{row.sku}</span>,
     },
     {
       key: "quantity",
@@ -201,11 +185,19 @@ export default async function ReconciliationPage() {
             </span>
           )}
         </div>
-        {unreconciledCount > 0 && (
-          <span className="text-xs font-semibold text-rose-500 bg-rose-500/10 px-3 py-1 rounded-full">
-            {unreconciledCount} unreconciled item{unreconciledCount > 1 ? "s" : ""}
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {unreconciledCount > 0 && (
+            <span className="text-xs font-semibold text-rose-500 bg-rose-500/10 px-3 py-1 rounded-full">
+              {unreconciledCount} unreconciled
+            </span>
+          )}
+          <SetBaselineButton
+            companyId={companyId}
+            isReset
+            baselineCount={baselines.length}
+            adjustmentCount={adjustments.filter((a) => a.createdAt > earliestSetAt).length}
+          />
+        </div>
       </div>
 
       {cgetcError && (
@@ -214,7 +206,18 @@ export default async function ReconciliationPage() {
         </div>
       )}
 
-      {/* KPI Cards */}
+      <div className="text-[11px] text-[var(--text-tertiary)]">
+        Baseline set:{" "}
+        {new Date(earliestSetAt).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })}
+        {" · "}Tracking {baselines.length} SKUs
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <KpiCard
           label="Total Difference"
@@ -234,23 +237,37 @@ export default async function ReconciliationPage() {
         />
       </div>
 
-      {/* Reconciliation Table */}
       <Card>
-        {rows.length === 0 ? (
-          <EmptyState
-            title="No tracked products"
-            description="No tracked products. Sync purchase orders first."
-          />
-        ) : (
-          <ReconciliationTable rows={rows} companyId={cgetcConfig?.companyId || ""} />
-        )}
+        <ReconciliationTable rows={rows} companyId={companyId} />
       </Card>
 
-      {/* Adjustment History */}
+      {unbaselinedProducts.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+            Unbaselined Products{" "}
+            <span className="text-[var(--text-quaternary)]">({unbaselinedProducts.length})</span>
+          </h2>
+          <Card>
+            <div className="text-[11px] text-[var(--text-secondary)] px-4 py-3 border-b border-[var(--card-border)]">
+              These CGETC products are not in the current baseline. Click &quot;Reset Baseline&quot; to include them.
+            </div>
+            <DataTable
+              columns={[
+                { key: "sku", header: "SKU", render: (p: CgetcProduct) => <span className="font-semibold">{p.sku}</span> },
+                { key: "name", header: "Product", render: (p: CgetcProduct) => <span className="text-[var(--text-secondary)]">{p.name}</span> },
+                { key: "quantity", header: "CGETC Qty", align: "right" as const, render: (p: CgetcProduct) => <span className="font-semibold">{p.quantity}</span> },
+              ]}
+              data={unbaselinedProducts}
+            />
+          </Card>
+        </div>
+      )}
+
       {adjustmentRows.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
-            Adjustment History <span className="text-[var(--text-quaternary)]">({adjustmentRows.length})</span>
+            Adjustment History{" "}
+            <span className="text-[var(--text-quaternary)]">({adjustmentRows.length})</span>
           </h2>
           <Card>
             <DataTable columns={adjColumns} data={adjustmentRows} />

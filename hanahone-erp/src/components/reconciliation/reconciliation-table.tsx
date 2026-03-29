@@ -4,23 +4,39 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DataTable } from "@/components/ui/table";
 import { AdjustModal } from "./adjust-modal";
-
-type ReconciliationRow = {
-  sku: string;
-  productName: string;
-  purchased: number;
-  sold: number;
-  adjusted: number;
-  expected: number;
-  actual: number;
-  diff: number;
-  reconciled: boolean;
-};
+import type { ReconciliationRow } from "@/lib/reconciliation";
 
 type Props = {
   rows: ReconciliationRow[];
   companyId: string;
 };
+
+const CHANNEL_LABELS: Record<string, string> = {
+  SHOPIFY: "Shopify",
+  AMAZON: "Amazon",
+  TIKTOK: "TikTok",
+  NAVER: "Naver",
+  PHARMACY: "Pharmacy",
+  CGETC: "CGETC",
+  ORDERDESK: "OrderDesk",
+  OTHER: "Other",
+};
+
+function ChannelBreakdown({ salesByChannel }: { salesByChannel: Record<string, number> }) {
+  const entries = Object.entries(salesByChannel).filter(([, qty]) => qty > 0);
+  if (entries.length === 0) return <span className="text-[var(--text-quaternary)]">—</span>;
+
+  return (
+    <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+      {entries.map(([channel, qty]) => (
+        <span key={channel} className="text-[11px] text-[var(--text-secondary)]">
+          <span className="text-[var(--text-tertiary)]">{CHANNEL_LABELS[channel] || channel}</span>{" "}
+          <span className="font-semibold">-{qty}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
 
 export function ReconciliationTable({ rows, companyId }: Props) {
   const router = useRouter();
@@ -31,35 +47,43 @@ export function ReconciliationTable({ rows, companyId }: Props) {
       key: "sku",
       header: "SKU",
       render: (row: ReconciliationRow) => (
-        <span className="font-semibold">{row.sku}</span>
+        <div>
+          <span className="font-semibold">{row.sku}</span>
+          <div className="text-[11px] text-[var(--text-tertiary)]">{row.productName}</div>
+        </div>
       ),
     },
     {
-      key: "productName",
-      header: "Product",
+      key: "baseline",
+      header: "Baseline",
+      align: "right" as const,
       render: (row: ReconciliationRow) => (
-        <span className="text-[var(--text-secondary)]">{row.productName}</span>
+        <span className="font-semibold">{row.baseline}</span>
       ),
     },
     {
-      key: "purchased",
-      header: "Purchased",
-      align: "right" as const,
-      render: (row: ReconciliationRow) => <span className="font-semibold">{row.purchased}</span>,
-    },
-    {
-      key: "sold",
-      header: "Sold",
-      align: "right" as const,
-      render: (row: ReconciliationRow) => <span className="font-semibold">{row.sold}</span>,
+      key: "sales",
+      header: "Sales Since Baseline",
+      render: (row: ReconciliationRow) => (
+        <div>
+          <span className="font-semibold text-rose-500">
+            {row.totalSales > 0 ? `-${row.totalSales}` : "—"}
+          </span>
+          <ChannelBreakdown salesByChannel={row.salesByChannel} />
+        </div>
+      ),
     },
     {
       key: "adjusted",
       header: "Adjusted",
       align: "right" as const,
       render: (row: ReconciliationRow) => (
-        <span className={`font-semibold ${row.adjusted !== 0 ? "text-amber-500" : "text-[var(--text-tertiary)]"}`}>
-          {row.adjusted}
+        <span
+          className={`font-semibold ${
+            row.adjusted !== 0 ? "text-amber-500" : "text-[var(--text-quaternary)]"
+          }`}
+        >
+          {row.adjusted === 0 ? "—" : row.adjusted > 0 ? `+${row.adjusted}` : row.adjusted}
         </span>
       ),
     },
@@ -80,7 +104,15 @@ export function ReconciliationTable({ rows, companyId }: Props) {
       header: "Diff",
       align: "right" as const,
       render: (row: ReconciliationRow) => (
-        <span className={`font-semibold ${row.diff === 0 ? "text-teal-600" : row.diff < 0 ? "text-rose-500" : "text-amber-500"}`}>
+        <span
+          className={`font-semibold ${
+            row.diff === 0
+              ? "text-teal-600"
+              : row.diff < 0
+              ? "text-rose-500"
+              : "text-amber-500"
+          }`}
+        >
           {row.diff > 0 ? `+${row.diff}` : row.diff}
         </span>
       ),
