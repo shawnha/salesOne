@@ -63,6 +63,7 @@ export default async function OrdersPage({
         customer: { select: { id: true, name: true } },
         company: { select: { name: true } },
         transfer: true,
+        items: { select: { quantity: true, product: { select: { name: true } } } },
       },
       orderBy: { orderDate: "desc" },
     }),
@@ -109,6 +110,10 @@ export default async function OrdersPage({
     netAmount: o.netAmount ? Number(o.netAmount) : null,
     orderDate: o.orderDate.toISOString(),
     notes: o.notes,
+    items: o.items.map((item) => ({
+      productName: item.product?.name || null,
+      quantity: item.quantity,
+    })),
   }));
 
   return (

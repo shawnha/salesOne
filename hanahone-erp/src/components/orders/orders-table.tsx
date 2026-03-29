@@ -19,6 +19,11 @@ const platformBadge: Record<string, { label: string; color: string }> = {
   CGETC: { label: "CGETC", color: "text-indigo-600 bg-indigo-600/[0.08]" },
 };
 
+interface OrderItemRow {
+  productName: string | null;
+  quantity: number;
+}
+
 interface OrderRow {
   id: string;
   orderNumber: string;
@@ -33,6 +38,7 @@ interface OrderRow {
   netAmount: number | null;
   orderDate: string;
   notes: string | null;
+  items?: OrderItemRow[];
 }
 
 interface RefundData {
@@ -198,6 +204,22 @@ function ExpandedRow({
 
   return (
     <div className="px-8 py-4 space-y-3">
+      {/* Products */}
+      {row.items && row.items.length > 0 && (
+        <div className="flex items-start gap-3 text-[13px]">
+          <div className="w-2 h-2 rounded-full bg-accent mt-1" />
+          <div className="flex-1">
+            <span className="font-semibold text-[var(--text-secondary)]">Items</span>
+            <div className="mt-1 space-y-0.5">
+              {row.items.map((item, i) => (
+                <div key={i} className="text-xs text-[var(--text-secondary)]">
+                  {item.productName || "Unknown product"}{item.quantity > 1 ? ` x${item.quantity}` : ""}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
       {/* Order timeline */}
       <div className="flex items-center gap-3 text-[13px]">
         <div className="w-2 h-2 rounded-full bg-teal-500" />
