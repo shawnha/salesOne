@@ -11,7 +11,10 @@ export async function fetchNaverInventory(
   let hasMore = true;
 
   while (hasMore) {
-    const res = await naverFetch(credentials, `/v2/products?page=${page}&size=${PAGE_SIZE}`);
+    const res = await naverFetch(credentials, "/v1/products/search", {
+      method: "POST",
+      body: JSON.stringify({ page, size: PAGE_SIZE }),
+    });
 
     if (!res.ok) {
       throw new Error(`Naver products fetch failed: ${res.status}`);
