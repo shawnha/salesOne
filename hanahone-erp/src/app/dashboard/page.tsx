@@ -6,6 +6,9 @@ import { LowStockAlerts } from "@/components/dashboard/low-stock-alerts";
 import { DateFilter } from "@/components/ui/date-filter";
 import { fetchCgetcInventory, type CgetcProduct } from "@/lib/integrations/connectors/cgetc";
 import { decrypt } from "@/lib/integrations/encryption";
+import { getUsdKrwRate, convertUsdToKrw } from "@/lib/exchange-rate";
+
+const KRW_PLATFORMS = new Set(["NAVER", "PHARMACY"]);
 
 function timeAgo(date: Date | null): string {
   if (!date) return "unknown";
@@ -50,8 +53,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
   const inventoryValue = filteredInventory.reduce((sum, inv) => sum + inv.quantity * Number(inv.product.costPrice), 0)
     + cgetcProducts.reduce((sum, p) => sum + p.quantity * 0, 0); // CGETC products have no costPrice yet
 
-  const [totalSales, openOrders, pendingShipments, latestSyncs] = await Promise.all([
-    prisma.order.aggregate({ where: { ...companyFilter, type: { in: ["SALE", "BROKERAGE"] } }, _sum: { totalAmount: true } }),
+  const [salesOrders, openOrders, pendingShipments, latestSyncs, exchangeRate] = await Promise.all([
+    prisma.order.findMany({
+      where: { ...companyFilter, type: { in: ["SALE", "BROKERAGE"] } },
+      select: { totalAmount: true, externalSource: true },
+    }),
     prisma.order.count({ where: { ...companyFilter, fulfillmentStatus: { in: ["UNFULFILLED", "PARTIALLY_FULFILLED", "FULFILLED"] } } }),
     prisma.order.count({ where: { ...companyFilter, fulfillmentStatus: "UNFULFILLED", financialStatus: "PAID" } }),
     prisma.syncJob.findMany({
@@ -61,13 +67,27 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
       select: { platform: true, completedAt: true },
       take: 10,
     }),
+    getUsdKrwRate(),
   ]);
+
+  // Convert all sales to KRW for consistent dashboard totals
+  const totalSalesKRW = salesOrders.reduce((sum, o) => {
+    const amount = Number(o.totalAmount);
+    return sum + (KRW_PLATFORMS.has(o.externalSource || "") ? amount : convertUsdToKrw(amount, exchangeRate.rate));
+  }, 0);
 
   const companyBreakdowns = await Promise.all(
     companies.map(async (c) => {
-      const revenue = await prisma.order.aggregate({ where: { companyId: c.id, type: { in: ["SALE", "BROKERAGE"] } }, _sum: { totalAmount: true } });
+      const companyOrders = await prisma.order.findMany({
+        where: { companyId: c.id, type: { in: ["SALE", "BROKERAGE"] } },
+        select: { totalAmount: true, externalSource: true },
+      });
       const orderCount = await prisma.order.count({ where: { companyId: c.id } });
-      return { ...c, revenue: Number(revenue._sum.totalAmount || 0), orderCount };
+      const revenue = companyOrders.reduce((sum, o) => {
+        const amount = Number(o.totalAmount);
+        return sum + (KRW_PLATFORMS.has(o.externalSource || "") ? amount : convertUsdToKrw(amount, exchangeRate.rate));
+      }, 0);
+      return { ...c, revenue, orderCount };
     })
   );
 
@@ -91,7 +111,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
         <DateFilter />
       </div>
       <div className="space-y-4">
-        <KpiRow data={{ totalSales: Number(totalSales._sum.totalAmount || 0), openOrders, inventoryValue, productionRuns: productionOrders, salesChange: 0, pendingShipments, lowStockCount: lowStock.length, newProductionRuns: 0 }} />
+        <KpiRow data={{ totalSales: totalSalesKRW, openOrders, inventoryValue, productionRuns: productionOrders, salesChange: 0, pendingShipments, lowStockCount: lowStock.length, newProductionRuns: 0 }} />
         {latestSyncs.length > 0 && (
           <div className="flex gap-3 flex-wrap">
             {latestSyncs.map((sync) => (
@@ -111,7 +131,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
         )}
         <div className="grid grid-cols-12 gap-4">
           <div className="col-span-8">
-            <RecentOrders orders={orders.map((o) => ({ id: o.id, orderNumber: o.orderNumber, customerName: o.customer?.name || "—", status: o.fulfillmentStatus, totalAmount: Number(o.totalAmount), isTransfer: o.type === "INTER_COMPANY", transferLabel: o.transfer ? `${o.transfer.fromCompany.name} → ${o.transfer.toCompany.name}` : undefined }))} />
+            <RecentOrders orders={orders.map((o) => ({ id: o.id, orderNumber: o.orderNumber, customerName: o.customer?.name || "—", status: o.fulfillmentStatus, totalAmount: Number(o.totalAmount), externalSource: o.externalSource, isTransfer: o.type === "INTER_COMPANY", transferLabel: o.transfer ? `${o.transfer.fromCompany.name} → ${o.transfer.toCompany.name}` : undefined }))} />
           </div>
           <div className="col-span-4">
             <LowStockAlerts items={lowStock.map((inv) => ({ productName: inv.product.name, companyName: inv.company.name, reorderLevel: inv.reorderLevel, quantity: inv.quantity }))} />
