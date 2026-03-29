@@ -4,9 +4,11 @@ import { DataTable } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { fetchCgetcInventory, type CgetcProduct } from "@/lib/integrations/connectors/cgetc";
 import { decrypt } from "@/lib/integrations/encryption";
+import { calculateExpectedStock } from "@/lib/reconciliation";
 
 type InventoryRow = {
   id: string;
+  sku: string;
   name: string;
   warehouse: string;
   company: string;
@@ -15,6 +17,9 @@ type InventoryRow = {
   available: number;
   reorderLevel: number;
   source: "internal" | "cgetc";
+  expected: number | null;
+  actual: number | null;
+  diff: number | null;
 };
 
 export default async function InventoryPage({
@@ -24,7 +29,7 @@ export default async function InventoryPage({
 }) {
   const where = searchParams.company ? { companyId: searchParams.company } : {};
 
-  const [inventories, cgetcConfig] = await Promise.all([
+  const [inventories, cgetcConfig, poLines, orderItems, adjustments] = await Promise.all([
     prisma.inventory.findMany({
       where,
       include: {
@@ -35,6 +40,16 @@ export default async function InventoryPage({
     }),
     prisma.integrationConfig.findFirst({
       where: { platform: "CGETC", isActive: true },
+    }),
+    prisma.purchaseOrderLine.findMany({
+      where: { sku: { not: null } },
+      select: { sku: true, quantity: true },
+    }),
+    prisma.orderItem.findMany({
+      include: { product: { select: { sku: true } } },
+    }),
+    prisma.reconciliationAdjustment.findMany({
+      select: { sku: true, quantity: true },
     }),
   ]);
 
@@ -73,9 +88,27 @@ export default async function InventoryPage({
     (inv) => !(inv.warehouseLocation === "CGETC" && inv.product.sku && cgetcSkus.has(inv.product.sku))
   );
 
+  // Build reconciliation maps for CGETC comparison columns
+  const purchasedBySku = new Map<string, number>();
+  for (const line of poLines) {
+    if (!line.sku) continue;
+    purchasedBySku.set(line.sku, (purchasedBySku.get(line.sku) || 0) + Number(line.quantity));
+  }
+  const soldBySku = new Map<string, number>();
+  for (const item of orderItems) {
+    const sku = item.product?.sku;
+    if (!sku) continue;
+    soldBySku.set(sku, (soldBySku.get(sku) || 0) + item.quantity);
+  }
+  const adjustedBySku = new Map<string, number>();
+  for (const adj of adjustments) {
+    adjustedBySku.set(adj.sku, (adjustedBySku.get(adj.sku) || 0) + adj.quantity);
+  }
+
   const rows: InventoryRow[] = [
     ...filteredInventories.map((inv) => ({
       id: inv.id,
+      sku: inv.product.sku || "",
       name: inv.product.name,
       warehouse: inv.warehouseLocation,
       company: inv.company.name,
@@ -84,18 +117,34 @@ export default async function InventoryPage({
       available: inv.quantity,
       reorderLevel: inv.reorderLevel,
       source: "internal" as const,
+      expected: null,
+      actual: null,
+      diff: null,
     })),
-    ...cgetcProducts.map((p) => ({
-      id: `cgetc-${p.sku}`,
-      name: p.name,
-      warehouse: "CGETC",
-      company: "HOI",
-      quantity: p.quantity,
-      reserved: p.reserved,
-      available: p.available,
-      reorderLevel: 0,
-      source: "cgetc" as const,
-    })),
+    ...cgetcProducts.map((p) => {
+      const purchased = purchasedBySku.get(p.sku) || 0;
+      const sold = soldBySku.get(p.sku) || 0;
+      const adjusted = adjustedBySku.get(p.sku) || 0;
+      const hasPo = purchased > 0;
+      const expected = hasPo ? calculateExpectedStock({ purchased, sold, adjusted }) : null;
+      const actual = p.quantity;
+      const diff = expected !== null ? actual - expected : null;
+      return {
+        id: `cgetc-${p.sku}`,
+        sku: p.sku,
+        name: p.name,
+        warehouse: "CGETC",
+        company: "HOI",
+        quantity: p.quantity,
+        reserved: p.reserved,
+        available: p.available,
+        reorderLevel: 0,
+        source: "cgetc" as const,
+        expected,
+        actual,
+        diff,
+      };
+    }),
   ];
 
   const columns = [
@@ -156,6 +205,47 @@ export default async function InventoryPage({
           {row.available}
         </span>
       ),
+    },
+    {
+      key: "expected",
+      header: "Expected",
+      align: "right" as const,
+      render: (row: InventoryRow) => (
+        <span className={`font-semibold ${row.expected === null ? "text-[var(--text-quaternary)]" : ""}`}>
+          {row.expected !== null ? row.expected : "—"}
+        </span>
+      ),
+    },
+    {
+      key: "actual",
+      header: "Actual",
+      align: "right" as const,
+      render: (row: InventoryRow) => (
+        <span className={`font-semibold ${row.actual === null ? "text-[var(--text-quaternary)]" : ""}`}>
+          {row.actual !== null ? row.actual : "—"}
+        </span>
+      ),
+    },
+    {
+      key: "diff",
+      header: "Diff",
+      align: "right" as const,
+      render: (row: InventoryRow) => {
+        if (row.diff === null) return <span className="text-[var(--text-quaternary)]">—</span>;
+        return (
+          <span
+            className={`font-semibold ${
+              row.diff === 0
+                ? "text-teal-600"
+                : row.diff < 0
+                ? "text-rose-500"
+                : "text-amber-500"
+            }`}
+          >
+            {row.diff > 0 ? `+${row.diff}` : row.diff}
+          </span>
+        );
+      },
     },
   ];
 

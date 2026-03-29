@@ -9,6 +9,8 @@ const navLinks = [
   { href: "/sales", label: "Sales" },
   { href: "/orders", label: "Orders" },
   { href: "/inventory", label: "Inventory" },
+  { href: "/reconciliation", label: "Reconciliation" },
+  { href: "/shipping-costs", label: "Shipping" },
   { href: "/products", label: "Products" },
   { href: "/customers", label: "Customers" },
   { href: "/transfers", label: "Transfers" },
