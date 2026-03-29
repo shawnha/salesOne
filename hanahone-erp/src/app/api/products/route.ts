@@ -58,13 +58,35 @@ export async function DELETE(req: NextRequest) {
   if (error) return error;
 
   const id = req.nextUrl.searchParams.get("id");
+  const force = req.nextUrl.searchParams.get("force") === "true";
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+
+  // Check what's linked to this product
+  const [orderItems, productionOrders, bom] = await Promise.all([
+    prisma.orderItem.count({ where: { productId: id } }),
+    prisma.productionOrder.count({ where: { productId: id } }),
+    prisma.billOfMaterials.count({ where: { OR: [{ finishedProductId: id }, { rawMaterialId: id }] } }),
+  ]);
+
+  const deps = [];
+  if (orderItems > 0) deps.push(`${orderItems} order items`);
+  if (productionOrders > 0) deps.push(`${productionOrders} production orders`);
+  if (bom > 0) deps.push(`${bom} BOM records`);
+
+  if (deps.length > 0 && !force) {
+    return NextResponse.json(
+      { error: `Product has: ${deps.join(", ")}. Use force delete to remove all.`, deps },
+      { status: 409 },
+    );
+  }
 
   try {
     await prisma.$transaction([
-      prisma.orderItem.deleteMany({ where: { productId: id } }),
-      prisma.productionOrder.deleteMany({ where: { productId: id } }),
-      prisma.billOfMaterials.deleteMany({ where: { OR: [{ finishedProductId: id }, { rawMaterialId: id }] } }),
+      ...(force ? [
+        prisma.orderItem.deleteMany({ where: { productId: id } }),
+        prisma.productionOrder.deleteMany({ where: { productId: id } }),
+        prisma.billOfMaterials.deleteMany({ where: { OR: [{ finishedProductId: id }, { rawMaterialId: id }] } }),
+      ] : []),
       prisma.skuMapping.deleteMany({ where: { productId: id } }),
       prisma.inventory.deleteMany({ where: { productId: id } }),
       prisma.inventorySnapshot.deleteMany({ where: { productId: id } }),
@@ -74,7 +96,7 @@ export async function DELETE(req: NextRequest) {
   } catch (err: any) {
     if (err.code === "P2003") {
       return NextResponse.json(
-        { error: "Cannot delete: product has dependent records" },
+        { error: "Cannot delete: product has dependent records that were not cleaned up" },
         { status: 409 },
       );
     }

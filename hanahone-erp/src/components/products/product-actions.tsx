@@ -104,8 +104,25 @@ export function ProductDeleteButton({ product }: ProductActionsProps) {
       const res = await fetch(`/api/products?id=${product.id}`, { method: "DELETE" });
       if (res.ok) {
         window.location.reload();
+        return;
+      }
+
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 409 && data.deps) {
+        // Has dependent records — ask for force delete
+        const forceConfirm = confirm(
+          `"${product.name}" has linked records:\n${data.deps.map((d: string) => `  - ${d}`).join("\n")}\n\nForce delete? This will remove all linked records.`
+        );
+        if (forceConfirm) {
+          const forceRes = await fetch(`/api/products?id=${product.id}&force=true`, { method: "DELETE" });
+          if (forceRes.ok) {
+            window.location.reload();
+            return;
+          }
+          const forceData = await forceRes.json().catch(() => ({}));
+          alert(forceData.error || "Force delete failed");
+        }
       } else {
-        const data = await res.json().catch(() => ({}));
         alert(data.error || "Failed to delete product");
       }
     } finally {
