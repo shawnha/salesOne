@@ -61,8 +61,10 @@ export async function DELETE(req: NextRequest) {
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
   try {
-    // Delete related records that are safe to cascade
     await prisma.$transaction([
+      prisma.orderItem.deleteMany({ where: { productId: id } }),
+      prisma.productionOrder.deleteMany({ where: { productId: id } }),
+      prisma.billOfMaterials.deleteMany({ where: { OR: [{ finishedProductId: id }, { rawMaterialId: id }] } }),
       prisma.skuMapping.deleteMany({ where: { productId: id } }),
       prisma.inventory.deleteMany({ where: { productId: id } }),
       prisma.inventorySnapshot.deleteMany({ where: { productId: id } }),
@@ -72,7 +74,7 @@ export async function DELETE(req: NextRequest) {
   } catch (err: any) {
     if (err.code === "P2003") {
       return NextResponse.json(
-        { error: "Cannot delete: product has orders or production records" },
+        { error: "Cannot delete: product has dependent records" },
         { status: 409 },
       );
     }
