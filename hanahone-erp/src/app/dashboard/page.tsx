@@ -103,7 +103,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
       select: { platform: true, completedAt: true },
       take: 10,
     }),
-    getUsdKrwRate(),
+    getUsdKrwRate(dateRange.lt > new Date() ? undefined : new Date(dateRange.lt.getTime() - 1)),
   ]);
 
   const rate = exchangeRate.rate;
