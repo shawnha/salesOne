@@ -11,6 +11,7 @@ interface Product {
   description: string | null;
   category: string;
   basePrice: number;
+  salePrice: number | null;
   costPrice: number;
   companyId: string;
 }
@@ -25,6 +26,7 @@ export function ProductEditButton({ product }: ProductActionsProps) {
   const [sku, setSku] = useState(product.sku);
   const [category, setCategory] = useState(product.category);
   const [basePrice, setBasePrice] = useState(String(product.basePrice));
+  const [salePrice, setSalePrice] = useState(product.salePrice != null ? String(product.salePrice) : "");
   const [costPrice, setCostPrice] = useState(String(product.costPrice));
   const [saving, setSaving] = useState(false);
 
@@ -40,6 +42,7 @@ export function ProductEditButton({ product }: ProductActionsProps) {
           sku,
           category,
           basePrice: parseFloat(basePrice) || 0,
+          salePrice: salePrice ? parseFloat(salePrice) : null,
           costPrice: parseFloat(costPrice) || 0,
         }),
       });
@@ -81,6 +84,7 @@ export function ProductEditButton({ product }: ProductActionsProps) {
               <Input label="Base Price" type="number" value={basePrice} onChange={(e) => setBasePrice(e.target.value)} />
               <Input label="Cost Price" type="number" value={costPrice} onChange={(e) => setCostPrice(e.target.value)} />
             </div>
+            <Input label="Sale Price" type="number" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} />
             <div className="flex items-center gap-3 pt-2">
               <Button variant="primary" size="md" onClick={handleSave} disabled={saving}>
                 {saving ? "Saving..." : "Save"}
