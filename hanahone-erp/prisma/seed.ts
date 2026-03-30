@@ -88,11 +88,14 @@ async function main() {
   const collagenHok = await prisma.product.create({
     data: { name: "Collagen Peptides", sku: "COLL-PEP", category: "Collagen", basePrice: 38000, costPrice: 14000, companyId: hok.id },
   });
-  const omega3Hoi = await prisma.product.create({
-    data: { name: "Omega-3 Fish Oil 1000mg", sku: "OMEGA3-1000", category: "Fish Oil", basePrice: 35000, costPrice: 18000, companyId: hoi.id },
+  const starterKit = await prisma.product.create({
+    data: { name: "5 Bottle Pack", sku: "8800316050001", category: "Shopify", basePrice: 49, costPrice: 0, salePrice: 29, companyId: hoi.id },
   });
-  const vitD3Hoi = await prisma.product.create({
-    data: { name: "Vitamin D3 5000IU", sku: "VITD3-5000", category: "Vitamins", basePrice: 22000, costPrice: 10000, companyId: hoi.id },
+  const monthlyPack = await prisma.product.create({
+    data: { name: "30 Bottle Pack", sku: "XG-MNLD-D8SM", category: "Shopify", basePrice: 159, costPrice: 0, salePrice: 129, companyId: hoi.id },
+  });
+  const subscription = await prisma.product.create({
+    data: { name: "Monthly Subscription", sku: "8800316050018", category: "Shopify", basePrice: 129, costPrice: 0, salePrice: 109, companyId: hoi.id },
   });
 
   // Inventory
@@ -102,8 +105,9 @@ async function main() {
       { productId: vitD3Hok.id, companyId: hok.id, quantity: 1800, warehouseLocation: "HOK-Main", reorderLevel: 300 },
       { productId: probioticsHok.id, companyId: hok.id, quantity: 52, warehouseLocation: "HOK-Main", reorderLevel: 200 },
       { productId: collagenHok.id, companyId: hok.id, quantity: 198, warehouseLocation: "HOK-Main", reorderLevel: 400 },
-      { productId: omega3Hoi.id, companyId: hoi.id, quantity: 127, warehouseLocation: "HOI-Main", reorderLevel: 500 },
-      { productId: vitD3Hoi.id, companyId: hoi.id, quantity: 84, warehouseLocation: "HOI-Main", reorderLevel: 300 },
+      { productId: starterKit.id, companyId: hoi.id, quantity: 659, warehouseLocation: "HOI-Main", reorderLevel: 100 },
+      { productId: monthlyPack.id, companyId: hoi.id, quantity: 248, warehouseLocation: "HOI-Main", reorderLevel: 100 },
+      { productId: subscription.id, companyId: hoi.id, quantity: 248, warehouseLocation: "HOI-Main", reorderLevel: 100 },
     ],
   });
 
