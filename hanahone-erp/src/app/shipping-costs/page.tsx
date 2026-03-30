@@ -7,8 +7,15 @@ import { ShippingChart } from "@/components/shipping/ShippingChart";
 
 const formatUSD = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
-export default async function ShippingCostsPage() {
+export default async function ShippingCostsPage({
+  searchParams,
+}: {
+  searchParams: { company?: string };
+}) {
+  const where = searchParams.company ? { companyId: searchParams.company } : {};
+
   const shippingCosts = await prisma.shippingCost.findMany({
+    where,
     include: {
       order: { select: { orderNumber: true, externalOrderNumber: true } },
     },
