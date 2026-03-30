@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mapNaverStatus } from "../orders";
+import { mapNaverStatus, isGongguOrder } from "../orders";
 
 describe("mapNaverStatus", () => {
   it("maps PAYMENT_WAITING to UNFULFILLED/PENDING", () => {
@@ -36,5 +36,31 @@ describe("mapNaverStatus", () => {
 
   it("returns defaults for unknown status", () => {
     expect(mapNaverStatus("SOME_UNKNOWN")).toEqual({ fulfillment: "UNFULFILLED", financial: "PENDING" });
+  });
+});
+
+describe("isGongguOrder", () => {
+  it("detects gonggu via sellerCustomCode1 containing gonggu", () => {
+    expect(isGongguOrder({ sellerCustomCode1: "GONGGU-2026-04" }, new Set())).toBe(true);
+  });
+
+  it("detects gonggu via sellerCustomCode1 containing korean 공구", () => {
+    expect(isGongguOrder({ sellerCustomCode1: "예영공구4월" }, new Set())).toBe(true);
+  });
+
+  it("detects gonggu via gongguSkus set with productId", () => {
+    expect(isGongguOrder({ productId: "12345" }, new Set(["12345"]))).toBe(true);
+  });
+
+  it("detects gonggu via gongguSkus set with originalProductId", () => {
+    expect(isGongguOrder({ originalProductId: "99999" }, new Set(["99999"]))).toBe(true);
+  });
+
+  it("returns false when no match", () => {
+    expect(isGongguOrder({ sellerCustomCode1: "" }, new Set())).toBe(false);
+  });
+
+  it("returns false when sellerCustomCode1 is undefined", () => {
+    expect(isGongguOrder({}, new Set())).toBe(false);
   });
 });

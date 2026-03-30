@@ -45,8 +45,9 @@ export const naverConnector: Connector & {
   async fetchOrders(
     credentials: NaverCredentials,
     since: Date | null,
+    companyId?: string,
   ): Promise<ExternalOrderData[]> {
-    return fetchNaverOrders(credentials, since);
+    return fetchNaverOrders(credentials, since, companyId);
   },
 
   syncInventory: syncNaverInventory,

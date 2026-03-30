@@ -49,7 +49,7 @@ export async function runSync(connector: Connector, companyId: string): Promise<
 
   try {
     const credentials = JSON.parse(decrypt(config.credentials));
-    const externalOrders = await connector.fetchOrders(credentials, config.lastSyncAt);
+    const externalOrders = await connector.fetchOrders(credentials, config.lastSyncAt, companyId);
 
     let processed = 0;
     let failed = 0;

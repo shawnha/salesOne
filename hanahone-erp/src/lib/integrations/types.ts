@@ -46,7 +46,7 @@ export interface ExternalInventoryData {
 
 export interface Connector {
   platform: Platform;
-  fetchOrders(credentials: any, since: Date | null): Promise<ExternalOrderData[]>;
+  fetchOrders(credentials: any, since: Date | null, companyId?: string): Promise<ExternalOrderData[]>;
   fetchInventory?(credentials: any): Promise<ExternalInventoryData[]>;
 }
 

@@ -40,6 +40,8 @@ export interface NaverProductOrderInfo {
   optionCode?: string;
   productId?: string; // 채널상품번호
   originalProductId?: string; // 원상품번호
+  sellerCustomCode1?: string; // 판매자 내부코드1 (공구 태그 등)
+  sellerCustomCode2?: string; // 판매자 내부코드2
   shippingAddress?: {
     name: string;
     tel1: string;
