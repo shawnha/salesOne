@@ -147,3 +147,62 @@ export const shopifyConnector: Connector = {
     return orders;
   },
 };
+
+export interface ShopifyProduct {
+  id: number;
+  title: string;
+  status: string;
+  variants: {
+    id: number;
+    title: string;
+    sku: string;
+    price: string;
+    compareAtPrice: string | null;
+  }[];
+}
+
+export async function fetchShopifyProducts(
+  credentials: ShopifyCredentials,
+): Promise<ShopifyProduct[]> {
+  const shop = credentials.shop || credentials.storeUrl;
+  if (!shop) throw new Error("Missing shop URL");
+
+  const token = await getAccessToken({ ...credentials, shop });
+  const baseUrl = `https://${shop}/admin/api/2024-01`;
+  const headers = {
+    "X-Shopify-Access-Token": token,
+    "Content-Type": "application/json",
+  };
+
+  const products: ShopifyProduct[] = [];
+  let url: string | null = `${baseUrl}/products.json?limit=250`;
+
+  while (url) {
+    const res = await fetch(url, { headers });
+    if (!res.ok) {
+      throw new Error(`Shopify Products API error: ${res.status} ${res.statusText}`);
+    }
+    const data = await res.json();
+
+    for (const p of data.products || []) {
+      products.push({
+        id: p.id,
+        title: p.title,
+        status: p.status,
+        variants: (p.variants || []).map((v: any) => ({
+          id: v.id,
+          title: v.title,
+          sku: v.sku || "",
+          price: v.price,
+          compareAtPrice: v.compare_at_price,
+        })),
+      });
+    }
+
+    const linkHeader = res.headers.get("Link");
+    const nextMatch = linkHeader?.match(/<([^>]+)>;\s*rel="next"/);
+    url = nextMatch ? nextMatch[1] : null;
+  }
+
+  return products;
+}
