@@ -23,14 +23,14 @@ export async function POST(req: NextRequest) {
   if (error) return error;
 
   const body = await req.json();
-  const { name, sku, description, category, basePrice, costPrice, companyId } = body;
+  const { name, sku, description, category, basePrice, costPrice, salePrice, companyId } = body;
 
   if (!name || !sku || !category || !companyId) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
   const product = await prisma.product.create({
-    data: { name, sku, description, category, basePrice: basePrice || 0, costPrice: costPrice || 0, companyId },
+    data: { name, sku, description, category, basePrice: basePrice || 0, costPrice: costPrice || 0, salePrice: salePrice || null, companyId },
   });
 
   return NextResponse.json(product, { status: 201 });
