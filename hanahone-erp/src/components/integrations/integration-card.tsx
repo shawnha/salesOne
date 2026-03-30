@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { CredentialsModal } from "./credentials-modal";
 
-type Platform = "SHOPIFY" | "AMAZON" | "TIKTOK" | "CGETC" | "NAVER" | "PHARMACY";
+type Platform = "SHOPIFY" | "AMAZON" | "TIKTOK" | "CGETC" | "NAVER" | "PHARMACY" | "ORDERDESK";
 
 interface IntegrationCardProps {
   platform: Platform;
@@ -24,6 +24,7 @@ const platformLabels: Record<Platform, string> = {
   CGETC: "CGETC",
   NAVER: "Naver",
   PHARMACY: "Pharmacy",
+  ORDERDESK: "OrderDesk",
 };
 
 function getStatus(isActive: boolean, hasCreds: boolean, lastJobStatus: string | null) {

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-type Platform = "SHOPIFY" | "AMAZON" | "TIKTOK" | "CGETC" | "NAVER" | "PHARMACY";
+type Platform = "SHOPIFY" | "AMAZON" | "TIKTOK" | "CGETC" | "NAVER" | "PHARMACY" | "ORDERDESK";
 
 interface CredentialsModalProps {
   platform: Platform;
@@ -47,6 +47,10 @@ const platformFields: Record<Platform, FieldDef[]> = {
     { key: "email", label: "Email", type: "email" },
     { key: "password", label: "Password", type: "password" },
   ],
+  ORDERDESK: [
+    { key: "storeId", label: "Store ID" },
+    { key: "apiKey", label: "API Key", type: "password" },
+  ],
 };
 
 const platformLabels: Record<Platform, string> = {
@@ -56,6 +60,7 @@ const platformLabels: Record<Platform, string> = {
   CGETC: "CGETC",
   NAVER: "Naver",
   PHARMACY: "Pharmacy",
+  ORDERDESK: "OrderDesk",
 };
 
 export function CredentialsModal({ platform, companyId, hasCreds, onClose }: CredentialsModalProps) {

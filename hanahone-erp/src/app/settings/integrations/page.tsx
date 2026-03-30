@@ -5,7 +5,7 @@ import { SyncHistory } from "@/components/integrations/sync-history";
 import type { Platform } from "@prisma/client";
 
 const companyPlatforms: Record<string, Platform[]> = {
-  HOI: ["SHOPIFY", "AMAZON", "TIKTOK", "CGETC"],
+  HOI: ["SHOPIFY", "AMAZON", "TIKTOK", "CGETC", "ORDERDESK"],
   HOK: ["NAVER", "PHARMACY"],
 };
 
