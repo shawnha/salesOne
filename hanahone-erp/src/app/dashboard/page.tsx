@@ -3,6 +3,7 @@ import { KpiRow } from "@/components/dashboard/kpi-row";
 import { CompanyBreakdown } from "@/components/dashboard/company-breakdown";
 import { RecentOrders } from "@/components/dashboard/recent-orders";
 import { LowStockAlerts } from "@/components/dashboard/low-stock-alerts";
+import { ProductionSummary } from "@/components/dashboard/production-summary";
 import { DateFilter } from "@/components/ui/date-filter";
 import { fetchCgetcInventory, type CgetcProduct } from "@/lib/integrations/connectors/cgetc";
 import { decrypt } from "@/lib/integrations/encryption";
@@ -136,6 +137,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
     getUsdKrwRate(dateRange.lt > new Date() ? undefined : new Date(dateRange.lt.getTime() - 1)),
   ]);
 
+  // Fetch active production orders for dashboard widget
+  const activeProduction = await prisma.productionOrder.findMany({
+    where: { ...companyFilter, status: { in: ["PLANNED", "IN_PROGRESS"] } },
+    include: { product: { select: { name: true } } },
+    orderBy: { startDate: "desc" },
+    take: 5,
+  });
+
   const rate = exchangeRate.rate;
 
   // Dual currency totals
@@ -199,8 +208,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
           <div className="col-span-8">
             <RecentOrders orders={orders.map((o) => ({ id: o.id, orderNumber: o.orderNumber, customerName: o.customer?.name || "—", status: o.fulfillmentStatus, totalAmount: Number(o.totalAmount), externalSource: o.externalSource, isTransfer: o.type === "INTER_COMPANY", transferLabel: o.transfer ? `${o.transfer.fromCompany.name} → ${o.transfer.toCompany.name}` : undefined }))} />
           </div>
-          <div className="col-span-4">
+          <div className="col-span-4 space-y-4">
             <LowStockAlerts items={lowStock.map((inv) => ({ productName: inv.product.name, companyName: inv.company.name, reorderLevel: inv.reorderLevel, quantity: inv.quantity, daysLeft: inv.daysLeft, burnRate: inv.burnRate }))} />
+            {activeProduction.length > 0 && (
+              <ProductionSummary items={activeProduction.map((po) => ({
+                id: po.id,
+                productName: po.product.name,
+                status: po.status,
+                quantityToProduce: po.quantityToProduce,
+                quantityProduced: po.quantityProduced,
+              }))} />
+            )}
           </div>
         </div>
       </div>
