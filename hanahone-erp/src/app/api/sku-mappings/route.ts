@@ -1,12 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/api-guard";
+import { requireAuth, requireCompanyAccess } from "@/lib/api-guard";
+import { z } from "zod";
+
+const UpsertSkuMappingSchema = z.object({
+  companyId: z.string().uuid(),
+  platform: z.string().min(1),
+  externalSku: z.string().min(1),
+  displayName: z.string().min(1),
+  productId: z.string().uuid().optional().nullable(),
+});
 
 export async function GET(req: NextRequest) {
-  const { error } = await requireAuth();
-  if (error) return error;
-
   const companyId = req.nextUrl.searchParams.get("companyId");
+  if (companyId) {
+    const { error } = await requireCompanyAccess(companyId);
+    if (error) return error;
+  } else {
+    const { error } = await requireAuth();
+    if (error) return error;
+  }
+
   const platform = req.nextUrl.searchParams.get("platform");
 
   const where: any = {};
@@ -23,18 +37,19 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { error } = await requireAuth();
-  if (error) return error;
-
-  const { companyId, platform, externalSku, displayName, productId } = await req.json();
-
-  if (!companyId || !platform || !externalSku || !displayName) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  const raw = await req.json();
+  const parsed = UpsertSkuMappingSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid input", details: parsed.error.flatten() }, { status: 400 });
   }
+  const { companyId, platform, externalSku, displayName, productId } = parsed.data;
+
+  const { error } = await requireCompanyAccess(companyId);
+  if (error) return error;
 
   const mapping = await prisma.skuMapping.upsert({
     where: {
-      companyId_platform_externalSku: { companyId, platform, externalSku },
+      companyId_platform_externalSku: { companyId, platform: platform as any, externalSku },
     },
     update: {
       displayName,
@@ -42,7 +57,7 @@ export async function POST(req: NextRequest) {
     },
     create: {
       companyId,
-      platform,
+      platform: platform as any,
       externalSku,
       displayName,
       productId: productId || null,

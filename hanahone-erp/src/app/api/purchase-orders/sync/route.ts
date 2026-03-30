@@ -1,16 +1,25 @@
 // src/app/api/purchase-orders/sync/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-guard";
+import { requireCompanyAccess } from "@/lib/api-guard";
 import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/integrations/encryption";
 import { syncPurchaseOrders } from "@/lib/integrations/connectors/cgetc-purchase";
+import { z } from "zod";
+
+const SyncPurchaseOrdersSchema = z.object({
+  companyId: z.string().uuid(),
+});
 
 export async function POST(req: NextRequest) {
-  const { error } = await requireAuth();
-  if (error) return error;
+  const raw = await req.json();
+  const parsed = SyncPurchaseOrdersSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid input", details: parsed.error.flatten() }, { status: 400 });
+  }
+  const { companyId } = parsed.data;
 
-  const { companyId } = await req.json();
-  if (!companyId) return NextResponse.json({ error: "companyId required" }, { status: 400 });
+  const { error } = await requireCompanyAccess(companyId);
+  if (error) return error;
 
   const config = await prisma.integrationConfig.findUnique({
     where: { companyId_platform: { companyId, platform: "CGETC" } },

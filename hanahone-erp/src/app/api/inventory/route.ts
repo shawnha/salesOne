@@ -1,13 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/api-guard";
+import { requireAuth, requireCompanyAccess } from "@/lib/api-guard";
 import { calculateAdjustment } from "@/lib/inventory-adjuster";
+import { z } from "zod";
+
+const PatchInventorySchema = z.object({
+  inventoryId: z.string().uuid(),
+  change: z.number(),
+  type: z.string().min(1),
+  reason: z.string().optional().nullable(),
+});
 
 export async function GET(req: NextRequest) {
-  const { error } = await requireAuth();
-  if (error) return error;
-
   const companyId = req.nextUrl.searchParams.get("companyId");
+  if (companyId) {
+    const { error } = await requireCompanyAccess(companyId);
+    if (error) return error;
+  } else {
+    const { error } = await requireAuth();
+    if (error) return error;
+  }
+
   const lowStockOnly = req.nextUrl.searchParams.get("lowStock") === "true";
   const where: any = companyId ? { companyId } : {};
 
@@ -27,11 +40,22 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const { error, session } = await requireAuth();
+  const raw = await req.json();
+  const parsed = PatchInventorySchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid input", details: parsed.error.flatten() }, { status: 400 });
+  }
+  const { inventoryId, change, type, reason } = parsed.data;
+
+  // Look up the inventory to get companyId for access check
+  const inventoryRecord = await prisma.inventory.findUnique({ where: { id: inventoryId } });
+  if (!inventoryRecord) {
+    return NextResponse.json({ error: "Inventory not found" }, { status: 404 });
+  }
+
+  const { error, session } = await requireCompanyAccess(inventoryRecord.companyId);
   if (error) return error;
   const currentUserId = (session!.user as any).id;
-
-  const { inventoryId, change, type, reason } = await req.json();
 
   const result = await prisma.$transaction(async (tx) => {
     const inventory = await tx.inventory.findUniqueOrThrow({ where: { id: inventoryId } });
@@ -45,7 +69,7 @@ export async function PATCH(req: NextRequest) {
       data: {
         inventoryId,
         companyId: inventory.companyId,
-        adjustmentType: type,
+        adjustmentType: type as any,
         quantityChange: adj.quantityChange,
         previousQuantity: adj.previousQuantity,
         newQuantity: adj.newQuantity,

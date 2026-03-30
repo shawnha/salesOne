@@ -1,12 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/api-guard";
+import { requireAuth, requireCompanyAccess } from "@/lib/api-guard";
+import { z } from "zod";
+
+const CreateCustomerSchema = z.object({
+  companyId: z.string().uuid(),
+  name: z.string().min(1),
+  type: z.enum(["INDIVIDUAL", "DRUGSTORE", "WHOLESALE"]),
+  email: z.string().email().optional().nullable(),
+  contactInfo: z.record(z.string(), z.string()).optional().nullable(),
+});
 
 export async function GET(req: NextRequest) {
-  const { error } = await requireAuth();
-  if (error) return error;
-
   const companyId = req.nextUrl.searchParams.get("companyId");
+  if (companyId) {
+    const { error } = await requireCompanyAccess(companyId);
+    if (error) return error;
+  } else {
+    const { error } = await requireAuth();
+    if (error) return error;
+  }
+
   const type = req.nextUrl.searchParams.get("type");
   const where: any = {};
   if (companyId) where.companyId = companyId;
@@ -21,11 +35,17 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { error } = await requireAuth();
+  const raw = await req.json();
+  const parsed = CreateCustomerSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid input", details: parsed.error.flatten() }, { status: 400 });
+  }
+  const body = parsed.data;
+
+  const { error } = await requireCompanyAccess(body.companyId);
   if (error) return error;
 
-  const body = await req.json();
-  const customer = await prisma.customer.create({ data: body });
+  const customer = await prisma.customer.create({ data: body as any });
   return NextResponse.json(customer, { status: 201 });
 }
 

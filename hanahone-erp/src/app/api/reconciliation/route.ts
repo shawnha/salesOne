@@ -1,16 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-guard";
+import { requireCompanyAccess } from "@/lib/api-guard";
 import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/integrations/encryption";
 import { fetchCgetcInventory } from "@/lib/integrations/connectors/cgetc";
 import { calculateExpectedStock, buildBaselineRows } from "@/lib/reconciliation";
+import { z } from "zod";
+
+const VALID_REASONS = ["SEEDING", "DAMAGED", "SAMPLE", "PROMOTION", "OTHER"] as const;
+
+const CreateAdjustmentSchema = z.object({
+  companyId: z.string().uuid(),
+  sku: z.string().min(1),
+  productName: z.string().optional(),
+  quantity: z.coerce.number(),
+  reason: z.enum(VALID_REASONS),
+  memo: z.string().optional().nullable(),
+});
 
 export async function GET(req: NextRequest) {
-  const { error } = await requireAuth();
-  if (error) return error;
-
   const companyId = req.nextUrl.searchParams.get("companyId");
   if (!companyId) return NextResponse.json({ error: "companyId required" }, { status: 400 });
+
+  const { error } = await requireCompanyAccess(companyId);
+  if (error) return error;
 
   // Check if baselines exist
   const baselines = await prisma.inventoryBaseline.findMany({
@@ -134,21 +146,16 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(result);
 }
 
-const VALID_REASONS = ["SEEDING", "DAMAGED", "SAMPLE", "PROMOTION", "OTHER"];
-
 export async function POST(req: NextRequest) {
-  const { error, session } = await requireAuth();
+  const raw = await req.json();
+  const parsed = CreateAdjustmentSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid input", details: parsed.error.flatten() }, { status: 400 });
+  }
+  const { companyId, sku, productName, quantity, reason, memo } = parsed.data;
+
+  const { error, session } = await requireCompanyAccess(companyId);
   if (error) return error;
-
-  const { companyId, sku, productName, quantity, reason, memo } = await req.json();
-
-  if (!companyId || !sku || quantity === undefined || !reason) {
-    return NextResponse.json({ error: "companyId, sku, quantity, reason required" }, { status: 400 });
-  }
-
-  if (!VALID_REASONS.includes(reason)) {
-    return NextResponse.json({ error: `Invalid reason. Must be one of: ${VALID_REASONS.join(", ")}` }, { status: 400 });
-  }
 
   const adjustment = await prisma.reconciliationAdjustment.create({
     data: {

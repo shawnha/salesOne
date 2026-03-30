@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-guard";
+import { requireCompanyAccess } from "@/lib/api-guard";
 import { prisma } from "@/lib/prisma";
 import { parseTikTokCsv } from "@/lib/integrations/connectors/tiktok-csv";
 import { mapExternalOrder } from "@/lib/integrations/mappers/order-mapper";
 
 export async function POST(req: NextRequest) {
-  const { error } = await requireAuth();
-  if (error) return error;
-
   const formData = await req.formData();
   const file = formData.get("file") as File;
   const companyId = formData.get("companyId") as string;
@@ -15,6 +12,9 @@ export async function POST(req: NextRequest) {
   if (!file || !companyId) {
     return NextResponse.json({ error: "file and companyId required" }, { status: 400 });
   }
+
+  const { error } = await requireCompanyAccess(companyId);
+  if (error) return error;
 
   const csvContent = await file.text();
   const externalOrders = parseTikTokCsv(csvContent);

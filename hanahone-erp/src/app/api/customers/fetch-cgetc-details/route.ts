@@ -1,17 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/api-guard";
+import { requireCompanyAccess } from "@/lib/api-guard";
 import { decrypt } from "@/lib/integrations/encryption";
 import { fetchPartnerDetails } from "@/lib/integrations/connectors/cgetc-partners";
+import { z } from "zod";
+
+const FetchCgetcDetailsSchema = z.object({
+  companyId: z.string().uuid(),
+});
 
 export async function POST(req: NextRequest) {
-  const { error } = await requireAuth();
-  if (error) return error;
-
-  const { companyId } = await req.json();
-  if (!companyId) {
-    return NextResponse.json({ error: "companyId required" }, { status: 400 });
+  const raw = await req.json();
+  const parsed = FetchCgetcDetailsSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid input", details: parsed.error.flatten() }, { status: 400 });
   }
+  const { companyId } = parsed.data;
+
+  const { error } = await requireCompanyAccess(companyId);
+  if (error) return error;
 
   const config = await prisma.integrationConfig.findUnique({
     where: { companyId_platform: { companyId, platform: "CGETC" } },

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-guard";
+import { requireCompanyAccess } from "@/lib/api-guard";
 import { prisma } from "@/lib/prisma";
 import { runSync } from "@/lib/integrations/sync-runner";
 import { recalculateHokInventory } from "@/lib/integrations/inventory-calculator";
@@ -10,6 +10,7 @@ import { decrypt } from "@/lib/integrations/encryption";
 import { pharmacyConnector } from "@/lib/integrations/connectors/pharmacy";
 import { cgetcConnector } from "@/lib/integrations/connectors/cgetc";
 import type { Connector } from "@/lib/integrations/types";
+import { z } from "zod";
 
 const connectors: Record<string, Connector> = {
   SHOPIFY: shopifyConnector,
@@ -19,16 +20,24 @@ const connectors: Record<string, Connector> = {
   CGETC: cgetcConnector,
 };
 
-export async function POST(req: NextRequest, { params }: { params: { platform: string } }) {
-  const { error } = await requireAuth();
-  if (error) return error;
+const SyncSchema = z.object({
+  companyId: z.string().uuid(),
+});
 
+export async function POST(req: NextRequest, { params }: { params: { platform: string } }) {
   const platform = params.platform.toUpperCase();
   const connector = connectors[platform];
   if (!connector) return NextResponse.json({ error: "Unknown platform" }, { status: 400 });
 
-  const { companyId } = await req.json();
-  if (!companyId) return NextResponse.json({ error: "companyId required" }, { status: 400 });
+  const raw = await req.json();
+  const parsed = SyncSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid input", details: parsed.error.flatten() }, { status: 400 });
+  }
+  const { companyId } = parsed.data;
+
+  const { error } = await requireCompanyAccess(companyId);
+  if (error) return error;
 
   const result = await runSync(connector, companyId);
 

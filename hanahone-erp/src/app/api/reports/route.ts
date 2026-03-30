@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/api-guard";
+import { requireAuth, requireCompanyAccess } from "@/lib/api-guard";
 
 export async function GET(req: NextRequest) {
-  const { error } = await requireAuth();
-  if (error) return error;
-
   const type = req.nextUrl.searchParams.get("type") || "sales-by-period";
   const companyId = req.nextUrl.searchParams.get("company");
   const format = req.nextUrl.searchParams.get("format") || "json";
+
+  if (companyId) {
+    const { error } = await requireCompanyAccess(companyId);
+    if (error) return error;
+  } else {
+    const { error } = await requireAuth();
+    if (error) return error;
+  }
+
   const companyFilter = companyId ? { companyId } : {};
 
   let data: any;

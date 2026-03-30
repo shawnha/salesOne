@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/api-guard";
+import { requireAuth, requireCompanyAccess } from "@/lib/api-guard";
 
 export async function GET(req: NextRequest) {
-  const { error } = await requireAuth();
-  if (error) return error;
-
   const companyId = req.nextUrl.searchParams.get("companyId");
+  if (companyId) {
+    const { error } = await requireCompanyAccess(companyId);
+    if (error) return error;
+  } else {
+    const { error } = await requireAuth();
+    if (error) return error;
+  }
+
   const platform = req.nextUrl.searchParams.get("platform") || "CGETC";
   const search = req.nextUrl.searchParams.get("search");
   const mapped = req.nextUrl.searchParams.get("mapped");

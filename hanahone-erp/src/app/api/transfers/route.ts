@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api-guard";
 import { calculateAdjustment } from "@/lib/inventory-adjuster";
+import { z } from "zod";
+
+const PatchTransferSchema = z.object({
+  transferId: z.string().uuid(),
+  status: z.string().min(1),
+});
 
 export async function GET(req: NextRequest) {
   const { error } = await requireAuth();
@@ -19,10 +25,22 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const raw = await req.json();
+  const parsed = PatchTransferSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid input", details: parsed.error.flatten() }, { status: 400 });
+  }
+  const { transferId, status } = parsed.data;
+
+  // Look up the transfer to verify access
+  const transferRecord = await prisma.interCompanyTransfer.findUnique({ where: { id: transferId } });
+  if (!transferRecord) {
+    return NextResponse.json({ error: "Transfer not found" }, { status: 404 });
+  }
+
   const { error, session } = await requireAuth();
   if (error) return error;
   const currentUserId = (session!.user as any).id;
-  const { transferId, status } = await req.json();
 
   if (status === "SHIPPED") {
     const result = await prisma.$transaction(async (tx) => {
@@ -90,7 +108,7 @@ export async function PATCH(req: NextRequest) {
 
   const updated = await prisma.interCompanyTransfer.update({
     where: { id: transferId },
-    data: { status },
+    data: { status: status as any },
   });
   return NextResponse.json(updated);
 }

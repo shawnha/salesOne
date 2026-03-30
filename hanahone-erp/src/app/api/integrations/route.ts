@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-guard";
+import { requireAuth, requireCompanyAccess } from "@/lib/api-guard";
 import { prisma } from "@/lib/prisma";
 import { encrypt, maskCredentials } from "@/lib/integrations/encryption";
+import { z } from "zod";
+
+const UpsertIntegrationSchema = z.object({
+  companyId: z.string().uuid(),
+  platform: z.string().min(1),
+  credentials: z.record(z.string(), z.unknown()).optional(),
+  isActive: z.boolean().optional(),
+  syncIntervalMinutes: z.number().int().positive().optional(),
+});
 
 export async function GET(req: NextRequest) {
   const { error } = await requireAuth();
@@ -27,15 +36,20 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { error } = await requireAuth();
-  if (error) return error;
+  const raw = await req.json();
+  const parsed = UpsertIntegrationSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid input", details: parsed.error.flatten() }, { status: 400 });
+  }
+  const { companyId, platform, credentials, isActive, syncIntervalMinutes } = parsed.data;
 
-  const { companyId, platform, credentials, isActive, syncIntervalMinutes } = await req.json();
+  const { error } = await requireCompanyAccess(companyId);
+  if (error) return error;
 
   const encrypted = credentials ? encrypt(JSON.stringify(credentials)) : undefined;
 
   const config = await prisma.integrationConfig.upsert({
-    where: { companyId_platform: { companyId, platform } },
+    where: { companyId_platform: { companyId, platform: platform as any } },
     update: {
       ...(encrypted ? { credentials: encrypted } : {}),
       ...(isActive !== undefined ? { isActive } : {}),
@@ -43,7 +57,7 @@ export async function POST(req: NextRequest) {
     },
     create: {
       companyId,
-      platform,
+      platform: platform as any,
       credentials: encrypted || "",
       isActive: isActive ?? false,
       syncIntervalMinutes: syncIntervalMinutes ?? 15,
