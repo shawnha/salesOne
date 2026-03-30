@@ -6,6 +6,7 @@ import { DataTable } from "@/components/ui/table";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { OrderStatusBadge } from "@/components/orders/order-status-badge";
+import { OrderStatusChanger } from "@/components/orders/OrderStatusChanger";
 
 const formatUSD = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 const formatKRW = (n: number) => `₩${Math.round(n).toLocaleString("ko-KR")}`;
@@ -199,6 +200,12 @@ export default async function OrderDetailPage({
               <span className="text-[var(--text-secondary)]">Financial</span>
               <Badge status={order.financialStatus} />
             </div>
+            <div className="border-t border-[var(--border)] my-2" />
+            <OrderStatusChanger
+              orderId={order.id}
+              fulfillmentStatus={order.fulfillmentStatus}
+              financialStatus={order.financialStatus}
+            />
             <div className="border-t border-[var(--border)] my-2" />
             <div className="flex justify-between">
               <span className="text-[var(--text-secondary)]">Total Amount</span>
