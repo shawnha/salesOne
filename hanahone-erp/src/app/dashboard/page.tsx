@@ -85,7 +85,36 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
     (inv) => !(inv.warehouseLocation === "CGETC" && inv.product.sku && cgetcSkus.has(inv.product.sku))
   );
 
-  const lowStock = filteredInventory.filter((inv) => inv.quantity <= inv.reorderLevel).slice(0, 5);
+  // Calculate 30-day burn rate for low stock prediction
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const recentSales = await prisma.orderItem.findMany({
+    where: {
+      order: {
+        ...companyFilter,
+        type: { in: ["SALE", "BROKERAGE"] },
+        orderDate: { gte: thirtyDaysAgo },
+      },
+    },
+    select: { productId: true, quantity: true },
+  });
+  const salesByProduct = new Map<string, number>();
+  for (const item of recentSales) {
+    if (item.productId) {
+      salesByProduct.set(item.productId, (salesByProduct.get(item.productId) || 0) + item.quantity);
+    }
+  }
+
+  const lowStock = filteredInventory
+    .map((inv) => {
+      const sold30d = salesByProduct.get(inv.productId) || 0;
+      const burnRate = sold30d > 0 ? sold30d / 30 : null;
+      const daysLeft = burnRate ? Math.round(inv.quantity / burnRate) : null;
+      return { ...inv, burnRate, daysLeft };
+    })
+    .filter((inv) => inv.quantity <= inv.reorderLevel || (inv.daysLeft !== null && inv.daysLeft <= 30))
+    .sort((a, b) => (a.daysLeft ?? 999) - (b.daysLeft ?? 999))
+    .slice(0, 5);
   const inventoryValue = filteredInventory.reduce((sum, inv) => sum + inv.quantity * Number(inv.product.costPrice), 0)
     + cgetcProducts.reduce((sum, p) => sum + p.quantity * 0, 0); // CGETC products have no costPrice yet
 
@@ -171,7 +200,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
             <RecentOrders orders={orders.map((o) => ({ id: o.id, orderNumber: o.orderNumber, customerName: o.customer?.name || "—", status: o.fulfillmentStatus, totalAmount: Number(o.totalAmount), externalSource: o.externalSource, isTransfer: o.type === "INTER_COMPANY", transferLabel: o.transfer ? `${o.transfer.fromCompany.name} → ${o.transfer.toCompany.name}` : undefined }))} />
           </div>
           <div className="col-span-4">
-            <LowStockAlerts items={lowStock.map((inv) => ({ productName: inv.product.name, companyName: inv.company.name, reorderLevel: inv.reorderLevel, quantity: inv.quantity }))} />
+            <LowStockAlerts items={lowStock.map((inv) => ({ productName: inv.product.name, companyName: inv.company.name, reorderLevel: inv.reorderLevel, quantity: inv.quantity, daysLeft: inv.daysLeft, burnRate: inv.burnRate }))} />
           </div>
         </div>
       </div>

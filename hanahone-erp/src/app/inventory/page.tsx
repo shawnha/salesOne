@@ -20,6 +20,8 @@ type InventoryRow = {
   expected: number | null;
   actual: number | null;
   diff: number | null;
+  burnRate: number | null;
+  daysLeft: number | null;
 };
 
 export default async function InventoryPage({
@@ -74,6 +76,30 @@ export default async function InventoryPage({
     }
   }
 
+  // Calculate 30-day burn rate per product
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const recentSales = await prisma.orderItem.findMany({
+    where: {
+      order: {
+        ...(searchParams.company ? { companyId: searchParams.company } : {}),
+        type: { in: ["SALE", "BROKERAGE"] },
+        orderDate: { gte: thirtyDaysAgo },
+      },
+    },
+    include: { product: { select: { sku: true } } },
+  });
+  const salesByProduct = new Map<string, number>();
+  const salesBySku = new Map<string, number>();
+  for (const item of recentSales) {
+    if (item.productId) {
+      salesByProduct.set(item.productId, (salesByProduct.get(item.productId) || 0) + item.quantity);
+    }
+    if (item.product?.sku) {
+      salesBySku.set(item.product.sku, (salesBySku.get(item.product.sku) || 0) + item.quantity);
+    }
+  }
+
   // Merge into unified rows — exclude internal records that overlap with CGETC live data
   const cgetcSkus = new Set(cgetcProducts.map((p) => p.sku));
   const filteredInventories = inventories.filter(
@@ -125,25 +151,36 @@ export default async function InventoryPage({
   }
 
   const rows: InventoryRow[] = [
-    ...filteredInventories.map((inv) => ({
-      id: inv.id,
-      sku: inv.product.sku || "",
-      name: inv.product.name,
-      warehouse: inv.warehouseLocation,
-      company: inv.company.name,
-      quantity: inv.quantity,
-      reserved: 0,
-      available: inv.quantity,
-      reorderLevel: inv.reorderLevel,
-      source: "internal" as const,
-      expected: null,
-      actual: null,
-      diff: null,
-    })),
+    ...filteredInventories.map((inv) => {
+      const sold30d = salesByProduct.get(inv.productId) || 0;
+      const burnRate = sold30d > 0 ? sold30d / 30 : null;
+      const daysLeft = burnRate ? Math.round(inv.quantity / burnRate) : null;
+      return {
+        id: inv.id,
+        sku: inv.product.sku || "",
+        name: inv.product.name,
+        warehouse: inv.warehouseLocation,
+        company: inv.company.name,
+        quantity: inv.quantity,
+        reserved: 0,
+        available: inv.quantity,
+        reorderLevel: inv.reorderLevel,
+        source: "internal" as const,
+        expected: null,
+        actual: null,
+        diff: null,
+        burnRate,
+        daysLeft,
+      };
+    }),
     ...cgetcProducts.map((p) => {
       const expected = baselineExpectedBySku.get(p.sku) ?? null;
       const actual = p.quantity;
       const diff = expected !== null ? actual - expected : null;
+      // Use SKU-based sales lookup for CGETC products
+      const sold30d = salesBySku.get(p.sku) || 0;
+      const burnRate = sold30d > 0 ? sold30d / 30 : null;
+      const daysLeft = burnRate ? Math.round(p.quantity / burnRate) : null;
       return {
         id: `cgetc-${p.sku}`,
         sku: p.sku,
@@ -158,6 +195,8 @@ export default async function InventoryPage({
         expected,
         actual,
         diff,
+        burnRate,
+        daysLeft,
       };
     }),
   ];
@@ -220,6 +259,23 @@ export default async function InventoryPage({
           {row.available}
         </span>
       ),
+    },
+    {
+      key: "daysLeft",
+      header: "Days Left",
+      align: "right" as const,
+      render: (row: InventoryRow) => {
+        if (row.daysLeft === null) return <span className="text-[var(--text-quaternary)]">—</span>;
+        const color = row.daysLeft <= 7 ? "text-rose-500" : row.daysLeft <= 30 ? "text-amber-500" : "text-teal-600";
+        return (
+          <div className="text-right">
+            <span className={`font-semibold ${color}`}>{row.daysLeft}d</span>
+            {row.burnRate !== null && (
+              <div className="text-[10px] text-[var(--text-tertiary)]">{row.burnRate.toFixed(1)}/day</div>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: "expected",
