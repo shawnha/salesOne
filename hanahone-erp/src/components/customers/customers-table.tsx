@@ -16,7 +16,7 @@ interface Customer {
   companyName: string;
 }
 
-export function CustomersTable({ customers, companyId }: { customers: Customer[]; companyId?: string }) {
+export function CustomersTable({ customers, companyId, companyName }: { customers: Customer[]; companyId?: string; companyName?: string }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [fetchingDetails, setFetchingDetails] = useState(false);
@@ -64,15 +64,18 @@ export function CustomersTable({ customers, companyId }: { customers: Customer[]
     window.location.reload();
   }
 
-  async function handleFetchCgetcDetails() {
-    if (!companyId) return;
+  const platform = companyName === "HOK" ? "NAVER" : companyName === "HOI" ? "CGETC" : null;
+  const fetchLabel = platform === "NAVER" ? "Fetch Naver Details" : "Fetch CGETC Details";
+
+  async function handleFetchDetails() {
+    if (!companyId || !platform) return;
     setFetchingDetails(true);
     setFetchResult(null);
     try {
       const res = await fetch("/api/customers/fetch-cgetc-details", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyId }),
+        body: JSON.stringify({ companyId, platform }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -92,15 +95,15 @@ export function CustomersTable({ customers, companyId }: { customers: Customer[]
 
   return (
     <>
-      {companyId && (
+      {companyId && platform && (
         <div className="flex items-center gap-3">
           <Button
             variant="secondary"
             size="sm"
-            onClick={handleFetchCgetcDetails}
+            onClick={handleFetchDetails}
             disabled={fetchingDetails}
           >
-            {fetchingDetails ? "Fetching..." : "Fetch CGETC Details"}
+            {fetchingDetails ? "Fetching..." : fetchLabel}
           </Button>
           {fetchResult && (
             <span className="text-xs text-[var(--text-secondary)]">{fetchResult}</span>

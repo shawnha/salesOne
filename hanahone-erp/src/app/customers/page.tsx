@@ -8,12 +8,6 @@ export default async function CustomersPage({
 }) {
   const where = searchParams.company ? { companyId: searchParams.company } : {};
 
-  // Get HOI company ID for CGETC detail fetch button
-  const hoiCompany = await prisma.company.findFirst({
-    where: { name: "HOI" },
-    select: { id: true },
-  });
-
   const customers = await prisma.customer.findMany({
     where,
     include: { company: { select: { id: true, name: true } } },
@@ -57,12 +51,17 @@ export default async function CustomersPage({
             </h2>
             <CustomersTable
               customers={group.customers}
-              companyId={companyId === hoiCompany?.id ? companyId : undefined}
+              companyId={companyId}
+              companyName={group.name}
             />
           </div>
         ))
       ) : (
-        <CustomersTable customers={data} companyId={hoiCompany?.id} />
+        <CustomersTable
+          customers={data}
+          companyId={searchParams.company}
+          companyName={data[0]?.companyName}
+        />
       )}
     </div>
   );
