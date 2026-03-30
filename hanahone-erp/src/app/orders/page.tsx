@@ -10,6 +10,7 @@ import { getDailyOrderData } from "@/lib/orders-chart-data";
 import { applyChannelFilter } from "@/lib/sales-chart-data";
 import { getUsdKrwRate } from "@/lib/exchange-rate";
 import { CurrencyDisplay, getPrimaryCurrency } from "@/components/ui/currency-display";
+import { SearchInput } from "@/components/ui/search-input";
 
 const formatUSD = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 const formatKRW = (n: number) => `₩${Math.round(n).toLocaleString("ko-KR")}`;
@@ -37,7 +38,7 @@ function getMonthRange(monthParam?: string) {
 export default async function OrdersPage({
   searchParams,
 }: {
-  searchParams: { company?: string; type?: string; month?: string; channel?: string };
+  searchParams: { company?: string; type?: string; month?: string; channel?: string; q?: string };
 }) {
   const dateRange = getMonthRange(searchParams.month);
 
@@ -45,6 +46,14 @@ export default async function OrdersPage({
   if (searchParams.company) where.companyId = searchParams.company;
   if (searchParams.type) where.type = searchParams.type;
   applyChannelFilter(where, searchParams.channel);
+  if (searchParams.q) {
+    const q = searchParams.q;
+    where.OR = [
+      { orderNumber: { contains: q, mode: "insensitive" } },
+      { externalOrderNumber: { contains: q, mode: "insensitive" } },
+      { customer: { name: { contains: q, mode: "insensitive" } } },
+    ];
+  }
 
   const [orders, chartData, exchangeRate, companies] = await Promise.all([
     prisma.order.findMany({
@@ -156,6 +165,14 @@ export default async function OrdersPage({
           <p className="text-xs text-[var(--text-secondary)] mb-3">Top Customers</p>
           <TopCustomersCard customers={topCustomers} />
         </Card>
+      </div>
+      <div className="flex items-center gap-3">
+        <SearchInput placeholder="Search order # or customer..." />
+        {searchParams.q && (
+          <span className="text-xs text-[var(--text-tertiary)]">
+            Showing results for &quot;{searchParams.q}&quot;
+          </span>
+        )}
       </div>
       <Card>
         {orders.length === 0 ? (

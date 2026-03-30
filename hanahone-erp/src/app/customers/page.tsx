@@ -1,12 +1,19 @@
 import { prisma } from "@/lib/prisma";
 import { CustomersTable } from "@/components/customers/customers-table";
+import { SearchInput } from "@/components/ui/search-input";
 
 export default async function CustomersPage({
   searchParams,
 }: {
-  searchParams: { company?: string };
+  searchParams: { company?: string; q?: string };
 }) {
-  const where = searchParams.company ? { companyId: searchParams.company } : {};
+  const where: any = searchParams.company ? { companyId: searchParams.company } : {};
+  if (searchParams.q) {
+    where.OR = [
+      { name: { contains: searchParams.q, mode: "insensitive" } },
+      { email: { contains: searchParams.q, mode: "insensitive" } },
+    ];
+  }
 
   const customers = await prisma.customer.findMany({
     where,
@@ -42,7 +49,10 @@ export default async function CustomersPage({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-bold tracking-tight">Customers</h1>
+      <div className="flex items-center gap-4">
+        <h1 className="text-xl font-bold tracking-tight">Customers</h1>
+        <SearchInput placeholder="Name or email..." />
+      </div>
       {companyGroups ? (
         companyGroups.map(([companyId, group]) => (
           <div key={companyId} className="space-y-3">
