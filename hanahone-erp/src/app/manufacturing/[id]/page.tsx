@@ -1,10 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/table";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { ProductionStatusChanger } from "@/components/manufacturing/ProductionStatusChanger";
 
 const formatWon = (n: number) => `₩${n.toLocaleString()}`;
 
@@ -175,21 +175,11 @@ export default async function ProductionOrderDetailPage({
               <p className="text-[13px] text-[var(--text-secondary)] mb-3">
                 Current status: <Badge status={productionOrder.status} />
               </p>
-              {nextStatuses.length > 0 ? (
-                <div className="flex gap-2 flex-wrap">
-                  {nextStatuses.map((status) => (
-                    <Button
-                      key={status}
-                      variant={status === "CANCELLED" ? "secondary" : "primary"}
-                      size="sm"
-                    >
-                      Mark as {status.replace("_", " ").charAt(0) + status.replace("_", " ").slice(1).toLowerCase()}
-                    </Button>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-[var(--text-tertiary)]">No further transitions available.</p>
-              )}
+              <ProductionStatusChanger
+                orderId={productionOrder.id}
+                status={productionOrder.status}
+                quantityToProduce={productionOrder.quantityToProduce}
+              />
             </div>
           </div>
         </Card>

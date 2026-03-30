@@ -69,8 +69,80 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Production order not found" }, { status: 404 });
   }
 
-  const { error } = await requireCompanyAccess(existing.companyId);
+  const { error, session } = await requireCompanyAccess(existing.companyId);
   if (error) return error;
+
+  // If completing production, consume materials and add finished goods
+  if (data.status === "COMPLETED" && existing.status === "IN_PROGRESS") {
+    const result = await prisma.$transaction(async (tx) => {
+      // Get BOM for this product
+      const bom = await tx.billOfMaterials.findMany({
+        where: { finishedProductId: existing.productId, companyId: existing.companyId },
+      });
+
+      const userId = (session?.user as any)?.id || "system";
+      const qty = existing.quantityToProduce;
+
+      // Consume raw materials
+      for (const item of bom) {
+        const needed = Math.ceil(Number(item.quantityRequired) * qty);
+        const inv = await tx.inventory.findFirst({
+          where: { productId: item.rawMaterialId, companyId: existing.companyId },
+        });
+        if (!inv) continue;
+        if (inv.quantity < needed) {
+          throw new Error(`Insufficient ${item.rawMaterialId}: need ${needed}, have ${inv.quantity}`);
+        }
+        await tx.inventory.update({
+          where: { id: inv.id },
+          data: { quantity: inv.quantity - needed },
+        });
+        await tx.inventoryAdjustment.create({
+          data: {
+            inventoryId: inv.id,
+            companyId: existing.companyId,
+            adjustmentType: "PRODUCTION",
+            quantityChange: -needed,
+            previousQuantity: inv.quantity,
+            newQuantity: inv.quantity - needed,
+            reason: `Production order: ${existing.id}`,
+            createdBy: userId,
+          },
+        });
+      }
+
+      // Add finished goods to inventory
+      const finishedInv = await tx.inventory.findFirst({
+        where: { productId: existing.productId, companyId: existing.companyId },
+      });
+      if (finishedInv) {
+        await tx.inventory.update({
+          where: { id: finishedInv.id },
+          data: { quantity: finishedInv.quantity + qty },
+        });
+        await tx.inventoryAdjustment.create({
+          data: {
+            inventoryId: finishedInv.id,
+            companyId: existing.companyId,
+            adjustmentType: "PRODUCTION",
+            quantityChange: qty,
+            previousQuantity: finishedInv.quantity,
+            newQuantity: finishedInv.quantity + qty,
+            reason: `Production completed: ${existing.id}`,
+            createdBy: userId,
+          },
+        });
+      }
+
+      // Update production order
+      return tx.productionOrder.update({
+        where: { id },
+        data: { status: "COMPLETED", quantityProduced: qty, endDate: new Date() },
+      });
+    });
+
+    return NextResponse.json(result);
+  }
 
   const updated = await prisma.productionOrder.update({ where: { id }, data: data as any });
   return NextResponse.json(updated);
