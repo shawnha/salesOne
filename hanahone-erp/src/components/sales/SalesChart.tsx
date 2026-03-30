@@ -24,6 +24,7 @@ const BAR_CHANNELS = [
   { key: "AMAZON", label: "Amazon" },
   { key: "TIKTOK", label: "TikTok" },
   { key: "NAVER", label: "Naver" },
+  { key: "GONGGU", label: "공구" },
   { key: "PHARMACY", label: "Pharmacy" },
   { key: "CGETC", label: "CGETC" },
   { key: "SEEDING", label: "Seeding" },

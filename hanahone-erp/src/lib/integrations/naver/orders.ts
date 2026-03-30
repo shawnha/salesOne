@@ -120,11 +120,22 @@ export async function fetchNaverOrders(
   // Fetch full details
   const details = await fetchOrderDetails(credentials, Array.from(allIds));
 
+  // 공구 product IDs (4월 공구 네이버 상품번호)
+  const GONGGU_PRODUCT_IDS = new Set([
+    "13269224598", "13269992041", "13269992042", "13269992043", "13269992044",
+  ]);
+
   // Map to ExternalOrderData
   return details.map((detail) => {
     const { order, productOrder } = detail;
     const { fulfillment, financial } = mapNaverStatus(productOrder.productOrderStatus);
     const addr = productOrder.shippingAddress;
+    const sku = productOrder.sellerProductCode || productOrder.optionCode || "";
+
+    // Detect 공구 orders by product ID
+    const isGonggu = GONGGU_PRODUCT_IDS.has(sku)
+      || GONGGU_PRODUCT_IDS.has(String(productOrder.productId))
+      || GONGGU_PRODUCT_IDS.has(String(productOrder.originalProductId));
 
     return {
       externalOrderId: productOrder.productOrderId,
@@ -136,16 +147,18 @@ export async function fetchNaverOrders(
       totalAmount: productOrder.totalPaymentAmount,
       refundAmount: productOrder.claimPrice && productOrder.claimPrice > 0 ? productOrder.claimPrice : undefined,
       customerName: order.ordererName,
+      customerPhone: order.ordererTel && !order.ordererTel.includes("*") ? order.ordererTel : undefined,
       shippingAddress: addr
-        ? [addr.baseAddress, addr.detailAddress].filter(Boolean).join(" ")
+        ? [addr.baseAddress, addr.detailAddress, addr.zipCode].filter(Boolean).join(" ")
         : undefined,
       recipientName: addr?.name,
       recipientPhone: addr?.tel1,
+      channelNote: isGonggu ? "공구" : undefined,
       items: [
         {
           externalItemId: productOrder.productOrderId,
           productName: productOrder.productName,
-          sku: productOrder.sellerProductCode || productOrder.optionCode || "",
+          sku,
           quantity: productOrder.quantity,
           unitPrice: productOrder.unitPrice,
         },

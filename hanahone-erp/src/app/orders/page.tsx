@@ -7,6 +7,7 @@ import { OrdersChart } from "@/components/orders/OrdersChart";
 import { TopCustomersCard } from "@/components/orders/TopCustomersCard";
 import { ChannelFilter } from "@/components/orders/channel-filter";
 import { getDailyOrderData } from "@/lib/orders-chart-data";
+import { applyChannelFilter } from "@/lib/sales-chart-data";
 import { getUsdKrwRate } from "@/lib/exchange-rate";
 import { CurrencyDisplay, getPrimaryCurrency } from "@/components/ui/currency-display";
 
@@ -43,18 +44,7 @@ export default async function OrdersPage({
   const where: any = { orderDate: dateRange };
   if (searchParams.company) where.companyId = searchParams.company;
   if (searchParams.type) where.type = searchParams.type;
-  if (searchParams.channel === "SEEDING") {
-    where.externalSource = "CGETC";
-    where.notes = { startsWith: "free gifting", mode: "insensitive" };
-  } else if (searchParams.channel === "CGETC") {
-    where.externalSource = "CGETC";
-    where.OR = [
-      { notes: null },
-      { NOT: { notes: { startsWith: "free gifting", mode: "insensitive" } } },
-    ];
-  } else if (searchParams.channel) {
-    where.externalSource = searchParams.channel;
-  }
+  applyChannelFilter(where, searchParams.channel);
 
   const [orders, chartData, exchangeRate, companies] = await Promise.all([
     prisma.order.findMany({

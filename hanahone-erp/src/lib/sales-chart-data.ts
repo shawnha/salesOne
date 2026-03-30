@@ -13,6 +13,7 @@ export interface MonthlyChannelData {
   AMAZON: number;
   TIKTOK: number;
   NAVER: number;
+  GONGGU: number;
   PHARMACY: number;
   CGETC: number;
   SEEDING: number;
@@ -24,6 +25,7 @@ const CHANNEL_COLORS: Record<string, string> = {
   AMAZON: "#FF9900",
   TIKTOK: "#EE1D52",
   NAVER: "#03C75A",
+  GONGGU: "#E11D48",
   PHARMACY: "#6B7280",
   CGETC: "#4F46E5",
   SEEDING: "#7C3AED",
@@ -35,6 +37,7 @@ const CHANNEL_LABELS: Record<string, string> = {
   AMAZON: "Amazon",
   TIKTOK: "TikTok",
   NAVER: "Naver",
+  GONGGU: "공구",
   PHARMACY: "Pharmacy",
   CGETC: "CGETC",
   SEEDING: "Seeding",
@@ -45,7 +48,7 @@ const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Se
 
 export { CHANNEL_COLORS, CHANNEL_LABELS };
 
-function applyChannelFilter(where: any, channel?: string) {
+export function applyChannelFilter(where: any, channel?: string) {
   if (channel === "SEEDING") {
     where.externalSource = "CGETC";
     where.notes = { startsWith: "free gifting", mode: "insensitive" };
@@ -54,6 +57,15 @@ function applyChannelFilter(where: any, channel?: string) {
     where.OR = [
       { notes: null },
       { NOT: { notes: { startsWith: "free gifting", mode: "insensitive" } } },
+    ];
+  } else if (channel === "GONGGU") {
+    where.externalSource = "NAVER";
+    where.notes = "공구";
+  } else if (channel === "NAVER") {
+    where.externalSource = "NAVER";
+    where.OR = [
+      { notes: null },
+      { NOT: { notes: "공구" } },
     ];
   } else if (channel) {
     where.externalSource = channel;
@@ -92,6 +104,8 @@ export async function getChannelSalesData(
     let channel = order.externalSource || "MANUAL";
     if (channel === "CGETC" && order.notes?.toLowerCase().startsWith("free gifting")) {
       channel = "SEEDING";
+    } else if (channel === "NAVER" && order.notes === "공구") {
+      channel = "GONGGU";
     }
     channelTotals[channel] = (channelTotals[channel] || 0) + Number(order.netAmount ?? order.totalAmount);
   }
@@ -129,7 +143,7 @@ export async function getChannelSalesData(
     monthly.push({
       month: MONTH_NAMES[m.getMonth()],
       yearMonth: `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`,
-      SHOPIFY: 0, AMAZON: 0, TIKTOK: 0, NAVER: 0, PHARMACY: 0, CGETC: 0, SEEDING: 0, MANUAL: 0,
+      SHOPIFY: 0, AMAZON: 0, TIKTOK: 0, NAVER: 0, GONGGU: 0, PHARMACY: 0, CGETC: 0, SEEDING: 0, MANUAL: 0,
     });
   }
 
@@ -140,6 +154,8 @@ export async function getChannelSalesData(
       let channel = (order.externalSource || "MANUAL") as keyof Omit<MonthlyChannelData, "month" | "yearMonth">;
       if (channel === "CGETC" && order.notes?.toLowerCase().startsWith("free gifting")) {
         channel = "SEEDING";
+      } else if (channel === "NAVER" && order.notes === "공구") {
+        channel = "GONGGU" as typeof channel;
       }
       if (channel in monthly[idx]) {
         monthly[idx][channel] += Number(order.netAmount ?? order.totalAmount);

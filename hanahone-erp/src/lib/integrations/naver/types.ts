@@ -15,6 +15,18 @@ export interface NaverOrderInfo {
   paymentDate: string;
   ordererName: string;
   ordererTel?: string;
+  ordererId?: string; // 네이버 아이디 (e.g. "wang******")
+  ordererNo?: string; // 네이버 회원번호
+  paymentMeans?: string; // 결제수단 (e.g. "신용카드 간편결제")
+}
+
+export interface NaverDeliveryInfo {
+  sendDate?: string;
+  deliveredDate?: string;
+  trackingNumber?: string;
+  deliveryCompany?: string;
+  deliveryStatus?: string;
+  deliveryMethod?: string;
 }
 
 export interface NaverProductOrderInfo {
@@ -26,6 +38,8 @@ export interface NaverProductOrderInfo {
   unitPrice: number;
   sellerProductCode?: string;
   optionCode?: string;
+  productId?: string; // 채널상품번호
+  originalProductId?: string; // 원상품번호
   shippingAddress?: {
     name: string;
     tel1: string;
@@ -41,6 +55,7 @@ export interface NaverProductOrderInfo {
 export interface NaverOrderDetail {
   order: NaverOrderInfo;
   productOrder: NaverProductOrderInfo;
+  delivery?: NaverDeliveryInfo;
 }
 
 export interface NaverChannelProduct {

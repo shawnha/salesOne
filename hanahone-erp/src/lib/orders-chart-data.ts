@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { applyChannelFilter } from "./sales-chart-data";
 
 export interface DailyOrderData {
   day: string; // "1", "2", ... "31"
@@ -26,18 +27,7 @@ export async function getDailyOrderData(
     orderDate: { gte: monthStart, lt: monthEnd },
   };
   if (companyId) where.companyId = companyId;
-  if (channel === "SEEDING") {
-    where.externalSource = "CGETC";
-    where.notes = { startsWith: "free gifting", mode: "insensitive" };
-  } else if (channel === "CGETC") {
-    where.externalSource = "CGETC";
-    where.OR = [
-      { notes: null },
-      { NOT: { notes: { startsWith: "free gifting", mode: "insensitive" } } },
-    ];
-  } else if (channel) {
-    where.externalSource = channel;
-  }
+  applyChannelFilter(where, channel);
 
   const orders = await prisma.order.findMany({
     where,

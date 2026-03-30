@@ -18,6 +18,7 @@ export interface ExternalOrderData {
   marginAmount?: number;
   customerName?: string;
   customerEmail?: string;
+  customerPhone?: string;
   shippingAddress?: string;
   recipientName?: string;
   recipientPhone?: string;
