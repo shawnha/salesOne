@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { IntegrationCard } from "@/components/integrations/integration-card";
 import { CsvUpload } from "@/components/integrations/csv-upload";
 import { SyncHistory } from "@/components/integrations/sync-history";
+import { SyncAllButton } from "@/components/integrations/sync-all-button";
 import type { Platform } from "@prisma/client";
 
 const companyPlatforms: Record<string, Platform[]> = {
@@ -51,6 +52,13 @@ export default async function IntegrationsPage() {
         <p className="text-sm text-[var(--text-secondary)] mt-1">
           Manage external platform connections and sync settings
         </p>
+        <div className="mt-4">
+          <SyncAllButton
+            configs={configs
+              .filter((c) => c.isActive && c.credentials && c.platform !== "TIKTOK")
+              .map((c) => ({ companyId: c.companyId, platform: c.platform, companyName: c.company.name }))}
+          />
+        </div>
       </div>
 
       <div className="space-y-8">
