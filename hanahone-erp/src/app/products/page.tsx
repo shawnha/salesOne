@@ -21,6 +21,7 @@ export default async function ProductsPage({
     description: p.description,
     category: p.category,
     basePrice: Number(p.basePrice),
+    salePrice: p.salePrice != null ? Number(p.salePrice) : null,
     costPrice: Number(p.costPrice),
     companyId: p.companyId,
     companyName: p.company.name,
