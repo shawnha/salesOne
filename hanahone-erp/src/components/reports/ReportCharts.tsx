@@ -16,9 +16,12 @@ const formatUSD = (n: number) =>
 
 interface MonthlyRevenueProps {
   data: { month: string; revenue: number }[];
+  currencyPrefix?: string;
 }
 
-export function MonthlyRevenueChart({ data }: MonthlyRevenueProps) {
+export function MonthlyRevenueChart({ data, currencyPrefix = "$" }: MonthlyRevenueProps) {
+  const fmtVal = (n: number) =>
+    `${currencyPrefix}${n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
   return (
     <ResponsiveContainer width="100%" height={280}>
       <BarChart data={data} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
@@ -33,11 +36,11 @@ export function MonthlyRevenueChart({ data }: MonthlyRevenueProps) {
           tick={{ fontSize: 10, fill: "var(--text-tertiary)" }}
           axisLine={false}
           tickLine={false}
-          tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+          tickFormatter={(v) => `${currencyPrefix}${(v / 1000).toFixed(0)}k`}
           width={55}
         />
         <Tooltip
-          formatter={(value) => [formatUSD(Number(value)), "Revenue"]}
+          formatter={(value) => [fmtVal(Number(value)), "Revenue"]}
           contentStyle={{
             background: "var(--surface)",
             border: "1px solid var(--border)",

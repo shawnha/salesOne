@@ -117,6 +117,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: { co
   const totalRevenue = salesOrders.reduce((sum, o) => sum + Number(o.netAmount ?? o.totalAmount), 0);
   const avgOrderValue = salesOrders.length > 0 ? totalRevenue / salesOrders.length : 0;
 
+  // Currency formatting based on company
+  const isKRW = companyName === "HOK" || companyName === "HOR";
+  const fmtCurrency = (n: number) =>
+    isKRW ? `₩${Math.round(n).toLocaleString()}` : `$${Math.round(n).toLocaleString()}`;
+
   const visibleReports = reportTypes.filter((r) => {
     if (r.scope === "all") return true;
     if (!companyName) return true;
@@ -135,9 +140,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: { co
       {/* KPI Row */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {[
-          { label: "Total Revenue", value: `$${Math.round(totalRevenue).toLocaleString()}` },
+          { label: "Total Revenue", value: fmtCurrency(totalRevenue) },
           { label: "Total Orders", value: totalOrders.toLocaleString() },
-          { label: "Avg Order Value", value: `$${Math.round(avgOrderValue).toLocaleString()}` },
+          { label: "Avg Order Value", value: fmtCurrency(avgOrderValue) },
           { label: "Fulfillment Rate", value: `${fulfillmentRate}%`, color: Number(fulfillmentRate) >= 90 ? "text-teal-600" : "text-amber-500" },
           { label: "Refund Rate", value: `${refundRate}%`, color: Number(refundRate) <= 5 ? "text-teal-600" : "text-rose-500" },
         ].map((kpi) => (
@@ -151,7 +156,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: { co
       {/* Monthly Revenue Chart */}
       <Card>
         <h3 className="text-sm font-bold tracking-tight mb-4">Monthly Revenue</h3>
-        <MonthlyRevenueChart data={monthlyRevenue} />
+        <MonthlyRevenueChart data={monthlyRevenue} currencyPrefix={isKRW ? "₩" : "$"} />
       </Card>
 
       {/* Top Products + Top Customers */}
@@ -159,7 +164,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: { co
         <Card>
           <h3 className="text-sm font-bold tracking-tight mb-4">Top Products by Revenue</h3>
           {topProducts.length > 0 ? (
-            <HorizontalBarChart data={topProducts} color="#0d9488" />
+            <HorizontalBarChart data={topProducts} color="#0d9488" valuePrefix={isKRW ? "₩" : "$"} />
           ) : (
             <p className="text-xs text-[var(--text-tertiary)]">No product data</p>
           )}
@@ -177,7 +182,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: { co
       <Card>
         <h3 className="text-sm font-bold tracking-tight mb-4">Top Customers by Revenue</h3>
         {topCustomers.length > 0 ? (
-          <HorizontalBarChart data={topCustomers} color="#d97706" />
+          <HorizontalBarChart data={topCustomers} color="#d97706" valuePrefix={isKRW ? "₩" : "$"} />
         ) : (
           <p className="text-xs text-[var(--text-tertiary)]">No customer data</p>
         )}
