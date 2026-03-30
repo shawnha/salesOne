@@ -13,6 +13,7 @@ interface Product {
   description: string | null;
   category: string;
   basePrice: number;
+  salePrice: number | null;
   costPrice: number;
   companyId: string;
   companyName: string;
@@ -65,6 +66,9 @@ function ProductRow({
       <td className="py-3 px-4 font-semibold">{row.name}</td>
       <td className="py-3 px-4 text-[var(--text-secondary)] font-mono text-xs">{row.sku}</td>
       <td className="py-3 px-4 text-right font-semibold">{formatPrice(row.basePrice, row.companyName)}</td>
+      <td className="py-3 px-4 text-right">
+        {row.salePrice != null ? formatPrice(row.salePrice, row.companyName) : "-"}
+      </td>
       <td className="py-3 px-4 text-right text-[var(--text-secondary)]">{formatPrice(row.costPrice, row.companyName)}</td>
       {showCompany && <td className="py-3 px-4 text-[var(--text-secondary)]">{row.companyName}</td>}
       <td className="py-3 px-4 text-right">
@@ -136,6 +140,7 @@ export function ProductsTable({ products, sourceGroups, showCompany = false }: P
       <th className="text-left py-3 px-4">Name</th>
       <th className="text-left py-3 px-4">SKU</th>
       <th className="text-right py-3 px-4">Base Price</th>
+      <th className="text-right py-3 px-4">Sale Price</th>
       <th className="text-right py-3 px-4">Cost Price</th>
       {showCompany && <th className="text-left py-3 px-4">Company</th>}
       <th className="text-right py-3 px-4"></th>
@@ -176,7 +181,7 @@ export function ProductsTable({ products, sourceGroups, showCompany = false }: P
                   sourceGroups.map(([source, items]) => (
                     <>
                       <tr key={`divider-${source}`}>
-                        <td colSpan={showCompany ? 7 : 6} className="py-2 px-4">
+                        <td colSpan={showCompany ? 8 : 7} className="py-2 px-4">
                           <div className="flex items-center gap-2">
                             <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-tertiary)]">{source}</span>
                             <span className="text-[10px] text-[var(--text-quaternary)]">({items.length})</span>
