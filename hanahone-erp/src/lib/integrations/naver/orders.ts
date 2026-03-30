@@ -132,8 +132,10 @@ export async function fetchNaverOrders(
     const addr = productOrder.shippingAddress;
     const sku = productOrder.sellerProductCode || productOrder.optionCode || "";
 
-    // Detect 공구 orders by product ID
-    const isGonggu = GONGGU_PRODUCT_IDS.has(sku)
+    // Detect 공구 orders by product ID or sellerCustomCode1 tag
+    const customCode = productOrder.sellerCustomCode1 || "";
+    const isGonggu = customCode.includes("공구") || customCode.toLowerCase().includes("gonggu")
+      || GONGGU_PRODUCT_IDS.has(sku)
       || GONGGU_PRODUCT_IDS.has(String(productOrder.productId))
       || GONGGU_PRODUCT_IDS.has(String(productOrder.originalProductId));
 
