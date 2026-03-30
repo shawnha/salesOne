@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
   try {
     const credentials = JSON.parse(decrypt(config.credentials));
     shippingResult = await syncShippingCosts(credentials, config.companyId);
-  } catch (err: any) {
+  } catch {
     shippingResult = { synced: 0, total: 0 };
   }
 

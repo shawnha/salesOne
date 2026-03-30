@@ -1,4 +1,4 @@
-import type { Connector, ExternalOrderData } from "../types";
+import type { Connector } from "../types";
 
 function mapFulfillmentStatus(status: string): string {
   switch (status.toLowerCase()) {

@@ -179,7 +179,7 @@ export async function fetchShopifyProducts(
   let url: string | null = `${baseUrl}/products.json?limit=250`;
 
   while (url) {
-    const res = await fetch(url, { headers });
+    const res: Response = await fetch(url, { headers });
     if (!res.ok) {
       throw new Error(`Shopify Products API error: ${res.status} ${res.statusText}`);
     }

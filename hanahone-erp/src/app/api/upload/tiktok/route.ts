@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       });
 
       processed++;
-    } catch (err) {
+    } catch {
       failed++;
     }
   }

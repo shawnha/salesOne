@@ -122,7 +122,7 @@ export async function runSync(connector: Connector, companyId: string): Promise<
         });
 
         processed++;
-      } catch (err) {
+      } catch {
         failed++;
         await prisma.externalOrder.create({
           data: {

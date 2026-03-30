@@ -5,7 +5,6 @@ import { KpiCard } from "@/components/ui/kpi-card";
 import { fetchCgetcInventory, type CgetcProduct } from "@/lib/integrations/connectors/cgetc";
 import { decrypt } from "@/lib/integrations/encryption";
 import { buildBaselineRows } from "@/lib/reconciliation";
-import type { ReconciliationRow } from "@/lib/reconciliation";
 import { ReconciliationTable } from "@/components/reconciliation/reconciliation-table";
 import { SetBaselineButton } from "@/components/reconciliation/set-baseline-button";
 

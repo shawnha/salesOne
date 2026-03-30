@@ -9,7 +9,7 @@ const PatchTransferSchema = z.object({
   status: z.string().min(1),
 });
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   const { error } = await requireAuth();
   if (error) return error;
 

@@ -41,13 +41,6 @@ export default async function ProductionOrderDetailPage({
     },
   });
 
-  const statusTransitions: Record<string, string[]> = {
-    PLANNED: ["IN_PROGRESS", "CANCELLED"],
-    IN_PROGRESS: ["COMPLETED", "CANCELLED"],
-  };
-
-  const nextStatuses = statusTransitions[productionOrder.status] ?? [];
-
   const progressPercent =
     productionOrder.quantityToProduce > 0
       ? Math.round((productionOrder.quantityProduced / productionOrder.quantityToProduce) * 100)

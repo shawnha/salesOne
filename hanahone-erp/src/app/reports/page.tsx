@@ -108,9 +108,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: { co
     .slice(0, 10);
 
   // Fulfillment KPIs
-  const [totalOrders, fulfilledOrders, paidOrders, refundedOrders] = fulfillmentStats;
+  const [totalOrders, fulfilledOrders, , refundedOrders] = fulfillmentStats;
   const fulfillmentRate = totalOrders > 0 ? ((fulfilledOrders / totalOrders) * 100).toFixed(1) : "0";
-  const paidRate = totalOrders > 0 ? ((paidOrders / totalOrders) * 100).toFixed(1) : "0";
   const refundRate = totalOrders > 0 ? ((refundedOrders / totalOrders) * 100).toFixed(1) : "0";
 
   // Total revenue

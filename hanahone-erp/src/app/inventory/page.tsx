@@ -71,8 +71,8 @@ export default async function InventoryPage({
           },
         });
       }
-    } catch (err: any) {
-      cgetcError = err.message || "Failed to fetch CGETC inventory";
+    } catch (_err: any) {
+      cgetcError = _err.message || "Failed to fetch CGETC inventory";
     }
   }
 

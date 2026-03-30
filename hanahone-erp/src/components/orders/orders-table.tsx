@@ -186,7 +186,7 @@ export function OrdersTable({ orders }: { orders: OrderRow[] }) {
 import { Fragment } from "react";
 
 function ExpandedRow({
-  orderId,
+  orderId: _orderId,
   data,
   loading,
   row,

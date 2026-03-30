@@ -12,7 +12,7 @@ const UpsertIntegrationSchema = z.object({
   syncIntervalMinutes: z.number().int().positive().optional(),
 });
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   const { error } = await requireAuth();
   if (error) return error;
 

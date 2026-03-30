@@ -12,14 +12,7 @@ import { getUsdKrwRate } from "@/lib/exchange-rate";
 import { CurrencyDisplay, getPrimaryCurrency } from "@/components/ui/currency-display";
 import { SearchInput } from "@/components/ui/search-input";
 
-const formatUSD = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
-const formatKRW = (n: number) => `₩${Math.round(n).toLocaleString("ko-KR")}`;
-
 const KRW_PLATFORMS = new Set(["NAVER", "PHARMACY"]);
-
-function formatOrderAmount(amount: number, platform: string | null) {
-  return KRW_PLATFORMS.has(platform || "") ? formatKRW(amount) : formatUSD(amount);
-}
 
 function toUSD(amount: number, platform: string | null, exchangeRate: number) {
   return KRW_PLATFORMS.has(platform || "") ? amount / exchangeRate : amount;
