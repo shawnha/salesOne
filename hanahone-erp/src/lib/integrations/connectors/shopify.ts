@@ -125,6 +125,7 @@ export const shopifyConnector: Connector = {
             ? `${order.customer.first_name || ""} ${order.customer.last_name || ""}`.trim()
             : undefined,
           customerEmail: order.customer?.email,
+          customerPhone: order.customer?.phone || order.billing_address?.phone || order.shipping_address?.phone,
           items: (order.line_items || []).map((item: any) => ({
             externalItemId: String(item.id),
             productName: item.title,
