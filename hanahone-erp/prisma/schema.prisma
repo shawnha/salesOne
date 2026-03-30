@@ -222,6 +222,7 @@ model Product {
   category    String
   basePrice   Decimal @map("base_price")
   costPrice   Decimal @map("cost_price")
+  salePrice   Decimal? @map("sale_price")
   companyId   String  @map("company_id")
   company     Company @relation(fields: [companyId], references: [id])
 
