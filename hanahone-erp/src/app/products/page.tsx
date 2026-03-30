@@ -1,16 +1,26 @@
 import { prisma } from "@/lib/prisma";
 import { ProductsTable } from "@/components/products/products-table";
+import { SearchInput } from "@/components/ui/search-input";
 
 export default async function ProductsPage({
   searchParams,
 }: {
-  searchParams: { company?: string };
+  searchParams: { company?: string; q?: string };
 }) {
-  const where = searchParams.company ? { companyId: searchParams.company } : {};
+  const where: any = searchParams.company ? { companyId: searchParams.company } : {};
+  if (searchParams.q) {
+    where.OR = [
+      { name: { contains: searchParams.q, mode: "insensitive" } },
+      { sku: { contains: searchParams.q, mode: "insensitive" } },
+    ];
+  }
 
   const products = await prisma.product.findMany({
     where,
-    include: { company: { select: { id: true, name: true } } },
+    include: {
+      company: { select: { id: true, name: true } },
+      inventories: { select: { quantity: true } },
+    },
     orderBy: { name: "asc" },
   });
 
@@ -25,6 +35,7 @@ export default async function ProductsPage({
     costPrice: Number(p.costPrice),
     companyId: p.companyId,
     companyName: p.company.name,
+    stock: p.inventories.reduce((sum, inv) => sum + inv.quantity, 0),
   }));
 
   const isGroupView = !searchParams.company;
@@ -57,7 +68,10 @@ export default async function ProductsPage({
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold tracking-tight">Products</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl font-bold tracking-tight">Products</h1>
+            <SearchInput placeholder="Name or SKU..." />
+          </div>
           <span className="text-xs text-[var(--text-tertiary)]">{products.length} products</span>
         </div>
         {companyGroups.map(([companyId, group]) => {

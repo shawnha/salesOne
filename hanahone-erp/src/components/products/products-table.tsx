@@ -17,6 +17,7 @@ interface Product {
   costPrice: number;
   companyId: string;
   companyName: string;
+  stock?: number;
 }
 
 const formatUSD = (n: number) =>
@@ -70,6 +71,11 @@ function ProductRow({
         {row.salePrice != null ? formatPrice(row.salePrice, row.companyName) : "-"}
       </td>
       <td className="py-3 px-4 text-right text-[var(--text-secondary)]">{formatPrice(row.costPrice, row.companyName)}</td>
+      <td className="py-3 px-4 text-right">
+        {row.stock != null ? (
+          <span className={`font-semibold ${row.stock === 0 ? "text-rose-500" : ""}`}>{row.stock}</span>
+        ) : "—"}
+      </td>
       {showCompany && <td className="py-3 px-4 text-[var(--text-secondary)]">{row.companyName}</td>}
       <td className="py-3 px-4 text-right">
         <div className="flex items-center gap-1 justify-end">
@@ -142,6 +148,7 @@ export function ProductsTable({ products, sourceGroups, showCompany = false }: P
       <th className="text-right py-3 px-4">Base Price</th>
       <th className="text-right py-3 px-4">Sale Price</th>
       <th className="text-right py-3 px-4">Cost Price</th>
+      <th className="text-right py-3 px-4">Stock</th>
       {showCompany && <th className="text-left py-3 px-4">Company</th>}
       <th className="text-right py-3 px-4"></th>
     </tr>
@@ -181,7 +188,7 @@ export function ProductsTable({ products, sourceGroups, showCompany = false }: P
                   sourceGroups.map(([source, items]) => (
                     <>
                       <tr key={`divider-${source}`}>
-                        <td colSpan={showCompany ? 8 : 7} className="py-2 px-4">
+                        <td colSpan={showCompany ? 9 : 8} className="py-2 px-4">
                           <div className="flex items-center gap-2">
                             <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-tertiary)]">{source}</span>
                             <span className="text-[10px] text-[var(--text-quaternary)]">({items.length})</span>
