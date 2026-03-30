@@ -108,7 +108,7 @@ export default async function InventoryPage({
 
   // Build baseline-forward reconciliation data for CGETC comparison columns
   const hasBaselines = baselines.length > 0;
-  let baselineExpectedBySku = new Map<string, number>();
+  const baselineExpectedBySku = new Map<string, number>();
 
   if (hasBaselines) {
     const companyId = cgetcConfig?.companyId || "";

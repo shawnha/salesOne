@@ -8,11 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
-  Cell,
 } from "recharts";
-
-const formatUSD = (n: number) =>
-  `$${n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
 interface MonthlyRevenueProps {
   data: { month: string; revenue: number }[];

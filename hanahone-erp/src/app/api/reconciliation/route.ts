@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
   });
 
   // Get CGETC actual stock (same source as page — fetchCgetcInventory)
-  let actualBySku: Record<string, number> = {};
+  const actualBySku: Record<string, number> = {};
   try {
     const config = await prisma.integrationConfig.findFirst({
       where: { companyId, platform: "CGETC", isActive: true },
