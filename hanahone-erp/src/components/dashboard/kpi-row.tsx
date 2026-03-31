@@ -25,13 +25,14 @@ const fmtUSD = (n: number) => {
   return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 };
 
-export function KpiRow({ data }: { data: KpiData }) {
+export function KpiRow({ data, primaryCurrency = "USD" }: { data: KpiData; primaryCurrency?: "USD" | "KRW" }) {
+  const isUSD = primaryCurrency === "USD";
   return (
     <div className="grid grid-cols-4 gap-4">
       <KpiCard
         label="Total sales"
-        value={fmtKRW(data.totalSalesKRW)}
-        subValue={fmtUSD(data.totalSalesUSD)}
+        value={isUSD ? fmtUSD(data.totalSalesUSD) : fmtKRW(data.totalSalesKRW)}
+        subValue={isUSD ? fmtKRW(data.totalSalesKRW) : fmtUSD(data.totalSalesUSD)}
         change={{ value: `${data.salesChange >= 0 ? "+" : ""}${data.salesChange}%`, direction: data.salesChange >= 0 ? "up" : "down" }}
         subtitle="vs previous period"
       />
@@ -41,7 +42,7 @@ export function KpiRow({ data }: { data: KpiData }) {
         change={{ value: `${data.fulfilledOrders} fulfilled · ${data.pendingOrders} pending`, direction: "neutral" }}
         subtitle="for this period"
       />
-      <KpiCard label="Inventory value" value={fmtKRW(data.inventoryValue)} change={{ value: `${data.lowStockCount} below reorder`, direction: data.lowStockCount > 0 ? "down" : "neutral" }} subtitle="combined warehouse stock" />
+      <KpiCard label="Inventory value" value={isUSD ? fmtUSD(data.inventoryValue) : fmtKRW(data.inventoryValue)} change={{ value: `${data.lowStockCount} below reorder`, direction: data.lowStockCount > 0 ? "down" : "neutral" }} subtitle="combined warehouse stock" />
       <KpiCard label="Production runs" value={data.productionRuns.toString()} change={{ value: `${data.newProductionRuns} active`, direction: "up" }} subtitle="HOK manufacturing" />
     </div>
   );

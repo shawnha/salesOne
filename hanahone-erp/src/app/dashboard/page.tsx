@@ -8,6 +8,7 @@ import { DateFilter } from "@/components/ui/date-filter";
 import { fetchCgetcInventory, type CgetcProduct } from "@/lib/integrations/connectors/cgetc";
 import { decrypt } from "@/lib/integrations/encryption";
 import { getUsdKrwRate, convertUsdToKrw, convertKrwToUsd } from "@/lib/exchange-rate";
+import { getPrimaryCurrency } from "@/components/ui/currency-display";
 
 const KRW_PLATFORMS = new Set(["NAVER", "PHARMACY"]);
 
@@ -146,6 +147,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
   });
 
   const rate = exchangeRate.rate;
+  const primaryCurrency = getPrimaryCurrency(companyId || undefined, companies);
 
   // Dual currency totals
   const totalSalesKRW = salesOrders.reduce((sum, o) => sum + toKRW(Number(o.totalAmount), o.externalSource, rate), 0);
@@ -183,7 +185,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
         </div>
       </div>
       <div className="space-y-4">
-        <KpiRow data={{ totalSalesKRW, totalSalesUSD, totalOrders: totalOrderCount, fulfilledOrders: fulfilledCount, pendingOrders: pendingCount, inventoryValue, productionRuns: productionOrders, salesChange: 0, lowStockCount: lowStock.length, newProductionRuns: 0 }} />
+        <KpiRow data={{ totalSalesKRW, totalSalesUSD, totalOrders: totalOrderCount, fulfilledOrders: fulfilledCount, pendingOrders: pendingCount, inventoryValue, productionRuns: productionOrders, salesChange: 0, lowStockCount: lowStock.length, newProductionRuns: 0 }} primaryCurrency={primaryCurrency} />
         {latestSyncs.length > 0 && (
           <div className="flex gap-3 flex-wrap">
             {latestSyncs.map((sync) => (
@@ -195,14 +197,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
           </div>
         )}
         {!companyId && (
-          <CompanyBreakdown companies={companyBreakdowns.map((c) => ({
-            name: c.name,
-            color: c.name === "HOI" ? "#0d9488" : c.name === "HOK" ? "#6366f1" : "#d97706",
-            stats: [
-              { label: "Revenue", value: formatWon(c.revenueKRW), subValue: formatUSD(c.revenueUSD) },
-              { label: "Orders", value: c.orderCount.toString() },
-            ],
-          }))} />
+          <CompanyBreakdown companies={companyBreakdowns.map((c) => {
+            const compPrimary = getPrimaryCurrency(c.id, companies);
+            return {
+              name: c.name,
+              color: c.name === "HOI" ? "#0d9488" : c.name === "HOK" ? "#6366f1" : "#d97706",
+              stats: [
+                { label: "Revenue", value: compPrimary === "USD" ? formatUSD(c.revenueUSD) : formatWon(c.revenueKRW), subValue: compPrimary === "USD" ? formatWon(c.revenueKRW) : formatUSD(c.revenueUSD) },
+                { label: "Orders", value: c.orderCount.toString() },
+              ],
+            };
+          })} />
         )}
         <div className="grid grid-cols-12 gap-4">
           <div className="col-span-8">
