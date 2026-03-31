@@ -49,6 +49,34 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(customer, { status: 201 });
 }
 
+const UpdateCustomerSchema = z.object({
+  id: z.string().uuid(),
+  email: z.string().email().optional().nullable(),
+  contactInfo: z.record(z.string(), z.string()).optional().nullable(),
+});
+
+export async function PATCH(req: NextRequest) {
+  const { error } = await requireAuth();
+  if (error) return error;
+
+  const raw = await req.json();
+  const parsed = UpdateCustomerSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid input", details: parsed.error.flatten() }, { status: 400 });
+  }
+  const { id, email, contactInfo } = parsed.data;
+
+  const updateData: any = {};
+  if (email !== undefined) updateData.email = email;
+  if (contactInfo !== undefined) updateData.contactInfo = contactInfo;
+
+  const customer = await prisma.customer.update({
+    where: { id },
+    data: updateData,
+  });
+  return NextResponse.json(customer);
+}
+
 export async function DELETE(req: NextRequest) {
   const { error } = await requireAuth();
   if (error) return error;

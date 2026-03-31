@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { EditableEmail } from "@/components/customers/editable-email";
 
 const formatUSD = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 const formatKRW = (n: number) => `₩${Math.round(n).toLocaleString("ko-KR")}`;
@@ -90,12 +91,10 @@ export default async function CustomerDetailPage({
               <span className="text-[var(--text-secondary)]">Company</span>
               <span className="font-semibold">{customer.company.name}</span>
             </div>
-            {customer.email && (
-              <div className="flex justify-between">
-                <span className="text-[var(--text-secondary)]">Email</span>
-                <span className="text-[var(--text-secondary)]">{customer.email}</span>
-              </div>
-            )}
+            <div className="flex justify-between">
+              <span className="text-[var(--text-secondary)]">Email</span>
+              <EditableEmail customerId={customer.id} currentEmail={customer.email} />
+            </div>
             {contactInfo?.phone && (
               <div className="flex justify-between">
                 <span className="text-[var(--text-secondary)]">Phone</span>
