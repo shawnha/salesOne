@@ -39,12 +39,14 @@ export async function GET(req: NextRequest) {
   const type = req.nextUrl.searchParams.get("type");
   const fulfillmentStatus = req.nextUrl.searchParams.get("fulfillmentStatus");
   const financialStatus = req.nextUrl.searchParams.get("financialStatus");
+  const externalSource = req.nextUrl.searchParams.get("externalSource");
 
   const where: any = {};
   if (companyId) where.companyId = companyId;
   if (type) where.type = type;
   if (fulfillmentStatus) where.fulfillmentStatus = fulfillmentStatus;
   if (financialStatus) where.financialStatus = financialStatus;
+  if (externalSource) where.externalSource = externalSource;
 
   const orders = await prisma.order.findMany({
     where,
