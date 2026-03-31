@@ -19,7 +19,7 @@ export function CompanyBreakdown({ companies }: { companies: CompanyData[] }) {
               <div className="text-right">
                 <span className="text-sm font-semibold">{s.value}</span>
                 {s.subValue && (
-                  <span className="text-[11px] text-[var(--text-tertiary)] ml-1.5">{s.subValue}</span>
+                  <span className="text-[11px] text-[var(--text-secondary)] ml-1.5">{s.subValue}</span>
                 )}
               </div>
             </div>

@@ -20,7 +20,7 @@ export function CurrencyDisplay({ amount, exchangeRate, primaryCurrency, size = 
     return (
       <div>
         <p className={primarySize}>{formatUSD(amount)}</p>
-        <p className={`${subSize} text-[var(--text-tertiary)]`}>{formatKRW(krwAmount)}</p>
+        <p className={`${subSize} text-[var(--text-secondary)]`}>{formatKRW(krwAmount)}</p>
       </div>
     );
   }
@@ -28,7 +28,7 @@ export function CurrencyDisplay({ amount, exchangeRate, primaryCurrency, size = 
   return (
     <div>
       <p className={primarySize}>{formatKRW(krwAmount)}</p>
-      <p className={`${subSize} text-[var(--text-tertiary)]`}>{formatUSD(amount)}</p>
+      <p className={`${subSize} text-[var(--text-secondary)]`}>{formatUSD(amount)}</p>
     </div>
   );
 }

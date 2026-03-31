@@ -18,7 +18,7 @@ export function KpiCard({ label, value, subValue, change, subtitle }: KpiCardPro
     <Card>
       <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)] mb-4">{label}</div>
       <div className="text-4xl font-bold tracking-tighter leading-none">{value}</div>
-      {subValue && <div className="text-sm text-[var(--text-tertiary)] mt-1">{subValue}</div>}
+      {subValue && <div className="text-sm text-[var(--text-secondary)] mt-1">{subValue}</div>}
       {change && (
         <div className={`inline-flex items-center gap-1 mt-2.5 text-[13px] font-semibold px-2.5 py-0.5 rounded-full ${changeColors[change.direction]}`}>
           {change.value}
