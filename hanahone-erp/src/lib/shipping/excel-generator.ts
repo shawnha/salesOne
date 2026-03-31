@@ -106,7 +106,7 @@ export function generatePurchaseOrderExcel(orders: PurchaseOrderInput[]): Buffer
   }
 
   const refRows: string[][] = [["상품명", "상품고유코드"]];
-  for (const [productName, tplCode] of seen) {
+  for (const [productName, tplCode] of Array.from(seen)) {
     refRows.push([productName, tplCode]);
   }
 
