@@ -8,6 +8,7 @@ import { DateFilter } from "@/components/ui/date-filter";
 import { fetchCgetcInventory, type CgetcProduct } from "@/lib/integrations/connectors/cgetc";
 import { decrypt } from "@/lib/integrations/encryption";
 import { getUsdKrwRate, convertUsdToKrw, convertKrwToUsd } from "@/lib/exchange-rate";
+import { getDateRange } from "@/lib/date-utils";
 import { getPrimaryCurrency } from "@/components/ui/currency-display";
 
 const KRW_PLATFORMS = new Set(["NAVER", "PHARMACY"]);
@@ -24,19 +25,6 @@ function timeAgo(date: Date | null): string {
   return `${days} days ago`;
 }
 
-function getDateRange(month?: string, year?: string): { gte: Date; lt: Date } {
-  const now = new Date();
-  if (year) {
-    const y = parseInt(year);
-    return { gte: new Date(y, 0, 1), lt: new Date(y + 1, 0, 1) };
-  }
-  if (month) {
-    const [y, m] = [parseInt(month.split("-")[0]), parseInt(month.split("-")[1]) - 1];
-    return { gte: new Date(y, m, 1), lt: new Date(y, m + 1, 1) };
-  }
-  // Default: current month
-  return { gte: new Date(now.getFullYear(), now.getMonth(), 1), lt: new Date(now.getFullYear(), now.getMonth() + 1, 1) };
-}
 
 function toKRW(amount: number, platform: string | null, rate: number): number {
   return KRW_PLATFORMS.has(platform || "") ? amount : convertUsdToKrw(amount, rate);

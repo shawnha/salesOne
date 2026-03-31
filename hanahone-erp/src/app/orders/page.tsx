@@ -12,21 +12,12 @@ import { getUsdKrwRate } from "@/lib/exchange-rate";
 import { CurrencyDisplay, getPrimaryCurrency } from "@/components/ui/currency-display";
 import { SearchInput } from "@/components/ui/search-input";
 import { Pagination } from "@/components/ui/pagination";
+import { getMonthRange } from "@/lib/date-utils";
 
 const KRW_PLATFORMS = new Set(["NAVER", "PHARMACY"]);
 
 function toUSD(amount: number, platform: string | null, exchangeRate: number) {
   return KRW_PLATFORMS.has(platform || "") ? amount / exchangeRate : amount;
-}
-
-function getMonthRange(monthParam?: string) {
-  const now = new Date();
-  const [y, m] = monthParam
-    ? [parseInt(monthParam.split("-")[0]), parseInt(monthParam.split("-")[1]) - 1]
-    : [now.getFullYear(), now.getMonth()];
-  const start = new Date(y, m, 1);
-  const end = new Date(y, m + 1, 1);
-  return { gte: start, lt: end };
 }
 
 export default async function OrdersPage({

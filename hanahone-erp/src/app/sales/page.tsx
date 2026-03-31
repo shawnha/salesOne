@@ -10,6 +10,7 @@ import { CurrencyDisplay, getPrimaryCurrency } from "@/components/ui/currency-di
 import Link from "next/link";
 import { ChannelFilter } from "@/components/orders/channel-filter";
 import { Pagination } from "@/components/ui/pagination";
+import { getMonthRange } from "@/lib/date-utils";
 
 const formatUSD = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 const formatKRW = (n: number) => `₩${Math.round(n).toLocaleString("ko-KR")}`;
@@ -32,16 +33,6 @@ const platformBadge: Record<string, { label: string; color: string }> = {
   PHARMACY: { label: "Pharmacy", color: "text-blue-600 bg-blue-600/[0.08]" },
   CGETC: { label: "CGETC", color: "text-indigo-600 bg-indigo-600/[0.08]" },
 };
-
-function getMonthRange(monthParam?: string) {
-  const now = new Date();
-  const [y, m] = monthParam
-    ? [parseInt(monthParam.split("-")[0]), parseInt(monthParam.split("-")[1]) - 1]
-    : [now.getFullYear(), now.getMonth()];
-  const start = new Date(y, m, 1);
-  const end = new Date(y, m + 1, 1);
-  return { gte: start, lt: end };
-}
 
 export default async function SalesPage({
   searchParams,
