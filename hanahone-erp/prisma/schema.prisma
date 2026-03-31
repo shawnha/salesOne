@@ -47,6 +47,7 @@ model Company {
   shippingCosts               ShippingCost[]
   reconciliationAdjustments   ReconciliationAdjustment[]
   inventoryBaselines          InventoryBaseline[]
+  shippingBatches             ShippingBatch[]
 
   @@map("companies")
   @@schema("public")
@@ -192,6 +193,14 @@ enum ExternalOrderStatus {
   @@schema("salesone")
 }
 
+enum ShippingBatchStatus {
+  PENDING
+  SHIPPED
+  COMPLETED
+
+  @@schema("salesone")
+}
+
 model Customer {
   id          String       @id @default(uuid())
   name        String
@@ -223,6 +232,7 @@ model Product {
   basePrice   Decimal @map("base_price")
   costPrice   Decimal @map("cost_price")
   salePrice   Decimal? @map("sale_price")
+  tplCode     String?  @map("tpl_code")
   companyId   String  @map("company_id")
   company     Company @relation(fields: [companyId], references: [id])
 
@@ -293,6 +303,7 @@ model Order {
   items     OrderItem[]
   transfer  InterCompanyTransfer?
   shippingCost  ShippingCost?
+  shippingBatchItems ShippingBatchItem[]
 
   externalSource    Platform?  @map("external_source")
   externalOrders    ExternalOrder[]
@@ -614,5 +625,38 @@ model ReconciliationAdjustment {
 
   @@index([companyId, sku])
   @@map("reconciliation_adjustments")
+  @@schema("salesone")
+}
+
+model ShippingBatch {
+  id          String              @id @default(uuid())
+  companyId   String              @map("company_id")
+  company     Company             @relation(fields: [companyId], references: [id])
+  platform    Platform            @default(NAVER)
+  status      ShippingBatchStatus @default(PENDING)
+  carrier     String              @default("CJ대한통운")
+  totalOrders Int                 @map("total_orders")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+
+  items ShippingBatchItem[]
+
+  @@index([companyId, status])
+  @@map("shipping_batches")
+  @@schema("salesone")
+}
+
+model ShippingBatchItem {
+  id             String        @id @default(uuid())
+  batchId        String        @map("batch_id")
+  batch          ShippingBatch @relation(fields: [batchId], references: [id])
+  rowNumber      Int           @map("row_number")
+  orderId        String        @map("order_id")
+  order          Order         @relation(fields: [orderId], references: [id])
+  productOrderId String        @map("product_order_id")
+  trackingNumber String?       @map("tracking_number")
+
+  @@unique([batchId, rowNumber])
+  @@map("shipping_batch_items")
   @@schema("salesone")
 }
