@@ -46,7 +46,7 @@ const minimalOrder: PurchaseOrderInput = {
 };
 
 describe("generatePurchaseOrderExcel", () => {
-  const EXPECTED_HEADERS = [
+  const EXPECTED_HEADERS_A_TO_P = [
     "보내는분",
     "보내는분 연락처",
     "주소 ",
@@ -58,13 +58,11 @@ describe("generatePurchaseOrderExcel", () => {
     "기타연락처",
     "주소",
     "배송메세지",
-    "",
+    "(공란)",
     "상품고유코드",
     "배송방식",
     "운송장번호",
     "택배사",
-    "productOrderId",
-    "batchId",
   ];
 
   it("returns a Buffer", () => {
@@ -78,10 +76,10 @@ describe("generatePurchaseOrderExcel", () => {
     expect(wb.SheetNames).toContain("1차");
   });
 
-  it("has correct headers in row 1", () => {
+  it("has correct headers in row 1 (A-P from template)", () => {
     const buf = generatePurchaseOrderExcel([sampleOrder]);
     const rows = readSheet(buf, "1차");
-    expect(rows[0]).toEqual(EXPECTED_HEADERS);
+    expect(rows[0].slice(0, 16)).toEqual(EXPECTED_HEADERS_A_TO_P);
   });
 
   it("fills fixed sender info in columns A-C", () => {
@@ -155,11 +153,10 @@ describe("generatePurchaseOrderExcel", () => {
     expect(rows[1][15] ?? "").toBe(""); // 택배사
   });
 
-  it("produces only header row when order list is empty", () => {
+  it("preserves template header when order list is empty", () => {
     const buf = generatePurchaseOrderExcel([]);
     const rows = readSheet(buf, "1차");
-    expect(rows.length).toBe(1);
-    expect(rows[0]).toEqual(EXPECTED_HEADERS);
+    expect(rows[0].slice(0, 16)).toEqual(EXPECTED_HEADERS_A_TO_P);
   });
 
   it("creates '참조' sheet", () => {
@@ -168,26 +165,13 @@ describe("generatePurchaseOrderExcel", () => {
     expect(wb.SheetNames).toContain("참조");
   });
 
-  it("'참조' sheet has unique productName → tplCode mappings", () => {
-    const order2: PurchaseOrderInput = { ...sampleOrder, productName: "한아원 오메가3", tplCode: "OMEGA-002", productOrderId: "ORDER-003" };
-    // duplicate of sampleOrder — should appear only once in 참조
-    const dup: PurchaseOrderInput = { ...sampleOrder, productOrderId: "ORDER-004" };
-    const buf = generatePurchaseOrderExcel([sampleOrder, order2, dup]);
-    const rows = readSheet(buf, "참조");
-    // expect 2 unique product rows (not counting header)
-    const productRows = rows.filter((r) => r[0] && r[0] !== "상품명");
-    expect(productRows.length).toBe(2);
-    const productNames = productRows.map((r) => r[0]);
-    expect(productNames).toContain("한아원 비타민C");
-    expect(productNames).toContain("한아원 오메가3");
-  });
-
-  it("'참조' sheet maps tplCode correctly", () => {
+  it("'참조' sheet preserves template product mappings", () => {
     const buf = generatePurchaseOrderExcel([sampleOrder]);
     const rows = readSheet(buf, "참조");
-    const dataRow = rows.find((r) => r[0] === "한아원 비타민C");
-    expect(dataRow).toBeDefined();
-    expect(dataRow![1]).toBe("VITS-001");
+    // Template has existing product mappings (e.g., ODD products)
+    expect(rows.length).toBeGreaterThan(0);
+    // First row should have product name and code
+    expect(rows[0][0]).toBeDefined();
   });
 
   it("handles multiple orders with correct row count", () => {

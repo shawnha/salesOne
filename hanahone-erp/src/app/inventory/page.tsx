@@ -322,6 +322,30 @@ export default async function InventoryPage({
 
   const lowStockCount = inventories.filter((inv) => inv.quantity <= inv.reorderLevel).length;
 
+  // HOK-specific: check if viewing HOK company
+  const hokCompany = await prisma.company.findFirst({ where: { name: { contains: "HOK" } }, select: { id: true } });
+  const isHokView = searchParams.company === hokCompany?.id;
+
+  // HOK baselines for 전체 카드
+  const hokBaselines = isHokView
+    ? await prisma.inventoryBaseline.findMany({
+        where: { companyId: hokCompany!.id },
+        orderBy: { setAt: "desc" },
+      })
+    : [];
+  // Deduplicate baselines by SKU (latest per SKU)
+  const hokBaselineMap = new Map<string, { sku: string; productName: string; quantity: number }>();
+  for (const b of hokBaselines) {
+    if (!hokBaselineMap.has(b.sku)) {
+      hokBaselineMap.set(b.sku, { sku: b.sku, productName: b.productName, quantity: b.quantity });
+    }
+  }
+  const hokBaselineItems = Array.from(hokBaselineMap.values());
+
+  // HOK: split rows into regular vs 공구
+  const hokRegularRows = isHokView ? rows.filter((r) => !r.name.includes("공구")) : [];
+  const hokGongguRows = isHokView ? rows.filter((r) => r.name.includes("공구")) : [];
+
   // Group view: separate sections per company
   const isGroupView = !searchParams.company;
   const companyGroups = isGroupView
@@ -358,7 +382,57 @@ export default async function InventoryPage({
           CGETC sync error: {cgetcError}
         </div>
       )}
-      {companyGroups ? (
+
+      {/* HOK: 전체 + 일반/공구 섹션 */}
+      {isHokView ? (
+        <>
+          {/* 전체 재고 카드 */}
+          {hokBaselineItems.length > 0 && (
+            <Card className="p-5">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)] mb-3">전체 재고</h2>
+              <div className="grid grid-cols-2 gap-4">
+                {hokBaselineItems.map((b) => (
+                  <div key={b.sku} className="text-center">
+                    <p className="text-2xl font-bold">{b.quantity.toLocaleString()}</p>
+                    <p className="text-xs text-[var(--text-secondary)] mt-1">{b.productName}</p>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {/* 일반 (스마트스토어) */}
+          <div className="space-y-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+              스마트스토어 <span className="text-[var(--text-quaternary)]">({hokRegularRows.length})</span>
+            </h2>
+            <Card>
+              {hokRegularRows.length === 0 ? (
+                <EmptyState title="No inventory" description="일반 재고가 없습니다." />
+              ) : (
+                <DataTable columns={columns} data={hokRegularRows} />
+              )}
+            </Card>
+          </div>
+
+          {/* 구분선 */}
+          <div className="border-t border-[var(--border)]" />
+
+          {/* 공구 */}
+          <div className="space-y-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+              공구 <span className="text-[var(--text-quaternary)]">({hokGongguRows.length})</span>
+            </h2>
+            <Card>
+              {hokGongguRows.length === 0 ? (
+                <EmptyState title="No inventory" description="공구 재고가 없습니다." />
+              ) : (
+                <DataTable columns={columns} data={hokGongguRows} />
+              )}
+            </Card>
+          </div>
+        </>
+      ) : companyGroups ? (
         companyGroups.map(([companyName, group]) => (
           <div key={companyName} className="space-y-3">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
