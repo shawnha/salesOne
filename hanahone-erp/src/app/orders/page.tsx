@@ -11,6 +11,7 @@ import { applyChannelFilter } from "@/lib/sales-chart-data";
 import { getUsdKrwRate } from "@/lib/exchange-rate";
 import { CurrencyDisplay, getPrimaryCurrency } from "@/components/ui/currency-display";
 import { SearchInput } from "@/components/ui/search-input";
+import { Pagination } from "@/components/ui/pagination";
 
 const KRW_PLATFORMS = new Set(["NAVER", "PHARMACY"]);
 
@@ -31,7 +32,7 @@ function getMonthRange(monthParam?: string) {
 export default async function OrdersPage({
   searchParams,
 }: {
-  searchParams: { company?: string; type?: string; month?: string; channel?: string; q?: string };
+  searchParams: { company?: string; type?: string; month?: string; channel?: string; q?: string; page?: string };
 }) {
   const dateRange = getMonthRange(searchParams.month);
 
@@ -48,7 +49,10 @@ export default async function OrdersPage({
     ];
   }
 
-  const [orders, chartData, exchangeRate, companies] = await Promise.all([
+  const PAGE_SIZE = 50;
+  const currentPage = Math.max(1, parseInt(searchParams.page || "1"));
+
+  const [orders, totalOrderCount, chartData, exchangeRate, companies] = await Promise.all([
     prisma.order.findMany({
       where,
       include: {
@@ -58,23 +62,37 @@ export default async function OrdersPage({
         items: { select: { quantity: true, product: { select: { name: true } } } },
       },
       orderBy: { orderDate: "desc" },
+      skip: (currentPage - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
     }),
+    prisma.order.count({ where }),
     getDailyOrderData(searchParams.company, searchParams.month, searchParams.channel),
     getUsdKrwRate(dateRange.lt > new Date() ? undefined : new Date(dateRange.lt.getTime() - 1)),
     prisma.company.findMany({ select: { id: true, name: true } }),
   ]);
 
   const primaryCurrency = getPrimaryCurrency(searchParams.company, companies);
+  const totalPages = Math.ceil(totalOrderCount / PAGE_SIZE);
 
-  const totalOrders = orders.length;
-  const totalAmount = orders.reduce((sum, o) => sum + toUSD(Number(o.totalAmount), o.externalSource, exchangeRate.rate), 0);
-  const paidCount = orders.filter(o => o.financialStatus === "PAID" || o.financialStatus === "PARTIALLY_PAID").length;
-  const refundedCount = orders.filter(o => o.financialStatus === "REFUNDED" || o.financialStatus === "PARTIALLY_REFUNDED").length;
-  const fulfilledCount = orders.filter(o => o.fulfillmentStatus === "FULFILLED" || o.fulfillmentStatus === "DELIVERED").length;
+  // KPI stats from all matching orders (not paginated)
+  const [allSalesOrders, paidCount, refundedCount, fulfilledCount] = await Promise.all([
+    prisma.order.findMany({
+      where,
+      select: { totalAmount: true, externalSource: true },
+    }),
+    prisma.order.count({ where: { ...where, financialStatus: { in: ["PAID", "PARTIALLY_PAID"] } } }),
+    prisma.order.count({ where: { ...where, financialStatus: { in: ["REFUNDED", "PARTIALLY_REFUNDED"] } } }),
+    prisma.order.count({ where: { ...where, fulfillmentStatus: { in: ["FULFILLED", "DELIVERED"] } } }),
+  ]);
+  const totalAmount = allSalesOrders.reduce((sum, o) => sum + toUSD(Number(o.totalAmount), o.externalSource, exchangeRate.rate), 0);
 
-  // Top 3 customers by order count
+  // Top 3 customers by order count (from all matching orders)
+  const allOrdersForCustomers = await prisma.order.findMany({
+    where,
+    select: { customer: { select: { name: true } }, netAmount: true, totalAmount: true },
+  });
   const customerCounts = new Map<string, { name: string; count: number; amount: number }>();
-  for (const order of orders) {
+  for (const order of allOrdersForCustomers) {
     const name = order.customer?.name ?? "Unknown";
     const existing = customerCounts.get(name);
     if (existing) {
@@ -119,7 +137,7 @@ export default async function OrdersPage({
         <div className="flex items-center gap-6">
           <div className="text-right">
             <p className="text-xs text-[var(--text-secondary)]">Total</p>
-            <p className="text-lg font-semibold">{totalOrders}</p>
+            <p className="text-lg font-semibold">{totalOrderCount}</p>
           </div>
           <div className="text-right">
             <p className="text-xs text-[var(--text-secondary)]">Fulfilled</p>
@@ -171,7 +189,10 @@ export default async function OrdersPage({
         {orders.length === 0 ? (
           <EmptyState title="No orders" description="No orders found for this month." />
         ) : (
-          <OrdersTable orders={orderRows} />
+          <>
+            <OrdersTable orders={orderRows} />
+            <Pagination currentPage={currentPage} totalPages={totalPages} totalItems={totalOrderCount} pageSize={PAGE_SIZE} />
+          </>
         )}
       </Card>
     </div>

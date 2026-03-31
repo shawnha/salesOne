@@ -9,6 +9,7 @@ import { getUsdKrwRate } from "@/lib/exchange-rate";
 import { CurrencyDisplay, getPrimaryCurrency } from "@/components/ui/currency-display";
 import Link from "next/link";
 import { ChannelFilter } from "@/components/orders/channel-filter";
+import { Pagination } from "@/components/ui/pagination";
 
 const formatUSD = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 const formatKRW = (n: number) => `₩${Math.round(n).toLocaleString("ko-KR")}`;
@@ -45,7 +46,7 @@ function getMonthRange(monthParam?: string) {
 export default async function SalesPage({
   searchParams,
 }: {
-  searchParams: { company?: string; month?: string; channel?: string };
+  searchParams: { company?: string; month?: string; channel?: string; page?: string };
 }) {
   const dateRange = getMonthRange(searchParams.month);
 
@@ -69,7 +70,10 @@ export default async function SalesPage({
     where.externalSource = searchParams.channel;
   }
 
-  const [orders, exchangeRate, companies] = await Promise.all([
+  const PAGE_SIZE = 50;
+  const currentPage = Math.max(1, parseInt(searchParams.page || "1"));
+
+  const [orders, totalSalesCount, exchangeRate, companies] = await Promise.all([
     prisma.order.findMany({
       where,
       include: {
@@ -77,7 +81,10 @@ export default async function SalesPage({
         company: { select: { name: true } },
       },
       orderBy: { orderDate: "desc" },
+      skip: (currentPage - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
     }),
+    prisma.order.count({ where }),
     getUsdKrwRate(dateRange.lt > new Date() ? undefined : new Date(dateRange.lt.getTime() - 1)),
     prisma.company.findMany({ select: { id: true, name: true } }),
   ]);
@@ -88,11 +95,16 @@ export default async function SalesPage({
     primaryCurrency,
   });
 
-  const totalRevenue = orders.reduce((sum, o) => {
+  const totalPages = Math.ceil(totalSalesCount / PAGE_SIZE);
+  const allSalesForKpi = await prisma.order.findMany({
+    where,
+    select: { netAmount: true, totalAmount: true, externalSource: true },
+  });
+  const totalRevenue = allSalesForKpi.reduce((sum, o) => {
     const amount = Number(o.netAmount ?? o.totalAmount);
     return sum + toUSD(amount, o.externalSource, exchangeRate.rate);
   }, 0);
-  const orderCount = orders.length;
+  const orderCount = totalSalesCount;
 
   const columns = [
     {
@@ -193,7 +205,10 @@ export default async function SalesPage({
         {orders.length === 0 ? (
           <EmptyState title="No sales" description="No delivered & paid orders for this month." />
         ) : (
-          <DataTable columns={columns} data={orders} />
+          <>
+            <DataTable columns={columns} data={orders} />
+            <Pagination currentPage={currentPage} totalPages={totalPages} totalItems={totalSalesCount} pageSize={PAGE_SIZE} />
+          </>
         )}
       </Card>
     </div>
