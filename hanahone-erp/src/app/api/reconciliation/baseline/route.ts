@@ -25,8 +25,10 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(baselines);
 }
 
-// POST: Set baselines from current CGETC live inventory
-// Body: { companyId } — snapshots ALL CGETC products as baselines
+// POST: Set baselines from current inventory
+// Body: { companyId } — snapshots inventory as baselines
+// For CGETC-connected companies: uses live CGETC data
+// For others: uses DB inventory table
 // On reset: deletes all existing baselines first, then inserts fresh
 export async function POST(req: NextRequest) {
   const raw = await req.json();
@@ -39,29 +41,41 @@ export async function POST(req: NextRequest) {
   const { error, session } = await requireCompanyAccess(companyId);
   if (error) return error;
 
-  // Fetch live CGETC inventory
+  // Try CGETC first
   const config = await prisma.integrationConfig.findFirst({
     where: { companyId, platform: "CGETC", isActive: true },
   });
-  if (!config) {
-    return NextResponse.json({ error: "CGETC integration not configured" }, { status: 400 });
+
+  let snapshotProducts: { sku: string; name: string; quantity: number }[] = [];
+
+  if (config) {
+    const credentials = JSON.parse(decrypt(config.credentials));
+    const cgetcProducts = await fetchCgetcInventory(credentials);
+    snapshotProducts = cgetcProducts
+      .filter((p) => p.sku)
+      .map((p) => ({ sku: p.sku, name: p.name, quantity: p.quantity }));
+  } else {
+    // Fallback: use DB inventory for non-CGETC companies
+    const dbInventory = await prisma.inventory.findMany({
+      where: { companyId, quantity: { gt: 0 } },
+      include: { product: { select: { name: true, sku: true } } },
+    });
+    snapshotProducts = dbInventory
+      .filter((inv) => inv.product.sku)
+      .map((inv) => ({ sku: inv.product.sku!, name: inv.product.name, quantity: inv.quantity }));
   }
 
-  const credentials = JSON.parse(decrypt(config.credentials));
-  const products = await fetchCgetcInventory(credentials);
-
-  if (products.length === 0) {
-    return NextResponse.json({ error: "No products found from CGETC" }, { status: 400 });
+  if (snapshotProducts.length === 0) {
+    return NextResponse.json({ error: "No products with inventory found" }, { status: 400 });
   }
 
   const now = new Date();
   const userId = (session as any).user?.id || "system";
-  const validProducts = products.filter((p) => p.sku);
 
   // Delete all existing baselines, then insert fresh (handles stale SKUs)
   const results = await prisma.$transaction([
     prisma.inventoryBaseline.deleteMany({ where: { companyId } }),
-    ...validProducts.map((p) =>
+    ...snapshotProducts.map((p) =>
       prisma.inventoryBaseline.create({
         data: {
           companyId,
