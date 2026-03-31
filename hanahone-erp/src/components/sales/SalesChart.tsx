@@ -18,6 +18,8 @@ import { CHANNEL_COLORS } from "@/lib/sales-chart-data";
 
 const formatUSD = (n: number) =>
   `$${n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+const formatKRW = (n: number) =>
+  `₩${Math.round(n).toLocaleString("ko-KR")}`;
 
 const BAR_CHANNELS = [
   { key: "SHOPIFY", label: "Shopify" },
@@ -35,13 +37,15 @@ interface SalesChartProps {
   donut: ChannelSalesData[];
   monthly: MonthlyChannelData[];
   currentMonth?: string; // "YYYY-MM"
+  primaryCurrency?: "USD" | "KRW";
 }
 
-export function SalesChart({ donut, monthly, currentMonth }: SalesChartProps) {
+export function SalesChart({ donut, monthly, currentMonth, primaryCurrency = "USD" }: SalesChartProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const total = donut.reduce((sum, d) => sum + d.amount, 0);
+  const fmt = primaryCurrency === "KRW" ? formatKRW : formatUSD;
 
   function handleBarClick(data: any) {
     const yearMonth = data?.payload?.yearMonth || data?.yearMonth;
@@ -82,7 +86,7 @@ export function SalesChart({ donut, monthly, currentMonth }: SalesChartProps) {
                 ))}
               </Pie>
               <Tooltip
-                formatter={(value) => formatUSD(Number(value))}
+                formatter={(value) => fmt(Number(value))}
                 contentStyle={{
                   background: "var(--surface)",
                   border: "1px solid var(--border)",
@@ -93,7 +97,7 @@ export function SalesChart({ donut, monthly, currentMonth }: SalesChartProps) {
             </PieChart>
           </ResponsiveContainer>
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <p className="text-sm font-bold">{formatUSD(total)}</p>
+            <p className="text-sm font-bold">{fmt(total)}</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 justify-center">
@@ -135,11 +139,11 @@ export function SalesChart({ donut, monthly, currentMonth }: SalesChartProps) {
               tick={{ fontSize: 10, fill: "var(--text-tertiary)" }}
               axisLine={false}
               tickLine={false}
-              tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+              tickFormatter={(v) => primaryCurrency === "KRW" ? `₩${(v / 10000).toFixed(0)}만` : `$${(v / 1000).toFixed(0)}k`}
               width={50}
             />
             <Tooltip
-              formatter={(value, name) => [formatUSD(Number(value)), name]}
+              formatter={(value, name) => [fmt(Number(value)), name]}
               contentStyle={{
                 background: "var(--surface)",
                 border: "1px solid var(--border)",

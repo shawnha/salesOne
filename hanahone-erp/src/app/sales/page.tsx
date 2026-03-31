@@ -69,7 +69,7 @@ export default async function SalesPage({
     where.externalSource = searchParams.channel;
   }
 
-  const [orders, chartData, exchangeRate, companies] = await Promise.all([
+  const [orders, exchangeRate, companies] = await Promise.all([
     prisma.order.findMany({
       where,
       include: {
@@ -78,12 +78,15 @@ export default async function SalesPage({
       },
       orderBy: { orderDate: "desc" },
     }),
-    getChannelSalesData(searchParams.company, searchParams.month, searchParams.channel),
     getUsdKrwRate(dateRange.lt > new Date() ? undefined : new Date(dateRange.lt.getTime() - 1)),
     prisma.company.findMany({ select: { id: true, name: true } }),
   ]);
 
   const primaryCurrency = getPrimaryCurrency(searchParams.company, companies);
+  const chartData = await getChannelSalesData(searchParams.company, searchParams.month, searchParams.channel, {
+    exchangeRate: exchangeRate.rate,
+    primaryCurrency,
+  });
 
   const totalRevenue = orders.reduce((sum, o) => {
     const amount = Number(o.netAmount ?? o.totalAmount);
@@ -184,7 +187,7 @@ export default async function SalesPage({
             ₩{exchangeRate.rate.toLocaleString()}/$ ({exchangeRate.date})
           </p>
         </div>
-        <SalesChart donut={chartData.donut} monthly={chartData.monthly} currentMonth={searchParams.month || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`} />
+        <SalesChart donut={chartData.donut} monthly={chartData.monthly} currentMonth={searchParams.month || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`} primaryCurrency={primaryCurrency} />
       </Card>
       <Card>
         {orders.length === 0 ? (

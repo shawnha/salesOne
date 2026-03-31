@@ -24,7 +24,7 @@ const CHANNEL_COLORS: Record<string, string> = {
   SHOPIFY: "#95BF47",
   AMAZON: "#FF9900",
   TIKTOK: "#EE1D52",
-  NAVER: "#03C75A",
+  NAVER: "#1B9E77",
   GONGGU: "#E11D48",
   PHARMACY: "#6B7280",
   CGETC: "#4F46E5",
@@ -72,11 +72,23 @@ export function applyChannelFilter(where: any, channel?: string) {
   }
 }
 
+const KRW_SOURCES = new Set(["NAVER", "PHARMACY"]);
+
 export async function getChannelSalesData(
   companyId: string | undefined,
   month: string | undefined,
   channel?: string | undefined,
+  options?: { exchangeRate?: number; primaryCurrency?: "USD" | "KRW" },
 ): Promise<{ donut: ChannelSalesData[]; monthly: MonthlyChannelData[] }> {
+  const rate = options?.exchangeRate || 1;
+  const primary = options?.primaryCurrency || "USD";
+
+  function normalize(amount: number, source: string | null): number {
+    const isKrw = KRW_SOURCES.has(source || "");
+    if (primary === "USD" && isKrw) return amount / rate;
+    if (primary === "KRW" && !isKrw) return amount * rate;
+    return amount;
+  }
   const now = new Date();
   const [targetYear, targetMonth] = month
     ? [parseInt(month.split("-")[0]), parseInt(month.split("-")[1]) - 1]
@@ -107,7 +119,8 @@ export async function getChannelSalesData(
     } else if (channel === "NAVER" && order.notes === "공구") {
       channel = "GONGGU";
     }
-    channelTotals[channel] = (channelTotals[channel] || 0) + Number(order.netAmount ?? order.totalAmount);
+    const raw = Number(order.netAmount ?? order.totalAmount);
+    channelTotals[channel] = (channelTotals[channel] || 0) + normalize(raw, order.externalSource);
   }
 
   const donut: ChannelSalesData[] = Object.entries(channelTotals)
@@ -158,7 +171,8 @@ export async function getChannelSalesData(
         channel = "GONGGU" as typeof channel;
       }
       if (channel in monthly[idx]) {
-        monthly[idx][channel] += Number(order.netAmount ?? order.totalAmount);
+        const raw = Number(order.netAmount ?? order.totalAmount);
+        monthly[idx][channel] += normalize(raw, order.externalSource);
       }
     }
   }
