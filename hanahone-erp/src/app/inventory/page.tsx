@@ -4,7 +4,6 @@ import { DataTable } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { fetchCgetcInventory, type CgetcProduct } from "@/lib/integrations/connectors/cgetc";
 import { decrypt } from "@/lib/integrations/encryption";
-import { buildBaselineRows } from "@/lib/reconciliation";
 import { HokInventoryClient, type BomEntry, type GongguInventoryRow, type InventoryRow as HokInventoryRow } from "@/components/inventory/HokInventoryClient";
 
 type InventoryRow = {
@@ -18,9 +17,8 @@ type InventoryRow = {
   available: number;
   reorderLevel: number;
   source: "internal" | "cgetc";
-  expected: number | null;
-  actual: number | null;
-  diff: number | null;
+  baseline: number | null;
+  baselineDate: string | null;
   burnRate: number | null;
   daysLeft: number | null;
 };
@@ -107,47 +105,11 @@ export default async function InventoryPage({
     (inv) => !(inv.warehouseLocation === "CGETC" && inv.product.sku && cgetcSkus.has(inv.product.sku))
   );
 
-  // Build baseline-forward reconciliation data for CGETC comparison columns
-  const hasBaselines = baselines.length > 0;
-  const baselineExpectedBySku = new Map<string, number>();
-
-  if (hasBaselines) {
-    const companyId = cgetcConfig?.companyId || "";
-    const earliestSetAt = baselines.reduce(
-      (earliest, b) => (b.setAt < earliest ? b.setAt : earliest),
-      baselines[0].setAt
-    );
-
-    const [orderItems, adjustments] = await Promise.all([
-      prisma.orderItem.findMany({
-        where: { order: { companyId, orderDate: { gt: earliestSetAt } } },
-        include: {
-          order: { select: { externalSource: true, orderDate: true } },
-          product: { select: { sku: true } },
-        },
-      }),
-      prisma.reconciliationAdjustment.findMany({ where: { companyId } }),
-    ]);
-
-    const actualBySku: Record<string, number> = {};
-    for (const p of cgetcProducts) {
-      if (p.sku) actualBySku[p.sku] = p.quantity;
-    }
-
-    const baselineRows = buildBaselineRows(
-      baselines,
-      orderItems.filter((i) => i.product?.sku).map((i) => ({
-        sku: i.product.sku,
-        quantity: i.quantity,
-        orderDate: i.order.orderDate,
-        channel: i.order.externalSource || "OTHER",
-      })),
-      adjustments.map((a) => ({ sku: a.sku, quantity: a.quantity, createdAt: a.createdAt })),
-      actualBySku,
-    );
-
-    for (const row of baselineRows) {
-      baselineExpectedBySku.set(row.sku, row.expected);
+  // Build baseline lookup for CGETC products (quantity + date)
+  const baselineBySku = new Map<string, { quantity: number; setAt: Date }>();
+  for (const bl of baselines) {
+    if (!baselineBySku.has(bl.sku)) {
+      baselineBySku.set(bl.sku, { quantity: bl.quantity, setAt: bl.setAt });
     }
   }
 
@@ -167,17 +129,14 @@ export default async function InventoryPage({
         available: inv.quantity,
         reorderLevel: inv.reorderLevel,
         source: "internal" as const,
-        expected: null,
-        actual: null,
-        diff: null,
+        baseline: null,
+        baselineDate: null,
         burnRate,
         daysLeft,
       };
     }),
     ...cgetcProducts.map((p) => {
-      const expected = baselineExpectedBySku.get(p.sku) ?? null;
-      const actual = p.quantity;
-      const diff = expected !== null ? actual - expected : null;
+      const bl = baselineBySku.get(p.sku);
       // Use SKU-based sales lookup for CGETC products
       const sold30d = salesBySku.get(p.sku) || 0;
       const burnRate = sold30d > 0 ? sold30d / 30 : null;
@@ -193,9 +152,8 @@ export default async function InventoryPage({
         available: p.available,
         reorderLevel: 0,
         source: "cgetc" as const,
-        expected,
-        actual,
-        diff,
+        baseline: bl?.quantity ?? null,
+        baselineDate: bl?.setAt.toISOString() ?? null,
         burnRate,
         daysLeft,
       };
@@ -279,43 +237,26 @@ export default async function InventoryPage({
       },
     },
     {
-      key: "expected",
-      header: "Expected",
-      align: "right" as const,
-      render: (row: InventoryRow) => (
-        <span className={`font-semibold ${row.expected === null ? "text-[var(--text-quaternary)]" : ""}`}>
-          {row.expected !== null ? row.expected : "—"}
-        </span>
-      ),
-    },
-    {
-      key: "actual",
-      header: "Actual",
-      align: "right" as const,
-      render: (row: InventoryRow) => (
-        <span className={`font-semibold ${row.actual === null ? "text-[var(--text-quaternary)]" : ""}`}>
-          {row.actual !== null ? row.actual : "—"}
-        </span>
-      ),
-    },
-    {
-      key: "diff",
-      header: "Diff",
+      key: "baseline",
+      header: "Baseline",
       align: "right" as const,
       render: (row: InventoryRow) => {
-        if (row.diff === null) return <span className="text-[var(--text-quaternary)]">—</span>;
+        if (row.baseline === null) return <span className="text-[var(--text-quaternary)]">—</span>;
+        const diff = row.quantity - row.baseline;
         return (
-          <span
-            className={`font-semibold ${
-              row.diff === 0
-                ? "text-teal-600"
-                : row.diff < 0
-                ? "text-rose-500"
-                : "text-amber-500"
-            }`}
-          >
-            {row.diff > 0 ? `+${row.diff}` : row.diff}
-          </span>
+          <div className="text-right">
+            <span className="font-semibold">{row.baseline.toLocaleString()}</span>
+            {diff !== 0 && (
+              <div className={`text-[10px] font-medium ${diff < 0 ? "text-rose-500" : "text-amber-500"}`}>
+                {diff > 0 ? `+${diff}` : diff}
+              </div>
+            )}
+            {row.baselineDate && (
+              <div className="text-[10px] text-[var(--text-tertiary)]">
+                {new Date(row.baselineDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+              </div>
+            )}
+          </div>
         );
       },
     },
