@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { CompanySwitcher } from "./company-switcher";
 import { useTheme } from "@/components/providers/theme-provider";
 import { useCompany } from "@/hooks/use-company";
+import { NotificationBell } from "./notification-bell";
 
 const navLinks = [
   { href: "/dashboard", label: "Dashboard" },
@@ -20,7 +21,7 @@ const navLinks = [
   { href: "/reports", label: "Reports" },
 ];
 
-export function TopNav() {
+export function TopNav({ unreadNotifications = 0 }: { unreadNotifications?: number }) {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
   const { selectedCompany } = useCompany();
@@ -54,6 +55,7 @@ export function TopNav() {
         {/* Right side — company switcher, theme toggle, settings (outside pill) */}
         <div className="flex items-center gap-3 flex-shrink-0">
           <CompanySwitcher />
+          <NotificationBell initialCount={unreadNotifications} />
           <button
             onClick={toggleTheme}
             className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-bg)] transition-all duration-200 text-sm"

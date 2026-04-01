@@ -6,6 +6,7 @@ import { CompanyProvider } from "@/components/providers/company-provider";
 import { TopNav } from "@/components/nav/top-nav";
 import { prisma } from "@/lib/prisma";
 import { Suspense } from "react";
+import { getUnreadCount } from "@/lib/notifications";
 
 export const metadata: Metadata = {
   title: "HanahOne ERP",
@@ -17,6 +18,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });
+  const unreadNotifications = await getUnreadCount();
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -25,7 +27,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <ThemeProvider>
             <Suspense>
               <CompanyProvider companies={companies}>
-                <TopNav />
+                <TopNav unreadNotifications={unreadNotifications} />
                 <main className="max-w-[1400px] mx-auto px-6 py-10">
                   {children}
                 </main>
