@@ -190,14 +190,42 @@ export default async function InventoryPage({
       ),
     },
     {
+      key: "baseline",
+      header: "Baseline",
+      align: "right" as const,
+      render: (row: InventoryRow) => {
+        if (row.baseline === null) return <span className="text-[var(--text-quaternary)]">—</span>;
+        return (
+          <div className="text-right">
+            <span className="font-semibold">{row.baseline.toLocaleString()}</span>
+            {row.baselineDate && (
+              <div className="text-[10px] text-[var(--text-tertiary)]">
+                {new Date(row.baselineDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
       key: "quantity",
       header: "On Hand",
       align: "right" as const,
-      render: (row: InventoryRow) => (
-        <span className={`font-semibold ${row.source === "internal" && row.quantity <= row.reorderLevel ? "text-rose-500" : ""}`}>
-          {row.quantity}
-        </span>
-      ),
+      render: (row: InventoryRow) => {
+        const diff = row.baseline !== null ? row.quantity - row.baseline : null;
+        return (
+          <div className="text-right">
+            <span className={`font-semibold ${row.source === "internal" && row.quantity <= row.reorderLevel ? "text-rose-500" : ""}`}>
+              {row.quantity.toLocaleString()}
+            </span>
+            {diff !== null && diff !== 0 && (
+              <div className={`text-[10px] font-medium ${diff < 0 ? "text-rose-500" : "text-amber-500"}`}>
+                {diff > 0 ? `+${diff}` : diff}
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: "reserved",
@@ -231,30 +259,6 @@ export default async function InventoryPage({
             <span className={`font-semibold ${color}`}>{row.daysLeft}d</span>
             {row.burnRate !== null && (
               <div className="text-[10px] text-[var(--text-tertiary)]">{row.burnRate.toFixed(1)}/day</div>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      key: "baseline",
-      header: "Baseline",
-      align: "right" as const,
-      render: (row: InventoryRow) => {
-        if (row.baseline === null) return <span className="text-[var(--text-quaternary)]">—</span>;
-        const diff = row.quantity - row.baseline;
-        return (
-          <div className="text-right">
-            <span className="font-semibold">{row.baseline.toLocaleString()}</span>
-            {diff !== 0 && (
-              <div className={`text-[10px] font-medium ${diff < 0 ? "text-rose-500" : "text-amber-500"}`}>
-                {diff > 0 ? `+${diff}` : diff}
-              </div>
-            )}
-            {row.baselineDate && (
-              <div className="text-[10px] text-[var(--text-tertiary)]">
-                {new Date(row.baselineDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-              </div>
             )}
           </div>
         );
