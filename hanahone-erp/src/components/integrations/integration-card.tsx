@@ -27,10 +27,10 @@ const platformLabels: Record<Platform, string> = {
 };
 
 function getStatus(isActive: boolean, hasCreds: boolean, lastJobStatus: string | null) {
-  if (!hasCreds) return { label: "Not configured", style: "text-slate-500 bg-slate-500/[0.08] dark:text-slate-400 dark:bg-slate-400/[0.10]" };
-  if (lastJobStatus === "FAILED") return { label: "Failed", style: "text-red-600 bg-red-600/[0.08] dark:text-red-400 dark:bg-red-400/[0.10]" };
-  if (isActive) return { label: "Active", style: "text-teal-600 bg-teal-600/[0.08] dark:text-teal-400 dark:bg-teal-400/[0.10]" };
-  return { label: "Inactive", style: "text-slate-500 bg-slate-500/[0.08] dark:text-slate-400 dark:bg-slate-400/[0.10]" };
+  if (!hasCreds) return { label: "Not configured", style: "text-[var(--badge-slate)] bg-[var(--badge-slate-bg)]" };
+  if (lastJobStatus === "FAILED") return { label: "Failed", style: "text-[var(--badge-red)] bg-[var(--badge-red-bg)]" };
+  if (isActive) return { label: "Active", style: "text-[var(--badge-teal)] bg-[var(--badge-teal-bg)]" };
+  return { label: "Inactive", style: "text-[var(--badge-slate)] bg-[var(--badge-slate-bg)]" };
 }
 
 function timeAgo(dateStr: string) {

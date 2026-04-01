@@ -42,7 +42,7 @@ export function TopNav() {
                 className={`px-3 py-1.5 text-[12px] font-medium rounded-full transition-all duration-200 whitespace-nowrap flex-shrink-0 ${
                   pathname === link.href || pathname?.startsWith(link.href + "/")
                     ? "text-accent bg-[var(--accent-dim)]"
-                    : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
+                    : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-bg)]"
                 }`}
               >
                 {link.label}
@@ -56,7 +56,7 @@ export function TopNav() {
           <CompanySwitcher />
           <button
             onClick={toggleTheme}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.05] transition-all duration-200 text-sm"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-bg)] transition-all duration-200 text-sm"
             aria-label="Toggle theme"
           >
             {theme === "light" ? (
@@ -82,7 +82,7 @@ export function TopNav() {
             className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
               pathname?.startsWith("/settings")
                 ? "text-accent"
-                : "text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
+                : "text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-bg)]"
             }`}
             aria-label="Settings"
           >

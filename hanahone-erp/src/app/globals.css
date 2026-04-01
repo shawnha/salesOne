@@ -11,11 +11,28 @@
     --text-primary: #0f1419;
     --text-secondary: #536471;
     --text-tertiary: #8899a6;
+    --text-quaternary: rgba(0, 0, 0, 0.2);
     --accent: #0d9488;
     --accent-dim: rgba(13, 148, 136, 0.08);
     --shadow-card: 0 1px 2px rgba(0,0,0,0.04);
     --shadow-card-hover: 0 12px 32px -8px rgba(0,0,0,0.08);
+    --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.8);
     --radius-lg: 28px;
+    --hover-bg: rgba(0, 0, 0, 0.04);
+    --hover-bg-subtle: rgba(0, 0, 0, 0.02);
+    --skeleton-bg: rgba(0, 0, 0, 0.06);
+    --badge-teal: #0d9488;
+    --badge-teal-bg: rgba(13, 148, 136, 0.08);
+    --badge-amber: #d97706;
+    --badge-amber-bg: rgba(217, 119, 6, 0.08);
+    --badge-red: #dc2626;
+    --badge-red-bg: rgba(220, 38, 38, 0.08);
+    --badge-blue: #2563eb;
+    --badge-blue-bg: rgba(37, 99, 235, 0.08);
+    --badge-indigo: #4f46e5;
+    --badge-indigo-bg: rgba(79, 70, 229, 0.08);
+    --badge-slate: #64748b;
+    --badge-slate-bg: rgba(100, 116, 139, 0.08);
   }
 
   .dark {
@@ -26,10 +43,27 @@
     --text-primary: #f0f0f3;
     --text-secondary: #8a8a9a;
     --text-tertiary: #55556a;
+    --text-quaternary: rgba(255, 255, 255, 0.15);
     --accent: #2dd4bf;
     --accent-dim: rgba(45, 212, 191, 0.10);
     --shadow-card: 0 1px 2px rgba(0,0,0,0.3);
     --shadow-card-hover: 0 12px 32px -8px rgba(0,0,0,0.5);
+    --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.04);
+    --hover-bg: rgba(255, 255, 255, 0.05);
+    --hover-bg-subtle: rgba(255, 255, 255, 0.02);
+    --skeleton-bg: rgba(255, 255, 255, 0.06);
+    --badge-teal: #2dd4bf;
+    --badge-teal-bg: rgba(45, 212, 191, 0.10);
+    --badge-amber: #fbbf24;
+    --badge-amber-bg: rgba(251, 191, 36, 0.10);
+    --badge-red: #f87171;
+    --badge-red-bg: rgba(248, 113, 113, 0.10);
+    --badge-blue: #60a5fa;
+    --badge-blue-bg: rgba(96, 165, 250, 0.10);
+    --badge-indigo: #818cf8;
+    --badge-indigo-bg: rgba(129, 140, 248, 0.10);
+    --badge-slate: #94a3b8;
+    --badge-slate-bg: rgba(148, 163, 184, 0.10);
   }
 
   body {

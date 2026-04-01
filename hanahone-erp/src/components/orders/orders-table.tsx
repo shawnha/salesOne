@@ -105,7 +105,7 @@ export function OrdersTable({ orders }: { orders: OrderRow[] }) {
                   className={`border-b border-[var(--border)] cursor-pointer transition-colors ${
                     isExpanded
                       ? "bg-accent/[0.04]"
-                      : "hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
+                      : "hover:bg-[var(--hover-bg-subtle)]"
                   }`}
                 >
                   <td className="py-3 px-4">
@@ -169,7 +169,7 @@ export function OrdersTable({ orders }: { orders: OrderRow[] }) {
                 </tr>
                 {isExpanded && (
                   <tr>
-                    <td colSpan={6} className="bg-black/[0.015] dark:bg-white/[0.015] border-b border-[var(--border)]">
+                    <td colSpan={6} className="bg-[var(--hover-bg-subtle)] border-b border-[var(--border)]">
                       <ExpandedRow orderId={row.id} data={refundData[row.id]} loading={loading === row.id} row={row} />
                     </td>
                   </tr>

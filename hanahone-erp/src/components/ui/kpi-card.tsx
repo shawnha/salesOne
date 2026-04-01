@@ -10,9 +10,9 @@ interface KpiCardProps {
 
 export function KpiCard({ label, value, subValue, change, subtitle }: KpiCardProps) {
   const changeColors = {
-    up: "text-teal-600 bg-teal-600/[0.08] dark:text-teal-400 dark:bg-teal-400/[0.10]",
-    down: "text-rose-600 bg-rose-600/[0.08] dark:text-rose-400 dark:bg-rose-400/[0.10]",
-    neutral: "text-[var(--text-tertiary)] bg-black/[0.04] dark:bg-white/[0.04]",
+    up: "text-[var(--badge-teal)] bg-[var(--badge-teal-bg)]",
+    down: "text-[var(--badge-red)] bg-[var(--badge-red-bg)]",
+    neutral: "text-[var(--text-tertiary)] bg-[var(--skeleton-bg)]",
   };
   return (
     <Card>

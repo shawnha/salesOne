@@ -80,13 +80,13 @@ export function CsvUpload() {
       </div>
 
       {result && (
-        <div className="mt-3 px-3 py-2 rounded-xl bg-teal-600/[0.06] border border-teal-600/[0.12] text-[11px] text-teal-600 dark:text-teal-400">
+        <div className="mt-3 px-3 py-2 rounded-xl bg-teal-600/[0.06] border border-teal-600/[0.12] text-[11px] text-[var(--badge-teal)]">
           Processed {result.total} records: {result.created} created, {result.failed} failed.
         </div>
       )}
 
       {error && (
-        <div className="mt-3 px-3 py-2 rounded-xl bg-red-600/[0.06] border border-red-600/[0.12] text-[11px] text-red-600 dark:text-red-400">
+        <div className="mt-3 px-3 py-2 rounded-xl bg-red-600/[0.06] border border-red-600/[0.12] text-[11px] text-[var(--badge-red)]">
           {error}
         </div>
       )}

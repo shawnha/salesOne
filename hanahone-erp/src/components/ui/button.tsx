@@ -9,7 +9,7 @@ export function Button({ variant = "primary", size = "md", className = "", child
   const variants = {
     primary: "bg-accent text-white hover:opacity-90",
     secondary: "bg-[var(--surface)] border border-[var(--border)] text-[var(--text-primary)] hover:border-[var(--border-strong)]",
-    ghost: "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.05]",
+    ghost: "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-bg)]",
   };
   return (
     <button className={`${base} ${sizes[size]} ${variants[variant]} ${className}`} {...props}>

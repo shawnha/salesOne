@@ -42,7 +42,7 @@ export function MonthPicker() {
     <div className="relative flex items-center gap-1">
       <button
         onClick={prev}
-        className="w-8 h-8 flex items-center justify-center rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.05] transition-colors"
+        className="w-8 h-8 flex items-center justify-center rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-bg)] transition-colors"
       >
         ◀
       </button>
@@ -56,7 +56,7 @@ export function MonthPicker() {
 
       <button
         onClick={next}
-        className="w-8 h-8 flex items-center justify-center rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.05] transition-colors"
+        className="w-8 h-8 flex items-center justify-center rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-bg)] transition-colors"
       >
         ▶
       </button>
@@ -68,14 +68,14 @@ export function MonthPicker() {
             <div className="flex items-center justify-between mb-3">
               <button
                 onClick={() => setPickerYear(pickerYear - 1)}
-                className="w-7 h-7 flex items-center justify-center rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.05] text-xs"
+                className="w-7 h-7 flex items-center justify-center rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-bg)] text-xs"
               >
                 ◀
               </button>
               <span className="text-sm font-bold">{pickerYear}</span>
               <button
                 onClick={() => setPickerYear(pickerYear + 1)}
-                className="w-7 h-7 flex items-center justify-center rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.05] text-xs"
+                className="w-7 h-7 flex items-center justify-center rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-bg)] text-xs"
               >
                 ▶
               </button>
@@ -94,7 +94,7 @@ export function MonthPicker() {
                         ? "bg-accent text-white"
                         : isFuture
                         ? "text-[var(--text-tertiary)] opacity-40 cursor-not-allowed"
-                        : "text-[var(--text-secondary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.05] hover:text-[var(--text-primary)]"
+                        : "text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] hover:text-[var(--text-primary)]"
                     }`}
                   >
                     {name}

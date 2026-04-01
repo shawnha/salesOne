@@ -53,7 +53,7 @@ function ProductRow({
       className={`border-b border-[var(--border)] last:border-b-0 transition-colors ${
         selected
           ? "bg-accent/[0.04]"
-          : "hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
+          : "hover:bg-[var(--hover-bg-subtle)]"
       }`}
     >
       <td className="py-3 px-4">

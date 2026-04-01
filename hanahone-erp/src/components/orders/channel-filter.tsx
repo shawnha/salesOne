@@ -52,7 +52,7 @@ export function ChannelFilter({ companyName }: { companyName?: string }) {
           className={`px-3 py-1.5 text-[11px] font-semibold transition-colors ${
             current === ch.value
               ? "bg-accent text-white"
-              : "text-[var(--text-secondary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
+              : "text-[var(--text-secondary)] hover:bg-[var(--hover-bg)]"
           }`}
         >
           {ch.label}

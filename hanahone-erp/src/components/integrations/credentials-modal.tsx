@@ -109,7 +109,7 @@ export function CredentialsModal({ platform, companyId, hasCreds, onClose }: Cre
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-[var(--surface)] border border-[var(--border)] rounded-3xl p-1.5 w-full max-w-lg mx-4 shadow-2xl">
-        <div className="bg-[var(--surface)] rounded-[calc(1.5rem-6px)] p-7 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <div className="bg-[var(--surface)] rounded-[calc(1.5rem-6px)] p-7 shadow-[var(--shadow-inset)]">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-sm font-bold tracking-tight">
               {platformLabels[platform]} Credentials
@@ -123,7 +123,7 @@ export function CredentialsModal({ platform, companyId, hasCreds, onClose }: Cre
           </div>
 
           {hasCreds && (
-            <div className="mb-4 px-3 py-2 rounded-xl bg-teal-600/[0.06] border border-teal-600/[0.12] text-[11px] text-teal-600 dark:text-teal-400">
+            <div className="mb-4 px-3 py-2 rounded-xl bg-teal-600/[0.06] border border-teal-600/[0.12] text-[11px] text-[var(--badge-teal)]">
               Credentials are configured. Enter new values to update, or leave blank to keep existing.
             </div>
           )}

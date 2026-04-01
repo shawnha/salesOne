@@ -183,7 +183,7 @@ export default async function CustomerDetailPage({
                 {customer.orders.map((order) => {
                   const hasRefund = order.refundAmount && Number(order.refundAmount) > 0;
                   return (
-                    <tr key={order.id} className="border-b border-[var(--border)] last:border-b-0 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]">
+                    <tr key={order.id} className="border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--hover-bg-subtle)]">
                       <td className="py-3 px-4">
                         <Link href={`/orders/${order.id}`} className="font-semibold text-accent hover:underline">
                           {order.externalOrderNumber || order.orderNumber}

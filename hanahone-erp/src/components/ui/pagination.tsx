@@ -38,7 +38,7 @@ export function Pagination({ currentPage, totalPages, totalItems, pageSize }: Pa
         <button
           onClick={() => goToPage(currentPage - 1)}
           disabled={currentPage <= 1}
-          className="px-2 py-1 text-xs rounded-lg hover:bg-black/[0.04] dark:hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed"
+          className="px-2 py-1 text-xs rounded-lg hover:bg-[var(--hover-bg)] disabled:opacity-30 disabled:cursor-not-allowed"
         >
           &larr;
         </button>
@@ -59,7 +59,7 @@ export function Pagination({ currentPage, totalPages, totalItems, pageSize }: Pa
                 className={`w-7 h-7 text-xs rounded-lg ${
                   p === currentPage
                     ? "bg-accent text-white font-semibold"
-                    : "hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+                    : "hover:bg-[var(--hover-bg)]"
                 }`}
               >
                 {p}
@@ -69,7 +69,7 @@ export function Pagination({ currentPage, totalPages, totalItems, pageSize }: Pa
         <button
           onClick={() => goToPage(currentPage + 1)}
           disabled={currentPage >= totalPages}
-          className="px-2 py-1 text-xs rounded-lg hover:bg-black/[0.04] dark:hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed"
+          className="px-2 py-1 text-xs rounded-lg hover:bg-[var(--hover-bg)] disabled:opacity-30 disabled:cursor-not-allowed"
         >
           &rarr;
         </button>
