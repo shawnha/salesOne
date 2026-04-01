@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { fetchCgetcInventory, type CgetcProduct } from "@/lib/integrations/connectors/cgetc";
 import { decrypt } from "@/lib/integrations/encryption";
 import { buildBaselineRows } from "@/lib/reconciliation";
+import { HokInventoryClient, type BomEntry, type GongguInventoryRow, type InventoryRow as HokInventoryRow } from "@/components/inventory/HokInventoryClient";
 
 type InventoryRow = {
   id: string;
@@ -342,9 +343,82 @@ export default async function InventoryPage({
   }
   const hokBaselineItems = Array.from(hokBaselineMap.values());
 
+  // HOK: calculate reserved from unfulfilled orders
+  if (isHokView) {
+    const unfulfilledItems = await prisma.orderItem.findMany({
+      where: {
+        order: {
+          companyId: hokCompany!.id,
+          fulfillmentStatus: { in: ["UNFULFILLED", "PARTIALLY_FULFILLED"] },
+        },
+        productId: { not: undefined },
+      },
+      select: { productId: true, quantity: true },
+    });
+    const reservedByProduct = new Map<string, number>();
+    for (const item of unfulfilledItems) {
+      if (item.productId) {
+        reservedByProduct.set(item.productId, (reservedByProduct.get(item.productId) || 0) + item.quantity);
+      }
+    }
+    // Patch rows with reserved/available for HOK
+    for (const row of rows) {
+      // Match by inventory id → find the productId from the original inventory record
+      const inv = inventories.find((i) => i.id === row.id);
+      if (inv) {
+        const reserved = reservedByProduct.get(inv.productId) || 0;
+        row.reserved = reserved;
+        row.available = row.quantity - reserved;
+      }
+    }
+  }
+
   // HOK: split rows into regular vs 공구
   const hokRegularRows = isHokView ? rows.filter((r) => !r.name.includes("공구")) : [];
   const hokGongguRows = isHokView ? rows.filter((r) => r.name.includes("공구")) : [];
+
+  // HOK: fetch BOM for gonggu → component deduction calculation
+  const hokBomEntries: BomEntry[] = [];
+  if (isHokView) {
+    const bom = await prisma.billOfMaterials.findMany({
+      where: { companyId: hokCompany!.id },
+      include: {
+        finishedProduct: { select: { sku: true } },
+        rawMaterial: { select: { sku: true } },
+      },
+    });
+    for (const b of bom) {
+      if (b.finishedProduct.sku && b.rawMaterial.sku) {
+        hokBomEntries.push({
+          finishedSku: b.finishedProduct.sku,
+          rawSku: b.rawMaterial.sku,
+          quantityRequired: Number(b.quantityRequired),
+        });
+      }
+    }
+
+    // Fetch Naver product number mappings (원상품 only)
+    const naverMappings = await prisma.skuMapping.findMany({
+      where: {
+        companyId: hokCompany!.id,
+        platform: "NAVER",
+        displayName: { contains: "원상품" },
+      },
+      select: { externalSku: true, productId: true },
+    });
+    const naverProductNoByProductId = new Map<string, string>();
+    for (const m of naverMappings) {
+      if (m.productId) naverProductNoByProductId.set(m.productId, m.externalSku);
+    }
+    // Attach naverProductNo to rows
+    for (const row of rows) {
+      const inv = inventories.find((i) => i.id === row.id);
+      if (inv) {
+        const naverNo = naverProductNoByProductId.get(inv.productId);
+        if (naverNo) (row as any).naverProductNo = naverNo;
+      }
+    }
+  }
 
   // Group view: separate sections per company
   const isGroupView = !searchParams.company;
@@ -383,55 +457,22 @@ export default async function InventoryPage({
         </div>
       )}
 
-      {/* HOK: 전체 + 일반/공구 섹션 */}
+      {/* HOK: 전체 + 일반/공구 섹션 (client component for inline editing) */}
       {isHokView ? (
-        <>
-          {/* 전체 재고 카드 */}
-          {hokBaselineItems.length > 0 && (
-            <Card className="p-5">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)] mb-3">전체 재고</h2>
-              <div className="grid grid-cols-2 gap-4">
-                {hokBaselineItems.map((b) => (
-                  <div key={b.sku} className="text-center">
-                    <p className="text-2xl font-bold">{b.quantity.toLocaleString()}</p>
-                    <p className="text-xs text-[var(--text-secondary)] mt-1">{b.productName}</p>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-
-          {/* 일반 (스마트스토어) */}
-          <div className="space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
-              스마트스토어 <span className="text-[var(--text-quaternary)]">({hokRegularRows.length})</span>
-            </h2>
-            <Card>
-              {hokRegularRows.length === 0 ? (
-                <EmptyState title="No inventory" description="일반 재고가 없습니다." />
-              ) : (
-                <DataTable columns={columns} data={hokRegularRows} />
-              )}
-            </Card>
-          </div>
-
-          {/* 구분선 */}
-          <div className="border-t border-[var(--border)]" />
-
-          {/* 공구 */}
-          <div className="space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
-              공구 <span className="text-[var(--text-quaternary)]">({hokGongguRows.length})</span>
-            </h2>
-            <Card>
-              {hokGongguRows.length === 0 ? (
-                <EmptyState title="No inventory" description="공구 재고가 없습니다." />
-              ) : (
-                <DataTable columns={columns} data={hokGongguRows} />
-              )}
-            </Card>
-          </div>
-        </>
+        <HokInventoryClient
+          baselines={hokBaselineItems}
+          gongguRows={hokGongguRows.map((r): GongguInventoryRow => ({
+            id: r.id,
+            sku: r.sku,
+            name: r.name,
+            quantity: r.quantity,
+            reserved: r.reserved,
+            available: r.available,
+          }))}
+          regularRows={hokRegularRows as HokInventoryRow[]}
+          bomEntries={hokBomEntries}
+          companyId={hokCompany!.id}
+        />
       ) : companyGroups ? (
         companyGroups.map(([companyName, group]) => (
           <div key={companyName} className="space-y-3">

@@ -2,6 +2,34 @@ import type { NaverCredentials, NaverProduct } from "./types";
 import type { ExternalInventoryData } from "../types";
 import { naverFetch } from "./auth";
 
+/**
+ * Update stock quantity for a Naver origin product.
+ * Uses PATCH /v2/products/origin-products/{originProductNo}
+ */
+export async function updateNaverStock(
+  credentials: NaverCredentials,
+  originProductNo: string,
+  stockQuantity: number,
+): Promise<void> {
+  const res = await naverFetch(
+    credentials,
+    `/v2/products/origin-products/${originProductNo}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        originProduct: {
+          stockQuantity,
+        },
+      }),
+    },
+  );
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Naver stock update failed (${res.status}): ${body}`);
+  }
+}
+
 export async function fetchNaverInventory(
   credentials: NaverCredentials,
 ): Promise<ExternalInventoryData[]> {
