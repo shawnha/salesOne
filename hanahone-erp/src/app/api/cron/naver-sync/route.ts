@@ -5,6 +5,7 @@ import { recalculateHokInventory } from "@/lib/integrations/inventory-calculator
 import { naverConnector } from "@/lib/integrations/naver";
 import { decrypt } from "@/lib/integrations/encryption";
 import { validateCronSecret } from "@/lib/cron-auth";
+import * as notify from "@/lib/notifications";
 
 export const maxDuration = 300;
 
@@ -25,6 +26,48 @@ export async function GET(req: NextRequest) {
   }
 
   const result = await runSync(naverConnector, config.companyId);
+
+  // --- Notifications ---
+  if (result.errorMessage || result.recordsFailed > 0) {
+    await notify.send({
+      type: "SYNC_FAILED",
+      priority: "URGENT",
+      title: "Naver Sync Failed",
+      message: result.errorMessage || `${result.recordsFailed} records failed`,
+      data: { platform: "NAVER", recordsFailed: result.recordsFailed, recordsProcessed: result.recordsProcessed },
+      companyId: config.companyId,
+    });
+  } else if (result.recordsProcessed > 0) {
+    await notify.send({
+      type: "NEW_ORDERS",
+      priority: "NORMAL",
+      title: `${result.recordsProcessed} New Orders (Naver)`,
+      message: "Synced successfully",
+      data: { platform: "NAVER", count: result.recordsProcessed },
+      companyId: config.companyId,
+    });
+  }
+
+  // Check low stock for HOK
+  try {
+    const lowStock = await prisma.$queryRaw<{ productName: string; quantity: number; companyId: string }[]>`
+      SELECT p.name as "productName", i.quantity, i."companyId"
+      FROM public."Inventory" i JOIN public."Product" p ON i."productId" = p.id
+      WHERE i.quantity <= i."reorderLevel" AND i."reorderLevel" > 0
+      AND i."companyId" = ${config.companyId}
+    `;
+    for (const item of lowStock) {
+      await notify.send({
+        type: "LOW_STOCK",
+        priority: "URGENT",
+        title: `Low Stock: ${item.productName}`,
+        message: `${item.quantity} remaining`,
+        companyId: item.companyId,
+      });
+    }
+  } catch (err) {
+    console.error("Low stock check failed:", (err as Error).message);
+  }
 
   // Sync ExternalInventory (Naver-specific)
   try {

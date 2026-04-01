@@ -5,6 +5,7 @@ import { cgetcConnector } from "@/lib/integrations/connectors/cgetc";
 import { syncShippingCosts } from "@/lib/integrations/connectors/cgetc-shipping";
 import { decrypt } from "@/lib/integrations/encryption";
 import { validateCronSecret } from "@/lib/cron-auth";
+import * as notify from "@/lib/notifications";
 
 export const maxDuration = 120;
 
@@ -25,6 +26,48 @@ export async function GET(req: NextRequest) {
   }
 
   const result = await runSync(cgetcConnector, config.companyId);
+
+  // --- Notifications ---
+  if (result.errorMessage || result.recordsFailed > 0) {
+    await notify.send({
+      type: "SYNC_FAILED",
+      priority: "URGENT",
+      title: "CGETC Sync Failed",
+      message: result.errorMessage || `${result.recordsFailed} records failed`,
+      data: { platform: "CGETC", recordsFailed: result.recordsFailed, recordsProcessed: result.recordsProcessed },
+      companyId: config.companyId,
+    });
+  } else if (result.recordsProcessed > 0) {
+    await notify.send({
+      type: "NEW_ORDERS",
+      priority: "NORMAL",
+      title: `${result.recordsProcessed} New Orders (CGETC)`,
+      message: "Synced successfully",
+      data: { platform: "CGETC", count: result.recordsProcessed },
+      companyId: config.companyId,
+    });
+  }
+
+  // Check low stock
+  try {
+    const lowStock = await prisma.$queryRaw<{ productName: string; quantity: number; companyId: string }[]>`
+      SELECT p.name as "productName", i.quantity, i."companyId"
+      FROM public."Inventory" i JOIN public."Product" p ON i."productId" = p.id
+      WHERE i.quantity <= i."reorderLevel" AND i."reorderLevel" > 0
+      AND i."companyId" = ${config.companyId}
+    `;
+    for (const item of lowStock) {
+      await notify.send({
+        type: "LOW_STOCK",
+        priority: "URGENT",
+        title: `Low Stock: ${item.productName}`,
+        message: `${item.quantity} remaining`,
+        companyId: item.companyId,
+      });
+    }
+  } catch (err) {
+    console.error("Low stock check failed:", (err as Error).message);
+  }
 
   // Also sync shipping costs from CGETC portal
   let shippingResult = { synced: 0, total: 0 };
