@@ -48,6 +48,7 @@ model Company {
   reconciliationAdjustments   ReconciliationAdjustment[]
   inventoryBaselines          InventoryBaseline[]
   shippingBatches             ShippingBatch[]
+  notifications               Notification[]
 
   @@map("companies")
   @@schema("public")
@@ -659,4 +660,23 @@ model ShippingBatchItem {
   @@unique([batchId, rowNumber])
   @@map("shipping_batch_items")
   @@schema("salesone")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  type      String   // SYNC_FAILED, LOW_STOCK, NEW_ORDERS
+  priority  String   // URGENT, NORMAL
+  title     String
+  message   String
+  data      Json?
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+  sentVia   String?  // "telegram", "slack", null
+  readAt    DateTime?
+  sentAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt(sort: Desc)])
+  @@index([readAt])
+  @@schema("public")
 }
