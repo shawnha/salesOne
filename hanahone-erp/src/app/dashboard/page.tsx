@@ -3,6 +3,7 @@ import { KpiRow } from "@/components/dashboard/kpi-row";
 import { CompanyBreakdown } from "@/components/dashboard/company-breakdown";
 import { RecentOrders } from "@/components/dashboard/recent-orders";
 import { LowStockAlerts } from "@/components/dashboard/low-stock-alerts";
+import { SystemAlerts } from "@/components/dashboard/system-alerts";
 import { ProductionSummary } from "@/components/dashboard/production-summary";
 import { DateFilter } from "@/components/ui/date-filter";
 import { fetchCgetcInventory, type CgetcProduct } from "@/lib/integrations/connectors/cgetc";
@@ -202,6 +203,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
             <RecentOrders orders={orders.map((o) => ({ id: o.id, orderNumber: o.orderNumber, customerName: o.customer?.name || "—", status: o.fulfillmentStatus, totalAmount: Number(o.totalAmount), externalSource: o.externalSource, isTransfer: o.type === "INTER_COMPANY", transferLabel: o.transfer ? `${o.transfer.fromCompany.name} → ${o.transfer.toCompany.name}` : undefined }))} />
           </div>
           <div className="col-span-4 space-y-4">
+            <SystemAlerts />
             <LowStockAlerts items={lowStock.map((inv) => ({ productName: inv.product.name, companyName: inv.company.name, reorderLevel: inv.reorderLevel, quantity: inv.quantity, daysLeft: inv.daysLeft, burnRate: inv.burnRate }))} />
             {activeProduction.length > 0 && (
               <ProductionSummary items={activeProduction.map((po) => ({
