@@ -8,7 +8,9 @@ export default auth((req) => {
   const isLoggedIn = !!req.auth;
   const isLoginPage = req.nextUrl.pathname === "/login";
   const isApiAuth = req.nextUrl.pathname.startsWith("/api/auth");
-  if (isApiAuth) return NextResponse.next();
+  const isApiCron = req.nextUrl.pathname.startsWith("/api/cron");
+  const isTelegramWebhook = req.nextUrl.pathname === "/api/telegram/webhook";
+  if (isApiAuth || isApiCron || isTelegramWebhook) return NextResponse.next();
   if (!isLoggedIn && !isLoginPage) {
     return NextResponse.redirect(new URL("/login", req.url));
   }

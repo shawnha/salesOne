@@ -324,6 +324,7 @@ export default async function InventoryPage({
 
   // HOK: fetch BOM for gonggu → component deduction calculation
   const hokBomEntries: BomEntry[] = [];
+  const naverProductNoByProductId = new Map<string, string>();
   if (isHokView) {
     const bom = await prisma.billOfMaterials.findMany({
       where: { companyId: hokCompany!.id },
@@ -342,16 +343,19 @@ export default async function InventoryPage({
       }
     }
 
-    // Fetch Naver product number mappings (원상품 only)
+    // Fetch Naver product number mappings (원상품 + 공구)
     const naverMappings = await prisma.skuMapping.findMany({
       where: {
         companyId: hokCompany!.id,
         platform: "NAVER",
-        displayName: { contains: "원상품" },
+        productId: { not: null },
+        OR: [
+          { displayName: { contains: "원상품" } },
+          { isGonggu: true },
+        ],
       },
       select: { externalSku: true, productId: true },
     });
-    const naverProductNoByProductId = new Map<string, string>();
     for (const m of naverMappings) {
       if (m.productId) naverProductNoByProductId.set(m.productId, m.externalSku);
     }
@@ -406,14 +410,20 @@ export default async function InventoryPage({
       {isHokView ? (
         <HokInventoryClient
           baselines={hokBaselineItems}
-          gongguRows={hokGongguRows.map((r): GongguInventoryRow => ({
-            id: r.id,
-            sku: r.sku,
-            name: r.name,
-            quantity: r.quantity,
-            reserved: r.reserved,
-            available: r.available,
-          }))}
+          gongguRows={hokGongguRows.map((r): GongguInventoryRow => {
+            const inv = inventories.find((i) => i.id === r.id);
+            const naverNo = inv ? naverProductNoByProductId.get(inv.productId) : undefined;
+            return {
+              id: r.id,
+              productId: inv?.productId || "",
+              sku: r.sku,
+              name: r.name,
+              quantity: r.quantity,
+              reserved: r.reserved,
+              available: r.available,
+              naverProductNo: naverNo,
+            };
+          })}
           regularRows={hokRegularRows as HokInventoryRow[]}
           bomEntries={hokBomEntries}
           companyId={hokCompany!.id}

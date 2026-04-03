@@ -3,6 +3,7 @@ import { decrypt } from "./encryption";
 import { SyncStatus } from "@prisma/client";
 import type { Connector, SyncResult } from "./types";
 import { mapExternalOrder, mapFulfillmentStatus, mapFinancialStatus } from "./mappers/order-mapper";
+import { adjustInventoryForOrder } from "./inventory-deduction";
 
 const STALE_JOB_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
 
@@ -100,6 +101,13 @@ export async function runSync(connector: Connector, companyId: string): Promise<
               where: { id: existing.id },
               data: { rawData: extOrder.rawData },
             });
+
+            // Adjust inventory on status change (deduct or restore)
+            try {
+              await adjustInventoryForOrder(existing.mappedOrder.id);
+            } catch (err) {
+              console.error("Inventory adjustment failed for order", existing.mappedOrder.id, (err as Error).message);
+            }
           }
           processed++;
           continue;
@@ -120,6 +128,13 @@ export async function runSync(connector: Connector, companyId: string): Promise<
             status: "MAPPED",
           },
         });
+
+        // Auto-deduct inventory for new orders
+        try {
+          await adjustInventoryForOrder(mappedOrder.id);
+        } catch (err) {
+          console.error("Inventory deduction failed for order", mappedOrder.id, (err as Error).message);
+        }
 
         processed++;
       } catch {

@@ -12,11 +12,13 @@ export type BaselineItem = { sku: string; productName: string; quantity: number 
 
 export type GongguInventoryRow = {
   id: string;           // Inventory record id
+  productId: string;    // Product record id (for BOM editing)
   sku: string;
   name: string;
   quantity: number;      // on-hand
   reserved: number;
   available: number;
+  naverProductNo?: string;
 };
 
 export type BomEntry = {
@@ -158,16 +160,27 @@ export function HokInventoryClient({
   const router = useRouter();
   const [gongguRows, setGongguRows] = useState(initialGongguRows);
   const [regRows, setRegRows] = useState(regularRows);
+  const [baselineData, setBaselineData] = useState(baselines);
 
   // Calculate deductions
   const deductions = calculateDeductions(gongguRows, bomEntries);
 
   // Build available inventory: baseline - deductions
-  const availableItems = baselines.map((b) => ({
+  const availableItems = baselineData.map((b) => ({
     ...b,
     allocated: deductions.get(b.sku) || 0,
     available: b.quantity - (deductions.get(b.sku) || 0),
   }));
+
+  // Override smartstore On Hand with baseline-derived available
+  const availableBySku = new Map(availableItems.map((a) => [a.sku, a.available]));
+  const adjustedRegRows = regRows.map((r) => {
+    const baselineAvail = availableBySku.get(r.sku);
+    if (baselineAvail !== undefined) {
+      return { ...r, quantity: baselineAvail, available: baselineAvail - r.reserved };
+    }
+    return r;
+  });
 
   const [error, setError] = useState<string | null>(null);
 
@@ -192,20 +205,27 @@ export function HokInventoryClient({
     router.refresh();
   };
 
-  const handleSaveRegular = async (inventoryId: string, newQuantity: number) => {
+  const handleSaveRegular = async (sku: string, newSmartOnHand: number) => {
+    // 스마트스토어 On Hand 변경 → baseline = newSmartOnHand + 공구 할당
+    const allocated = deductions.get(sku) || 0;
+    const newBaseline = newSmartOnHand + allocated;
+    await handleSaveBaseline(sku, newBaseline);
+  };
+
+  const handleSaveBaseline = async (sku: string, newQuantity: number) => {
     setError(null);
-    const res = await fetch("/api/inventory/gonggu", {
+    const res = await fetch("/api/inventory/baseline", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inventoryId, quantity: newQuantity }),
+      body: JSON.stringify({ companyId, sku, quantity: newQuantity }),
     });
     if (!res.ok) {
       const body = await res.text();
       setError(`API error ${res.status}: ${body}`);
       throw new Error(body);
     }
-    setRegRows((prev) =>
-      prev.map((r) => (r.id === inventoryId ? { ...r, quantity: newQuantity, available: newQuantity - r.reserved } : r))
+    setBaselineData((prev) =>
+      prev.map((b) => (b.sku === sku ? { ...b, quantity: newQuantity } : b))
     );
     router.refresh();
   };
@@ -215,7 +235,7 @@ export function HokInventoryClient({
   const [syncResult, setSyncResult] = useState<string | null>(null);
 
   const handleNaverSync = async () => {
-    const syncItems = regRows
+    const syncItems = adjustedRegRows
       .filter((r) => r.naverProductNo)
       .map((r) => ({ naverProductNo: r.naverProductNo!, quantity: r.quantity }));
     if (syncItems.length === 0) {
@@ -249,13 +269,111 @@ export function HokInventoryClient({
     }
   };
 
+  // BOM edit modal state
+  const [bomEditTarget, setBomEditTarget] = useState<GongguInventoryRow | null>(null);
+  const [bomStarterInput, setBomStarterInput] = useState(0);
+  const [bomRefillInput, setBomRefillInput] = useState(0);
+  const [bomSaving, setBomSaving] = useState(false);
+
+  // Add gonggu modal state
+  const [showAddGonggu, setShowAddGonggu] = useState(false);
+  const [addStarter, setAddStarter] = useState(0);
+  const [addRefill, setAddRefill] = useState(0);
+  const [addNaver, setAddNaver] = useState("");
+  const [addOnHand, setAddOnHand] = useState(0);
+  const [addSaving, setAddSaving] = useState(false);
+
+  // Auto-generate name and SKU from BOM
+  const addTotal = addStarter * 5 + addRefill * 30;
+  const autoName = addTotal > 0 ? `ODD M-01 ${addTotal}개입 (공구)` : "";
+  const autoSku = addTotal > 0 ? `ODD-M01-${addTotal}G` : "";
+
+  const openBomEdit = (row: GongguInventoryRow) => {
+    const boms = bomEntries.filter((b) => b.finishedSku === row.sku);
+    const starterBom = boms.find((b) => b.rawSku === "ODD-M01-5");
+    const refillBom = boms.find((b) => b.rawSku === "ODD-M01-30");
+    setBomStarterInput(starterBom?.quantityRequired || 0);
+    setBomRefillInput(refillBom?.quantityRequired || 0);
+    setBomEditTarget(row);
+  };
+
+  const saveBom = async () => {
+    if (!bomEditTarget) return;
+    setBomSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/inventory/bom", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId,
+          productId: bomEditTarget.productId,
+          starterQty: bomStarterInput,
+          refillQty: bomRefillInput,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.text();
+        setError(`BOM 저장 실패: ${body}`);
+        return;
+      }
+      setBomEditTarget(null);
+      router.refresh();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setBomSaving(false);
+    }
+  };
+
+  const saveAddGonggu = async () => {
+    setAddSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/inventory/gonggu-product", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId,
+          name: autoName,
+          sku: autoSku,
+          starterQty: addStarter,
+          refillQty: addRefill,
+          naverProductNo: addNaver || undefined,
+          initialOnHand: addOnHand,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.text();
+        setError(`공구 추가 실패: ${body}`);
+        return;
+      }
+      setShowAddGonggu(false);
+      setAddStarter(0); setAddRefill(0); setAddNaver(""); setAddOnHand(0);
+      router.refresh();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setAddSaving(false);
+    }
+  };
+
   // Gonggu table columns
   const gongguColumns = [
     {
       key: "name",
       header: "상품",
       render: (row: GongguInventoryRow) => (
-        <span className="font-semibold">{row.name}</span>
+        <div>
+          <span className="font-semibold">{row.name}</span>
+          {row.naverProductNo && (
+            <div className="mt-1">
+              <span className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded bg-[#03C75A]/10 text-[#03C75A]">
+                N {row.naverProductNo}
+              </span>
+            </div>
+          )}
+        </div>
       ),
     },
     {
@@ -289,25 +407,43 @@ export function HokInventoryClient({
     },
     {
       key: "components",
-      header: "구성품 할당",
-      align: "right" as const,
+      header: "구성품",
       render: (row: GongguInventoryRow) => {
         const boms = bomEntries.filter((b) => b.finishedSku === row.sku);
         if (boms.length === 0) return <span className="text-[var(--text-quaternary)]">—</span>;
         return (
-          <div className="space-y-0.5">
+          <div className="flex flex-wrap gap-1">
             {boms.map((b) => {
-              const total = row.quantity * b.quantityRequired;
               const label = b.rawSku === "ODD-M01-5" ? "스타터키트" : "리필팩";
+              const color = b.rawSku === "ODD-M01-5"
+                ? "bg-teal-500/10 text-teal-500"
+                : "bg-indigo-500/10 text-indigo-400";
               return (
-                <div key={b.rawSku} className="text-[11px] text-[var(--text-secondary)]">
-                  {label}: <span className="font-semibold text-amber-600">{total.toLocaleString()}</span>
-                </div>
+                <button
+                  key={b.rawSku}
+                  onClick={() => openBomEdit(row)}
+                  className={`inline-flex px-2 py-0.5 text-[11px] font-medium rounded-full ${color} hover:brightness-125 transition cursor-pointer`}
+                >
+                  {label} x{b.quantityRequired}
+                </button>
               );
             })}
           </div>
         );
       },
+    },
+    {
+      key: "edit",
+      header: "",
+      render: (row: GongguInventoryRow) => (
+        <button
+          onClick={() => openBomEdit(row)}
+          className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition text-sm px-1"
+          title="구성 편집"
+        >
+          &#9998;
+        </button>
+      ),
     },
   ];
 
@@ -336,7 +472,7 @@ export function HokInventoryClient({
       render: (row: InventoryRow) => (
         <EditableQuantity
           value={row.quantity}
-          onSave={(val) => handleSaveRegular(row.id, val)}
+          onSave={(val) => handleSaveRegular(row.sku, val)}
         />
       ),
     },
@@ -385,13 +521,18 @@ export function HokInventoryClient({
         </div>
       )}
       {/* 전체 재고 카드 */}
-      {baselines.length > 0 && (
+      {baselineData.length > 0 && (
         <Card className="p-5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)] mb-4">전체 재고</h2>
           <div className="grid grid-cols-2 gap-6">
             {availableItems.map((item) => (
               <div key={item.sku} className="text-center">
-                <p className="text-2xl font-bold">{item.quantity.toLocaleString()}</p>
+                <div className="text-2xl font-bold flex justify-center">
+                  <EditableQuantity
+                    value={item.quantity}
+                    onSave={(val) => handleSaveBaseline(item.sku, val)}
+                  />
+                </div>
                 <p className="text-xs text-[var(--text-secondary)] mt-1">{item.productName}</p>
                 {item.allocated > 0 && (
                   <div className="mt-2 space-y-0.5">
@@ -414,7 +555,7 @@ export function HokInventoryClient({
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
-            스마트스토어 <span className="text-[var(--text-quaternary)]">({regRows.length})</span>
+            스마트스토어 <span className="text-[var(--text-quaternary)]">({adjustedRegRows.length})</span>
           </h2>
           <div className="flex items-center gap-2">
             {syncResult && (
@@ -432,10 +573,10 @@ export function HokInventoryClient({
           </div>
         </div>
         <Card>
-          {regRows.length === 0 ? (
+          {adjustedRegRows.length === 0 ? (
             <div className="py-12 text-center text-[var(--text-tertiary)] text-sm">일반 재고가 없습니다.</div>
           ) : (
-            <DataTableInline columns={regularColumns} data={regRows} />
+            <DataTableInline columns={regularColumns} data={adjustedRegRows} />
           )}
         </Card>
       </div>
@@ -445,9 +586,17 @@ export function HokInventoryClient({
 
       {/* 공구 */}
       <div className="space-y-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
-          공구 <span className="text-[var(--text-quaternary)]">({gongguRows.length})</span>
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+            공구 <span className="text-[var(--text-quaternary)]">({gongguRows.length})</span>
+          </h2>
+          <button
+            onClick={() => setShowAddGonggu(true)}
+            className="text-[11px] font-medium px-3 py-1.5 rounded-full bg-teal-500/10 text-teal-500 hover:bg-teal-500/20 transition-colors"
+          >
+            + 공구 추가
+          </button>
+        </div>
         <Card>
           {gongguRows.length === 0 ? (
             <div className="py-12 text-center text-[var(--text-tertiary)] text-sm">공구 재고가 없습니다.</div>
@@ -456,6 +605,135 @@ export function HokInventoryClient({
           )}
         </Card>
       </div>
+
+      {/* BOM 편집 모달 */}
+      {bomEditTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setBomEditTarget(null)}>
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-7 w-[400px] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-bold mb-1">구성 편집</h3>
+            <p className="text-[13px] text-[var(--text-secondary)] mb-5">{bomEditTarget.name}</p>
+
+            <div className="bg-black/[0.03] dark:bg-white/[0.03] rounded-xl p-4 mb-5">
+              <p className="text-[11px] font-semibold uppercase text-[var(--text-tertiary)] mb-3">구성품 (BOM)</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-semibold text-[var(--text-tertiary)] block mb-1">5개입 (스타터키트)</label>
+                  <input
+                    type="number" min={0} value={bomStarterInput}
+                    onChange={(e) => setBomStarterInput(parseInt(e.target.value) || 0)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--bg)] outline-none focus:border-teal-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-[var(--text-tertiary)] block mb-1">30개입 (리필팩)</label>
+                  <input
+                    type="number" min={0} value={bomRefillInput}
+                    onChange={(e) => setBomRefillInput(parseInt(e.target.value) || 0)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--bg)] outline-none focus:border-teal-500"
+                  />
+                </div>
+              </div>
+              <p className="text-[12px] text-[var(--text-secondary)] mt-3 pt-3 border-t border-[var(--border)]">
+                = <span className="font-semibold text-[var(--text-primary)]">
+                  {[bomRefillInput > 0 && `30개입 ${bomRefillInput}개`, bomStarterInput > 0 && `5개입 ${bomStarterInput}개`].filter(Boolean).join(" + ") || "구성품 없음"}
+                </span>
+                {" "}= 총 <span className="font-semibold text-[var(--text-primary)]">{bomStarterInput * 5 + bomRefillInput * 30}개입</span>
+              </p>
+            </div>
+
+            {bomEditTarget.naverProductNo && (
+              <div className="mb-5">
+                <p className="text-[11px] font-semibold text-[var(--text-tertiary)] mb-1">네이버 연결</p>
+                <span className="inline-flex px-2 py-1 text-[11px] font-medium rounded bg-[#03C75A]/10 text-[#03C75A]">
+                  N {bomEditTarget.naverProductNo}
+                </span>
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setBomEditTarget(null)} className="px-4 py-2 text-[13px] rounded-lg border border-[var(--border)] text-[var(--text-secondary)]">취소</button>
+              <button onClick={saveBom} disabled={bomSaving} className="px-4 py-2 text-[13px] font-semibold rounded-lg bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50">
+                {bomSaving ? "저장 중..." : "저장"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 공구 추가 모달 */}
+      {showAddGonggu && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowAddGonggu(false)}>
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-7 w-[420px] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-bold mb-5">공구 추가</h3>
+
+            <div className="bg-black/[0.03] dark:bg-white/[0.03] rounded-xl p-4 mb-5">
+              <p className="text-[11px] font-semibold uppercase text-[var(--text-tertiary)] mb-3">구성품 (BOM)</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-semibold text-[var(--text-tertiary)] block mb-1">5개입 (스타터키트)</label>
+                  <input
+                    type="number" min={0} value={addStarter}
+                    onChange={(e) => setAddStarter(parseInt(e.target.value) || 0)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--bg)] outline-none focus:border-teal-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-[var(--text-tertiary)] block mb-1">30개입 (리필팩)</label>
+                  <input
+                    type="number" min={0} value={addRefill}
+                    onChange={(e) => setAddRefill(parseInt(e.target.value) || 0)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--bg)] outline-none focus:border-teal-500"
+                  />
+                </div>
+              </div>
+              {(addStarter > 0 || addRefill > 0) && (
+                <p className="text-[12px] text-[var(--text-secondary)] mt-3 pt-3 border-t border-[var(--border)]">
+                  = <span className="font-semibold text-[var(--text-primary)]">
+                    {[addRefill > 0 && `30개입 ${addRefill}개`, addStarter > 0 && `5개입 ${addStarter}개`].filter(Boolean).join(" + ")}
+                  </span>
+                  {" "}= 총 <span className="font-semibold text-[var(--text-primary)]">{addStarter * 5 + addRefill * 30}개입</span>
+                </p>
+              )}
+              {autoName && (
+                <div className="mt-3 pt-3 border-t border-[var(--border)] space-y-1">
+                  <p className="text-[12px] text-[var(--text-secondary)]">상품명: <span className="font-semibold text-[var(--text-primary)]">{autoName}</span></p>
+                  <p className="text-[12px] text-[var(--text-secondary)]">SKU: <span className="font-mono font-semibold text-[var(--text-primary)]">{autoSku}</span></p>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4 mb-5">
+              <div>
+                <label className="text-[11px] font-semibold text-[var(--text-tertiary)] block mb-1">네이버 상품번호 (선택)</label>
+                <input
+                  type="text" value={addNaver} onChange={(e) => setAddNaver(e.target.value)}
+                  placeholder="예: 13211473942"
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--bg)] outline-none focus:border-teal-500"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold text-[var(--text-tertiary)] block mb-1">초기 On Hand</label>
+                <input
+                  type="number" min={0} value={addOnHand}
+                  onChange={(e) => setAddOnHand(parseInt(e.target.value) || 0)}
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--bg)] outline-none focus:border-teal-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setShowAddGonggu(false)} className="px-4 py-2 text-[13px] rounded-lg border border-[var(--border)] text-[var(--text-secondary)]">취소</button>
+              <button
+                onClick={saveAddGonggu}
+                disabled={addSaving || addTotal === 0}
+                className="px-4 py-2 text-[13px] font-semibold rounded-lg bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50"
+              >
+                {addSaving ? "추가 중..." : "추가"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

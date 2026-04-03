@@ -73,6 +73,30 @@ export async function GET(req: NextRequest) {
   try {
     const credentials = JSON.parse(decrypt(config.credentials));
     await naverConnector.syncInventory(credentials, config.companyId);
+
+    // Check for broken mappings: mapped products missing from Naver
+    const mappings = await prisma.skuMapping.findMany({
+      where: { companyId: config.companyId, platform: "NAVER", productId: { not: null } },
+      include: { product: { select: { name: true } } },
+    });
+    const naverSkus = await prisma.externalInventory.findMany({
+      where: { companyId: config.companyId, platform: "NAVER" },
+      select: { externalSku: true },
+    });
+    const naverSkuSet = new Set(naverSkus.map((s) => s.externalSku));
+
+    for (const m of mappings) {
+      if (!naverSkuSet.has(m.externalSku)) {
+        await notify.send({
+          type: "MAPPING_BROKEN",
+          priority: "URGENT",
+          title: `매핑 끊어짐: ${m.product?.name || m.displayName}`,
+          message: `네이버 상품번호 ${m.externalSku}가 스마트스토어에서 발견되지 않습니다.`,
+          data: { externalSku: m.externalSku, productName: m.product?.name },
+          companyId: config.companyId,
+        });
+      }
+    }
   } catch (err) {
     console.error("Naver inventory sync failed:", (err as Error).message);
   }

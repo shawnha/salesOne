@@ -69,17 +69,25 @@ export default async function ReconciliationPage({
   }
 
   if (!hasCgetc || cgetcError) {
-    // Use DB inventory as actual
-    const dbInventory = await prisma.inventory.findMany({
-      where: { companyId },
-      include: { product: { select: { sku: true } } },
-    });
-    for (const inv of dbInventory) {
-      if (inv.product.sku) {
-        actualBySku[inv.product.sku] = (actualBySku[inv.product.sku] || 0) + inv.quantity;
+    // For companies with baselines (e.g. HOK), use baseline as actual (auto-deducted on sales)
+    // For others, use DB inventory
+    if (baselines.length > 0) {
+      for (const b of baselines) {
+        actualBySku[b.sku] = b.quantity;
       }
+      liveSource = "Baseline";
+    } else {
+      const dbInventory = await prisma.inventory.findMany({
+        where: { companyId },
+        include: { product: { select: { sku: true } } },
+      });
+      for (const inv of dbInventory) {
+        if (inv.product.sku) {
+          actualBySku[inv.product.sku] = (actualBySku[inv.product.sku] || 0) + inv.quantity;
+        }
+      }
+      liveSource = "DB";
     }
-    liveSource = "DB";
   }
 
   const hasBaselines = baselines.length > 0;

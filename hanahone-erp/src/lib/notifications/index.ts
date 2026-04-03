@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { sendTelegram } from "./telegram";
 
-export type NotificationType = "SYNC_FAILED" | "LOW_STOCK" | "NEW_ORDERS";
+export type NotificationType = "SYNC_FAILED" | "LOW_STOCK" | "NEW_ORDERS" | "MAPPING_BROKEN";
 export type NotificationPriority = "URGENT" | "NORMAL";
 
 export async function send(params: {
@@ -12,12 +12,12 @@ export async function send(params: {
   data?: Record<string, any>;
   companyId?: string;
 }): Promise<void> {
-  // Dedup: skip LOW_STOCK with same title within 24h
-  if (params.type === "LOW_STOCK") {
+  // Dedup: skip LOW_STOCK/MAPPING_BROKEN with same title within 24h
+  if (params.type === "LOW_STOCK" || params.type === "MAPPING_BROKEN") {
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const existing = await prisma.notification.findFirst({
       where: {
-        type: "LOW_STOCK",
+        type: params.type,
         title: params.title,
         createdAt: { gte: twentyFourHoursAgo },
       },
