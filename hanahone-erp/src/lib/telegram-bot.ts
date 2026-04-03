@@ -68,7 +68,7 @@ async function handleInventory(args: string): Promise<string> {
       orderBy: { quantity: "asc" },
     });
 
-    let lines = [`[${company.name} 재고]`];
+    const lines = [`[${company.name} 재고]`];
 
     if (baselines.length > 0) {
       lines.push("--- Baseline ---");
@@ -90,12 +90,9 @@ async function handleInventory(args: string): Promise<string> {
 
   // All companies summary
   const companies = await prisma.company.findMany({ select: { id: true, name: true } });
-  let lines = ["[전체 재고 요약]"];
+  const lines = ["[전체 재고 요약]"];
   for (const c of companies) {
     const count = await prisma.inventory.count({ where: { companyId: c.id } });
-    const lowStock = await prisma.inventory.count({
-      where: { companyId: c.id, quantity: { lte: prisma.inventory.fields?.reorderLevel ?? 0 } },
-    });
     lines.push(`${c.name}: ${count}개 상품`);
   }
   return lines.join("\n");
@@ -132,7 +129,7 @@ async function handleOrders(args: string): Promise<string> {
     byCompany.set(key, current);
   }
 
-  let lines = [`[어제 주문 (${yesterday.toLocaleDateString("ko-KR")})]`];
+  const lines = [`[어제 주문 (${yesterday.toLocaleDateString("ko-KR")})]`];
   if (byCompany.size === 0) {
     lines.push("주문 없음");
   } else {
@@ -172,7 +169,7 @@ async function handleSales(args: string): Promise<string> {
   }
 
   const monthStr = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
-  let lines = [`[${monthStr} 매출 MTD]`];
+  const lines = [`[${monthStr} 매출 MTD]`];
   if (byCompany.size === 0) {
     lines.push("매출 없음");
   } else {
@@ -212,7 +209,7 @@ export async function generateDailySummary(): Promise<string> {
     orderBy: { name: "asc" },
   });
 
-  let lines = [`[일일 요약] ${dateStr}`, ""];
+  const lines = [`[일일 요약] ${dateStr}`, ""];
 
   for (const company of companies) {
     const orders = await prisma.order.findMany({

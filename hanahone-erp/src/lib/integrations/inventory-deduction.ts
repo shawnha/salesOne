@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/prisma";
-import type { Prisma } from "@prisma/client";
 
 const SYSTEM_USER_EMAIL = "system@hanahone.internal";
 

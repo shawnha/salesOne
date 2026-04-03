@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notification UI Options</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8f9fa; color: #0f1419; }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 40px 20px; }
+  h1 { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+  .subtitle { color: #536471; font-size: 14px; margin-bottom: 40px; }
+
+  .option { margin-bottom: 60px; }
+  .option-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+  .option-label { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: #0d9488; color: white; border-radius: 50%; font-weight: 700; font-size: 14px; }
+  .option-title { font-size: 18px; font-weight: 700; }
+  .option-desc { color: #536471; font-size: 13px; margin-left: 44px; margin-bottom: 16px; }
+
+  /* Shared nav bar */
+  .nav-bar {
+    background: white;
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 9999px;
+    padding: 10px 24px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 4px 20px -2px rgba(0,0,0,0.06);
+    margin-bottom: 20px;
+  }
+  .nav-logo { font-weight: 700; font-size: 15px; }
+  .nav-logo span { color: #0d9488; }
+  .nav-links { display: flex; gap: 4px; }
+  .nav-link { padding: 6px 12px; font-size: 12px; font-weight: 500; color: #536471; border-radius: 9999px; text-decoration: none; }
+  .nav-link.active { color: #0d9488; background: rgba(13,148,136,0.08); }
+  .nav-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .nav-bell { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; border: none; background: none; font-size: 16px; color: #8899a6; }
+  .nav-bell:hover { background: rgba(0,0,0,0.04); }
+  .nav-bell .badge { position: absolute; top: 2px; right: 2px; width: 16px; height: 16px; background: #ef4444; color: white; font-size: 9px; font-weight: 700; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+
+  /* Bell dropdown */
+  .bell-dropdown {
+    position: absolute; top: 40px; right: 0; width: 360px; background: white;
+    border: 1px solid rgba(0,0,0,0.08); border-radius: 16px;
+    box-shadow: 0 12px 32px -8px rgba(0,0,0,0.15); z-index: 100; overflow: hidden;
+  }
+  .bell-dropdown-header { padding: 14px 16px; border-bottom: 1px solid rgba(0,0,0,0.06); display: flex; align-items: center; justify-content: space-between; }
+  .bell-dropdown-header h3 { font-size: 13px; font-weight: 700; }
+  .bell-dropdown-header a { font-size: 11px; color: #0d9488; text-decoration: none; }
+  .bell-item { padding: 12px 16px; border-bottom: 1px solid rgba(0,0,0,0.04); display: flex; gap: 10px; }
+  .bell-item:hover { background: rgba(0,0,0,0.02); }
+  .bell-item.unread { background: rgba(13,148,136,0.03); }
+  .bell-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+  .bell-dot.red { background: #ef4444; }
+  .bell-dot.amber { background: #f59e0b; }
+  .bell-dot.blue { background: #3b82f6; }
+  .bell-content { flex: 1; }
+  .bell-title { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+  .bell-desc { font-size: 11px; color: #536471; }
+  .bell-time { font-size: 10px; color: #8899a6; margin-top: 3px; }
+
+  /* Dashboard card */
+  .dashboard-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+  .card { background: rgba(0,0,0,0.02); border: 1px solid rgba(0,0,0,0.06); border-radius: 24px; padding: 6px; }
+  .card-inner { background: white; border-radius: 18px; padding: 24px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.8); }
+  .card-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #8899a6; margin-bottom: 16px; }
+
+  /* Alert items in dashboard */
+  .alert-item { display: flex; align-items: start; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,0.04); }
+  .alert-item:last-child { border-bottom: none; }
+  .alert-icon { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
+  .alert-icon.red { background: rgba(239,68,68,0.08); }
+  .alert-icon.amber { background: rgba(245,158,11,0.08); }
+  .alert-icon.blue { background: rgba(59,130,246,0.08); }
+  .alert-icon.green { background: rgba(13,148,136,0.08); }
+  .alert-text { flex: 1; }
+  .alert-text h4 { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+  .alert-text p { font-size: 11px; color: #536471; }
+  .alert-time { font-size: 10px; color: #8899a6; white-space: nowrap; }
+
+  /* Placeholder content */
+  .placeholder { background: rgba(0,0,0,0.03); border-radius: 12px; height: 120px; display: flex; align-items: center; justify-content: center; color: #8899a6; font-size: 12px; }
+
+  .mockup-frame { border: 2px solid rgba(0,0,0,0.08); border-radius: 16px; overflow: hidden; background: #f8f9fa; padding: 16px; }
+
+  .divider { border-top: 2px dashed rgba(0,0,0,0.08); margin: 60px 0; }
+
+  /* Highlight */
+  .highlight { position: relative; }
+  .highlight::after { content: ''; position: absolute; inset: -4px; border: 2px dashed #0d9488; border-radius: 20px; pointer-events: none; }
+
+  .tag { display: inline-flex; padding: 2px 8px; font-size: 10px; font-weight: 600; border-radius: 9999px; }
+  .tag.instant { background: rgba(239,68,68,0.08); color: #ef4444; }
+  .tag.daily { background: rgba(59,130,246,0.08); color: #3b82f6; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>알림 UI 옵션</h1>
+  <p class="subtitle">각 옵션을 비교하고 선택해주세요. 복합 선택도 가능합니다.</p>
+
+  <!-- Option A -->
+  <div class="option">
+    <div class="option-header">
+      <span class="option-label">A</span>
+      <span class="option-title">대시보드 알림 카드</span>
+    </div>
+    <p class="option-desc">대시보드 오른쪽에 "System Alerts" 카드 추가. Low Stock 위에 위치. 대시보드에서만 확인 가능.</p>
+
+    <div class="mockup-frame">
+      <div class="nav-bar">
+        <div class="nav-logo">Hanah<span>One</span></div>
+        <div class="nav-links">
+          <a class="nav-link active" href="#">Dashboard</a>
+          <a class="nav-link" href="#">Sales</a>
+          <a class="nav-link" href="#">Orders</a>
+          <a class="nav-link" href="#">Inventory</a>
+        </div>
+        <div class="nav-right">
+          <span style="font-size:12px; color:#8899a6;">🌙</span>
+          <span style="font-size:12px; color:#8899a6;">⚙️</span>
+        </div>
+      </div>
+
+      <div class="dashboard-grid">
+        <div>
+          <div class="placeholder">Recent Orders / KPI Cards</div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:16px;">
+          <div class="card highlight">
+            <div class="card-inner">
+              <div class="card-title">System Alerts <span class="tag instant" style="margin-left:8px;">3 new</span></div>
+              <div class="alert-item">
+                <div class="alert-icon red">⚠</div>
+                <div class="alert-text">
+                  <h4>CGETC Sync Failed</h4>
+                  <p>Connection timeout after 120s</p>
+                </div>
+                <span class="alert-time">02:00</span>
+              </div>
+              <div class="alert-item">
+                <div class="alert-icon amber">📦</div>
+                <div class="alert-text">
+                  <h4>Low Stock: Refill-pack</h4>
+                  <p>248 remaining — 572 days left</p>
+                </div>
+                <span class="alert-time">02:01</span>
+              </div>
+              <div class="alert-item">
+                <div class="alert-icon blue">🛒</div>
+                <div class="alert-text">
+                  <h4>12 New Orders (Naver)</h4>
+                  <p>₩2,580,000 total</p>
+                </div>
+                <span class="alert-time">03:00</span>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-inner">
+              <div class="card-title">Low Stock Alerts</div>
+              <div style="color:#8899a6; font-size:12px;">기존 Low Stock 카드...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- Option B -->
+  <div class="option">
+    <div class="option-header">
+      <span class="option-label">B</span>
+      <span class="option-title">글로벌 알림 벨</span>
+    </div>
+    <p class="option-desc">상단 네비게이션에 🔔 아이콘 + 드롭다운. 모든 페이지에서 접근 가능. 읽지 않은 수 배지 표시.</p>
+
+    <div class="mockup-frame">
+      <div class="nav-bar">
+        <div class="nav-logo">Hanah<span>One</span></div>
+        <div class="nav-links">
+          <a class="nav-link" href="#">Dashboard</a>
+          <a class="nav-link active" href="#">Orders</a>
+          <a class="nav-link" href="#">Inventory</a>
+          <a class="nav-link" href="#">Products</a>
+        </div>
+        <div class="nav-right" style="position:relative;">
+          <div class="highlight" style="border-radius:50%;">
+            <button class="nav-bell">
+              🔔
+              <span class="badge">3</span>
+            </button>
+            <div class="bell-dropdown">
+              <div class="bell-dropdown-header">
+                <h3>Notifications</h3>
+                <a href="#">Mark all read</a>
+              </div>
+              <div class="bell-item unread">
+                <span class="bell-dot red"></span>
+                <div class="bell-content">
+                  <div class="bell-title">CGETC Sync Failed</div>
+                  <div class="bell-desc">Connection timeout after 120s</div>
+                  <div class="bell-time">Today 02:00 KST</div>
+                </div>
+              </div>
+              <div class="bell-item unread">
+                <span class="bell-dot amber"></span>
+                <div class="bell-content">
+                  <div class="bell-title">Low Stock: Refill-pack</div>
+                  <div class="bell-desc">248 remaining — below reorder level</div>
+                  <div class="bell-time">Today 02:01 KST</div>
+                </div>
+              </div>
+              <div class="bell-item unread">
+                <span class="bell-dot blue"></span>
+                <div class="bell-content">
+                  <div class="bell-title">12 New Orders (Naver)</div>
+                  <div class="bell-desc">₩2,580,000 total synced</div>
+                  <div class="bell-time">Today 03:00 KST</div>
+                </div>
+              </div>
+              <div class="bell-item">
+                <span class="bell-dot" style="background:#ccc;"></span>
+                <div class="bell-content">
+                  <div class="bell-title">Naver Sync Complete</div>
+                  <div class="bell-desc">45 orders, 0 failed</div>
+                  <div class="bell-time">Yesterday 03:00 KST</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <span style="font-size:12px; color:#8899a6;">🌙</span>
+          <span style="font-size:12px; color:#8899a6;">⚙️</span>
+        </div>
+      </div>
+      <div class="placeholder" style="height:200px;">Orders Page Content (어떤 페이지에서든 벨 클릭으로 확인)</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- Option C -->
+  <div class="option">
+    <div class="option-header">
+      <span class="option-label">C</span>
+      <span class="option-title">둘 다 (벨 + 대시보드)</span>
+    </div>
+    <p class="option-desc">글로벌 벨로 빠르게 확인 + 대시보드에서 상세 이력. 긴급 알림은 벨에 빨간 배지, 대시보드에 전체 이력.</p>
+
+    <div class="mockup-frame">
+      <div class="nav-bar">
+        <div class="nav-logo">Hanah<span>One</span></div>
+        <div class="nav-links">
+          <a class="nav-link active" href="#">Dashboard</a>
+          <a class="nav-link" href="#">Sales</a>
+          <a class="nav-link" href="#">Orders</a>
+          <a class="nav-link" href="#">Inventory</a>
+        </div>
+        <div class="nav-right">
+          <button class="nav-bell highlight" style="border-radius:50%;">
+            🔔
+            <span class="badge">3</span>
+          </button>
+          <span style="font-size:12px; color:#8899a6;">🌙</span>
+          <span style="font-size:12px; color:#8899a6;">⚙️</span>
+        </div>
+      </div>
+
+      <div class="dashboard-grid">
+        <div>
+          <div class="placeholder">KPI Cards + Recent Orders</div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:16px;">
+          <div class="card highlight">
+            <div class="card-inner">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+                <div class="card-title" style="margin-bottom:0;">System Alerts</div>
+                <div style="display:flex; gap:4px;">
+                  <span class="tag instant">Instant</span>
+                  <span class="tag daily">Daily</span>
+                </div>
+              </div>
+              <div class="alert-item">
+                <div class="alert-icon red">⚠</div>
+                <div class="alert-text">
+                  <h4>CGETC Sync Failed <span class="tag instant" style="margin-left:4px;">→ Slack, TG</span></h4>
+                  <p>Connection timeout — sent to Slack & Telegram</p>
+                </div>
+                <span class="alert-time">02:00</span>
+              </div>
+              <div class="alert-item">
+                <div class="alert-icon amber">📦</div>
+                <div class="alert-text">
+                  <h4>Low Stock: Refill-pack <span class="tag instant" style="margin-left:4px;">→ Slack, TG</span></h4>
+                  <p>248 remaining — critical level</p>
+                </div>
+                <span class="alert-time">02:01</span>
+              </div>
+              <div class="alert-item">
+                <div class="alert-icon blue">🛒</div>
+                <div class="alert-text">
+                  <h4>12 New Orders (Naver) <span class="tag daily" style="margin-left:4px;">→ Daily</span></h4>
+                  <p>₩2,580,000 — included in daily summary</p>
+                </div>
+                <span class="alert-time">03:00</span>
+              </div>
+              <div class="alert-item">
+                <div class="alert-icon green">✓</div>
+                <div class="alert-text">
+                  <h4>Naver Sync Complete</h4>
+                  <p>45 orders synced, 0 failed</p>
+                </div>
+                <span class="alert-time">03:01</span>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-inner">
+              <div class="card-title">Low Stock</div>
+              <div style="color:#8899a6; font-size:12px;">기존 Low Stock...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="background:white; border:1px solid rgba(0,0,0,0.06); border-radius:16px; padding:24px; margin-top:40px;">
+    <h3 style="font-size:14px; font-weight:700; margin-bottom:12px;">외부 채널 알림 예시</h3>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+      <div>
+        <div style="font-size:11px; font-weight:600; color:#8899a6; text-transform:uppercase; margin-bottom:8px;">Slack</div>
+        <div style="background:#f8f8f8; border-left:4px solid #ef4444; padding:12px; border-radius:4px; font-size:12px;">
+          <strong>🚨 CGETC Sync Failed</strong><br>
+          <span style="color:#536471;">Connection timeout after 120s</span><br>
+          <span style="color:#8899a6; font-size:10px;">hanahone-erp · Today 02:00 KST</span>
+        </div>
+        <div style="background:#f8f8f8; border-left:4px solid #3b82f6; padding:12px; border-radius:4px; font-size:12px; margin-top:8px;">
+          <strong>🛒 Daily Order Summary</strong><br>
+          <span style="color:#536471;">Naver: 12 orders (₩2.58M) · Shopify: 3 orders ($245)</span><br>
+          <span style="color:#8899a6; font-size:10px;">hanahone-erp · Today 09:00 KST</span>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px; font-weight:600; color:#8899a6; text-transform:uppercase; margin-bottom:8px;">Telegram</div>
+        <div style="background:#e8f5e9; padding:12px; border-radius:12px; border-top-left-radius:4px; font-size:12px; max-width:280px;">
+          <strong>🚨 CGETC Sync Failed</strong><br>
+          Connection timeout after 120s<br>
+          <span style="color:#666; font-size:10px;">02:00 KST</span>
+        </div>
+        <div style="background:#e8f5e9; padding:12px; border-radius:12px; border-top-left-radius:4px; font-size:12px; max-width:280px; margin-top:8px;">
+          <strong>📦 Low Stock Alert</strong><br>
+          Refill-pack: 248 left (572d)<br>
+          <span style="color:#666; font-size:10px;">02:01 KST</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

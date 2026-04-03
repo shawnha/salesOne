@@ -1,0 +1,69 @@
+<h2>네이버 Push 2단계 - 우선순위 선택</h2>
+<p class="subtitle">어떤 기능부터 구현할까요? 현재 운영 상황에 맞게 선택해주세요.</p>
+
+<div class="options">
+  <div class="option" data-choice="shipping" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>배송 Push (송장 전송)</h3>
+      <p>주문 발송 처리 시 네이버에 <strong>택배사 + 송장번호</strong> 자동 전송</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>장점</h4><ul>
+          <li>셀러센터 수동 발송처리 제거</li>
+          <li>주문 상태 자동 업데이트 (SHIPPED)</li>
+          <li>고객에게 자동 배송 알림</li>
+        </ul></div>
+        <div class="cons"><h4>참고</h4><ul>
+          <li>택배사 코드 매핑 필요</li>
+          <li>ERP에 송장번호 입력 UI 필요</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="inventory" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>재고 Push (재고 동기화)</h3>
+      <p>ERP 재고 변경 시 네이버 스마트스토어 <strong>재고 수량 자동 반영</strong></p>
+      <div class="pros-cons">
+        <div class="pros"><h4>장점</h4><ul>
+          <li>품절/재입고 자동 반영</li>
+          <li>과판매 방지</li>
+          <li>공구 이벤트 재고 관리 편리</li>
+        </ul></div>
+        <div class="cons"><h4>참고</h4><ul>
+          <li>SKU ↔ 네이버 상품 매핑 필요</li>
+          <li>재고 계산 로직(HOK InventorySnapshot) 연동</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="both" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>둘 다 동시 진행</h3>
+      <p>배송 Push + 재고 Push를 함께 구현</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>장점</h4><ul>
+          <li>한번에 네이버 Push 완성</li>
+          <li>운영 자동화 극대화</li>
+        </ul></div>
+        <div class="cons"><h4>참고</h4><ul>
+          <li>구현 범위가 넓어짐</li>
+          <li>테스트/검증 시간 증가</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 2rem; padding: 1.5rem; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid rgba(255,255,255,0.06);">
+  <h3>현재 상태 참고</h3>
+  <ul style="margin: 0; padding-left: 1.2rem; color: rgba(255,255,255,0.6);">
+    <li><strong>Pull 완료:</strong> 네이버 주문 549건, 상품 7종, 고객 연락처 동기화</li>
+    <li><strong>Push 없음:</strong> 현재 셀러센터에서 수동 처리 중</li>
+    <li><strong>공구 시작:</strong> 4/6 예정 - 재고 관리 자동화 시 효과 큼</li>
+  </ul>
+</div>

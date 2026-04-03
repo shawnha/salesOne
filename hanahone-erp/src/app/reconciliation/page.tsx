@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { Card } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/table";
 import { KpiCard } from "@/components/ui/kpi-card";
-import { fetchCgetcInventory, type CgetcProduct } from "@/lib/integrations/connectors/cgetc";
+import { fetchCgetcInventory } from "@/lib/integrations/connectors/cgetc";
 import { decrypt } from "@/lib/integrations/encryption";
 import { buildBaselineRows } from "@/lib/reconciliation";
 import { ReconciliationTable } from "@/components/reconciliation/reconciliation-table";
