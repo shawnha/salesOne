@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { OrderStatusBadge } from "./order-status-badge";
@@ -55,7 +55,8 @@ interface RefundData {
   }[];
 }
 
-export function OrdersTable({ orders }: { orders: OrderRow[] }) {
+export function OrdersTable({ orders, viewMode = "orders" }: { orders: OrderRow[]; viewMode?: "orders" | "seeding" | "gifted" }) {
+  const isSeedingOrGift = viewMode === "seeding" || viewMode === "gifted";
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -74,25 +75,23 @@ export function OrdersTable({ orders }: { orders: OrderRow[] }) {
   }
 
   const handleRowClick = useCallback((orderId: string) => {
-    setExpandedId((prev) => {
-      if (prev === orderId) return null;
-      return orderId;
-    });
-
-    setRefundData((prev) => {
-      if (prev[orderId]) return prev;
-      // Fetch refund data async
-      setLoading(orderId);
-      fetch(`/api/orders/${orderId}/refund-timeline`)
-        .then((res) => res.ok ? res.json() : null)
-        .then((data) => {
-          if (data) setRefundData((p) => ({ ...p, [orderId]: data }));
-        })
-        .catch(() => {})
-        .finally(() => setLoading(null));
-      return prev;
-    });
+    setExpandedId((prev) => (prev === orderId ? null : orderId));
   }, []);
+
+  // Fetch refund data when a row is expanded
+  useEffect(() => {
+    if (!expandedId || refundData[expandedId]) return;
+    let cancelled = false;
+    setLoading(expandedId);
+    fetch(`/api/orders/${expandedId}/refund-timeline`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (!cancelled && data) setRefundData((p) => ({ ...p, [expandedId]: data }));
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(null); });
+    return () => { cancelled = true; };
+  }, [expandedId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="max-h-[70vh] overflow-y-auto">
@@ -100,10 +99,19 @@ export function OrdersTable({ orders }: { orders: OrderRow[] }) {
         <thead className="sticky top-0 z-10 bg-[var(--surface)]">
           <tr className="border-b border-[var(--border)] text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
             <th className="text-left py-3 px-4">Order #</th>
-            <th className="text-left py-3 px-4">Customer</th>
-            <th className="text-left py-3 px-4">Channel</th>
+            <th className="text-left py-3 px-4">{isSeedingOrGift ? "Recipient" : "Customer"}</th>
+            {isSeedingOrGift ? (
+              <>
+                <th className="text-left py-3 px-4">Product</th>
+                <th className="text-left py-3 px-4">Sets</th>
+              </>
+            ) : (
+              <>
+                <th className="text-left py-3 px-4">Channel</th>
+                <th className="text-right py-3 px-4">Amount</th>
+              </>
+            )}
             <th className="text-left py-3 px-4">Status</th>
-            <th className="text-right py-3 px-4">Amount</th>
             <th className="text-left py-3 px-4">Date</th>
           </tr>
         </thead>
@@ -150,44 +158,68 @@ export function OrdersTable({ orders }: { orders: OrderRow[] }) {
                       row.customerName ?? "—"
                     )}
                   </td>
-                  <td className="py-3 px-4">
-                    {isSeeding ? (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleChannelFilter("SEEDING"); }}
-                        className="inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full text-violet-600 bg-violet-600/[0.08] hover:ring-1 hover:ring-violet-400 transition-all"
-                      >
-                        Seeding
-                      </button>
-                    ) : row.externalSource ? (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleChannelFilter(row.externalSource!); }}
-                        className={`inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full ${platformBadge[row.externalSource]?.color || "text-[var(--text-tertiary)]"} hover:ring-1 hover:ring-current transition-all`}
-                      >
-                        {platformBadge[row.externalSource]?.label || row.externalSource}
-                      </button>
-                    ) : (
-                      <span className="text-[var(--text-tertiary)]">Manual</span>
-                    )}
-                  </td>
+                  {isSeedingOrGift ? (
+                    <>
+                      <td className="py-3 px-4 text-[var(--text-secondary)]">
+                        {row.items?.map((i) => i.productName).filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(", ") || "—"}
+                      </td>
+                      <td className="py-3 px-4">
+                        {(() => {
+                          const sets = row.items && row.items.length > 0 ? Math.max(...row.items.map((i) => i.quantity)) : 0;
+                          const badgeColor = viewMode === "seeding" ? "text-violet-500 bg-violet-500/10" : "text-rose-400 bg-rose-400/10";
+                          return <span className={`inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full ${badgeColor}`}>{sets} {sets === 1 ? "set" : "sets"}</span>;
+                        })()}
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="py-3 px-4">
+                        {isSeeding ? (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleChannelFilter("SEEDING"); }}
+                            className="inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full text-violet-600 bg-violet-600/[0.08] hover:ring-1 hover:ring-violet-400 transition-all"
+                          >
+                            Seeding
+                          </button>
+                        ) : isGift ? (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleChannelFilter("GIFT"); }}
+                            className="inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full text-rose-400 bg-rose-400/[0.08] hover:ring-1 hover:ring-rose-300 transition-all"
+                          >
+                            Gifted
+                          </button>
+                        ) : row.externalSource ? (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleChannelFilter(row.externalSource!); }}
+                            className={`inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full ${platformBadge[row.externalSource]?.color || "text-[var(--text-tertiary)]"} hover:ring-1 hover:ring-current transition-all`}
+                          >
+                            {platformBadge[row.externalSource]?.label || row.externalSource}
+                          </button>
+                        ) : (
+                          <span className="text-[var(--text-tertiary)]">Manual</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        {hasRefund ? (
+                          <div>
+                            <span className="font-semibold line-through text-[var(--text-tertiary)]">
+                              {fmt(row.totalAmount, row.externalSource)}
+                            </span>
+                            <div className="text-[11px] text-red-500">
+                              Net: {fmt(row.netAmount ?? row.totalAmount, row.externalSource)}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="font-semibold">{fmt(row.totalAmount, row.externalSource)}</span>
+                        )}
+                      </td>
+                    </>
+                  )}
                   <td className="py-3 px-4">
                     <OrderStatusBadge
                       fulfillmentStatus={row.fulfillmentStatus}
                       financialStatus={row.financialStatus}
                     />
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    {hasRefund ? (
-                      <div>
-                        <span className="font-semibold line-through text-[var(--text-tertiary)]">
-                          {fmt(row.totalAmount, row.externalSource)}
-                        </span>
-                        <div className="text-[11px] text-red-500">
-                          Net: {fmt(row.netAmount ?? row.totalAmount, row.externalSource)}
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="font-semibold">{fmt(row.totalAmount, row.externalSource)}</span>
-                    )}
                   </td>
                   <td className="py-3 px-4 text-[var(--text-secondary)]">
                     {new Date(row.orderDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}

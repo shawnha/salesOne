@@ -109,11 +109,15 @@ export default async function SalesPage({
   const totalPages = Math.ceil(totalSalesCount / PAGE_SIZE);
   const allSalesForKpi = await prisma.order.findMany({
     where,
-    select: { netAmount: true, totalAmount: true, externalSource: true },
+    select: { netAmount: true, totalAmount: true, externalSource: true, commissionAmount: true, settlementAmount: true },
   });
   const totalRevenue = allSalesForKpi.reduce((sum, o) => {
     const amount = Number(o.netAmount ?? o.totalAmount);
     return sum + toUSD(amount, o.externalSource, exchangeRate.rate);
+  }, 0);
+  const totalCommission = allSalesForKpi.reduce((sum, o) => {
+    if (!o.commissionAmount) return sum;
+    return sum + toUSD(Number(o.commissionAmount), o.externalSource, exchangeRate.rate);
   }, 0);
   const orderCount = totalSalesCount;
 
@@ -208,7 +212,17 @@ export default async function SalesPage({
               primaryCurrency={primaryCurrency}
             />
           </div>
-          {(seedingCount > 0 || giftCount > 0) && (
+          {totalCommission > 0 && (
+            <div className="text-right">
+              <p className="text-xs text-red-400">Fees</p>
+              <CurrencyDisplay
+                amount={totalCommission}
+                exchangeRate={exchangeRate.rate}
+                primaryCurrency={primaryCurrency}
+              />
+            </div>
+          )}
+          {(seedingCount > 0 || giftCount > 0 || totalCommission > 0) && (
             <div className="w-px h-8 bg-[var(--border-strong)]" />
           )}
           {seedingCount > 0 && (

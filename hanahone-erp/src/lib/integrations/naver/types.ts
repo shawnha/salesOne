@@ -52,6 +52,10 @@ export interface NaverProductOrderInfo {
   claimType?: string;
   claimStatus?: string;
   claimPrice?: number;
+  expectedSettlementAmount?: number;
+  paymentCommission?: number;
+  saleCommission?: number;
+  channelCommission?: number;
 }
 
 export interface NaverOrderDetail {

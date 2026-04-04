@@ -176,6 +176,8 @@ export async function fetchNaverOrders(
       recipientName: addr?.name,
       recipientPhone: addr?.tel1,
       channelNote: isGonggu ? "공구" : undefined,
+      settlementAmount: productOrder.expectedSettlementAmount || undefined,
+      commissionAmount: ((productOrder.paymentCommission || 0) + (productOrder.saleCommission || 0) + (productOrder.channelCommission || 0)) || undefined,
       items: [
         {
           externalItemId: productOrder.productOrderId,

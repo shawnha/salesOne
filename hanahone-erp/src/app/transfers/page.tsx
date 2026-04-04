@@ -1,9 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { DataTable } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/empty-state";
-import Link from "next/link";
+import { TransfersTable } from "@/components/transfers/transfers-table";
 
 export default async function TransfersPage({
   searchParams,
@@ -23,69 +21,43 @@ export default async function TransfersPage({
     include: {
       fromCompany: { select: { name: true } },
       toCompany: { select: { name: true } },
-      order: { select: { orderNumber: true, totalAmount: true } },
+      order: {
+        select: {
+          id: true,
+          orderNumber: true,
+          totalAmount: true,
+          items: { include: { product: { select: { name: true, sku: true } } } },
+        },
+      },
     },
     orderBy: { transferDate: "desc" },
   });
 
-  const formatWon = (n: number) => `₩${n.toLocaleString()}`;
-
-  const columns = [
-    {
-      key: "order",
-      header: "Order #",
-      render: (row: (typeof transfers)[0]) => (
-        <Link href={`/transfers/${row.id}`} className="font-semibold text-accent hover:underline">
-          {row.order.orderNumber}
-        </Link>
-      ),
-    },
-    {
-      key: "from",
-      header: "From",
-      render: (row: (typeof transfers)[0]) => (
-        <span className="font-semibold">{row.fromCompany.name}</span>
-      ),
-    },
-    {
-      key: "to",
-      header: "To",
-      render: (row: (typeof transfers)[0]) => (
-        <span className="font-semibold">{row.toCompany.name}</span>
-      ),
-    },
-    {
-      key: "status",
-      header: "Status",
-      render: (row: (typeof transfers)[0]) => <Badge status={row.status} />,
-    },
-    {
-      key: "amount",
-      header: "Amount",
-      align: "right" as const,
-      render: (row: (typeof transfers)[0]) => (
-        <span className="font-semibold">{formatWon(Number(row.order.totalAmount))}</span>
-      ),
-    },
-    {
-      key: "date",
-      header: "Date",
-      render: (row: (typeof transfers)[0]) => (
-        <span className="text-[var(--text-secondary)]">
-          {new Date(row.transferDate).toLocaleDateString("ko-KR")}
-        </span>
-      ),
-    },
-  ];
+  const rows = transfers.map((t) => ({
+    id: t.id,
+    orderNumber: t.order.orderNumber,
+    orderId: t.order.id,
+    fromCompany: t.fromCompany.name,
+    toCompany: t.toCompany.name,
+    status: t.status,
+    reason: t.reason,
+    costAmount: t.costAmount ? Number(t.costAmount) : null,
+    transferDate: t.transferDate.toISOString(),
+    receivedDate: t.receivedDate?.toISOString() || null,
+    items: t.order.items.map((i) => ({
+      quantity: i.quantity,
+      product: { name: i.product.name, sku: i.product.sku },
+    })),
+  }));
 
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-bold tracking-tight">Inter-Company Transfers</h1>
       <Card>
-        {transfers.length === 0 ? (
+        {rows.length === 0 ? (
           <EmptyState title="No transfers" description="No inter-company transfers found." />
         ) : (
-          <DataTable columns={columns} data={transfers} />
+          <TransfersTable transfers={rows} />
         )}
       </Card>
     </div>

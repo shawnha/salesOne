@@ -169,30 +169,45 @@ export default async function OrdersPage({
           <ChannelFilter companyName={companies.find((c) => c.id === searchParams.company)?.name} />
         </div>
         <div className="flex items-center gap-6">
-          <div className="text-right">
-            <p className="text-xs text-[var(--text-secondary)]">Total</p>
-            <p className="text-lg font-semibold">{totalOrderCount}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-[var(--text-secondary)]">Fulfilled</p>
-            <p className="text-lg font-semibold text-blue-600">{fulfilledCount}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-[var(--text-secondary)]">Paid</p>
-            <p className="text-lg font-semibold text-teal-600">{paidCount}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-[var(--text-secondary)]">Refunded</p>
-            <p className="text-lg font-semibold text-red-500">{refundedCount}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-[var(--text-secondary)]">Amount</p>
-            <CurrencyDisplay
-              amount={totalAmount}
-              exchangeRate={exchangeRate.rate}
-              primaryCurrency={primaryCurrency}
-            />
-          </div>
+          {searchParams.type === "SEEDING" || searchParams.type === "GIFT" ? (
+            <>
+              <div className="text-right">
+                <p className="text-xs text-[var(--text-secondary)]">Total</p>
+                <p className={`text-lg font-semibold ${searchParams.type === "SEEDING" ? "text-violet-500" : "text-rose-400"}`}>{totalOrderCount}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-[var(--text-secondary)]">Fulfilled</p>
+                <p className="text-lg font-semibold text-[var(--accent)]">{fulfilledCount}</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-right">
+                <p className="text-xs text-[var(--text-secondary)]">Total</p>
+                <p className="text-lg font-semibold">{totalOrderCount}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-[var(--text-secondary)]">Fulfilled</p>
+                <p className="text-lg font-semibold text-blue-600">{fulfilledCount}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-[var(--text-secondary)]">Paid</p>
+                <p className="text-lg font-semibold text-teal-600">{paidCount}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-[var(--text-secondary)]">Refunded</p>
+                <p className="text-lg font-semibold text-red-500">{refundedCount}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-[var(--text-secondary)]">Amount</p>
+                <CurrencyDisplay
+                  amount={totalAmount}
+                  exchangeRate={exchangeRate.rate}
+                  primaryCurrency={primaryCurrency}
+                />
+              </div>
+            </>
+          )}
           {showSeedingGiftCards && seedingCount > 0 && (
             <Link href={`/orders?${new URLSearchParams({ ...(searchParams.company ? { company: searchParams.company } : {}), ...(searchParams.month ? { month: searchParams.month } : {}), type: "SEEDING" }).toString()}`} className="text-right group">
               <p className="text-xs text-[var(--text-secondary)]">Seeding</p>
@@ -237,7 +252,7 @@ export default async function OrdersPage({
           <EmptyState title="No orders" description="No orders found for this month." />
         ) : (
           <>
-            <OrdersTable orders={orderRows} />
+            <OrdersTable orders={orderRows} viewMode={searchParams.type === "SEEDING" ? "seeding" : searchParams.type === "GIFT" ? "gifted" : "orders"} />
             <Pagination currentPage={currentPage} totalPages={totalPages} totalItems={totalOrderCount} pageSize={PAGE_SIZE} />
           </>
         )}

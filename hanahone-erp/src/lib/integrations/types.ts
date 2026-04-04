@@ -29,6 +29,10 @@ export interface ExternalOrderData {
   channelNote?: string;
   /** Override order type (e.g. SEEDING for free gifting orders) */
   orderType?: string;
+  /** Platform settlement amount (after fees) */
+  settlementAmount?: number;
+  /** Platform commission/fees */
+  commissionAmount?: number;
 }
 
 export interface ExternalOrderItemData {
