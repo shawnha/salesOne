@@ -64,7 +64,11 @@ export default async function SalesPage({
   const PAGE_SIZE = 50;
   const currentPage = Math.max(1, parseInt(searchParams.page || "1"));
 
-  const [orders, totalSalesCount, exchangeRate, companies] = await Promise.all([
+  // Seeding & gift counts for this period
+  const baseWhere: any = { orderDate: dateRange };
+  if (searchParams.company) baseWhere.companyId = searchParams.company;
+
+  const [orders, totalSalesCount, seedingOrders, giftOrders, exchangeRate, companies] = await Promise.all([
     prisma.order.findMany({
       where,
       include: {
@@ -76,9 +80,25 @@ export default async function SalesPage({
       take: PAGE_SIZE,
     }),
     prisma.order.count({ where }),
+    prisma.order.findMany({
+      where: { ...baseWhere, type: "SEEDING" },
+      include: { items: { select: { quantity: true } } },
+    }),
+    prisma.order.findMany({
+      where: { ...baseWhere, type: "GIFT" },
+      include: { items: { select: { quantity: true } } },
+    }),
     getUsdKrwRate(dateRange.lt > new Date() ? undefined : new Date(dateRange.lt.getTime() - 1)),
     prisma.company.findMany({ select: { id: true, name: true } }),
   ]);
+
+  const seedingCount = seedingOrders.length;
+  // Set count: max quantity across items per order (starter x6 + refill x6 = 6 sets)
+  const calcSets = (orders: typeof seedingOrders) =>
+    orders.reduce((sum, o) => sum + (o.items.length > 0 ? Math.max(...o.items.map((i) => i.quantity)) : 0), 0);
+  const seedingSets = calcSets(seedingOrders);
+  const giftCount = giftOrders.length;
+  const giftSets = calcSets(giftOrders);
 
   const primaryCurrency = getPrimaryCurrency(searchParams.company, companies);
   const chartData = await getChannelSalesData(searchParams.company, searchParams.month, searchParams.channel, {
@@ -118,19 +138,26 @@ export default async function SalesPage({
       key: "platform",
       header: "Channel",
       render: (row: (typeof orders)[0]) => {
-        const isSeeding = row.externalSource === "CGETC" && row.notes?.toLowerCase().startsWith("free gifting");
+        const isSeeding = row.type === "SEEDING" || (row.externalSource === "CGETC" && row.notes?.toLowerCase().startsWith("free gifting"));
+        const channelKey = isSeeding ? "SEEDING" : (row.externalSource || "");
+        const params = new URLSearchParams();
+        if (searchParams.company) params.set("company", searchParams.company);
+        if (searchParams.month) params.set("month", searchParams.month);
+        params.set("channel", channelKey);
+        const href = `/sales?${params.toString()}`;
+
         if (isSeeding) {
           return (
-            <span className="inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full text-violet-600 bg-violet-600/[0.08]">
+            <Link href={href} className="inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full text-violet-600 bg-violet-600/[0.08] hover:ring-1 hover:ring-violet-400 transition-all">
               Seeding
-            </span>
+            </Link>
           );
         }
         const p = row.externalSource ? platformBadge[row.externalSource] : null;
         return p ? (
-          <span className={`inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full ${p.color}`}>
+          <Link href={href} className={`inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full ${p.color} hover:ring-1 hover:ring-current transition-all`}>
             {p.label}
-          </span>
+          </Link>
         ) : <span className="text-[var(--text-tertiary)]">Manual</span>;
       },
     },
@@ -181,6 +208,18 @@ export default async function SalesPage({
               primaryCurrency={primaryCurrency}
             />
           </div>
+          {seedingCount > 0 && (
+            <div className="text-right">
+              <p className="text-xs text-[var(--text-secondary)]">Seeding</p>
+              <p className="text-lg font-semibold text-violet-500">{seedingCount}<span className="text-sm font-normal text-[var(--text-tertiary)]"> ({seedingSets} sets)</span></p>
+            </div>
+          )}
+          {giftCount > 0 && (
+            <div className="text-right">
+              <p className="text-xs text-[var(--text-secondary)]">Gifted</p>
+              <p className="text-lg font-semibold text-rose-400">{giftCount}<span className="text-sm font-normal text-[var(--text-tertiary)]"> ({giftSets} sets)</span></p>
+            </div>
+          )}
         </div>
       </div>
       {/* Channel Sales Charts */}

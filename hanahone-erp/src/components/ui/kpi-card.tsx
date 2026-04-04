@@ -6,13 +6,14 @@ interface KpiCardProps {
   subValue?: string;
   change?: { value: string; direction: "up" | "down" | "neutral" };
   subtitle?: string;
+  children?: React.ReactNode;
 }
 
-export function KpiCard({ label, value, subValue, change, subtitle }: KpiCardProps) {
+export function KpiCard({ label, value, subValue, change, subtitle, children }: KpiCardProps) {
   const changeColors = {
     up: "text-[var(--badge-teal)] bg-[var(--badge-teal-bg)]",
     down: "text-[var(--badge-red)] bg-[var(--badge-red-bg)]",
-    neutral: "text-[var(--text-tertiary)] bg-[var(--skeleton-bg)]",
+    neutral: "text-[var(--text-secondary)] bg-[var(--skeleton-bg)]",
   };
   return (
     <Card>
@@ -25,6 +26,7 @@ export function KpiCard({ label, value, subValue, change, subtitle }: KpiCardPro
         </div>
       )}
       {subtitle && <div className="text-[13px] text-[var(--text-tertiary)] mt-1.5">{subtitle}</div>}
+      {children}
     </Card>
   );
 }

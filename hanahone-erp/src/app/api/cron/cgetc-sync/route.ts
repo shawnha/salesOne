@@ -51,10 +51,10 @@ export async function GET(req: NextRequest) {
   // Check low stock
   try {
     const lowStock = await prisma.$queryRaw<{ productName: string; quantity: number; companyId: string }[]>`
-      SELECT p.name as "productName", i.quantity, i."companyId"
-      FROM public."Inventory" i JOIN public."Product" p ON i."productId" = p.id
-      WHERE i.quantity <= i."reorderLevel" AND i."reorderLevel" > 0
-      AND i."companyId" = ${config.companyId}
+      SELECT p.name as "productName", i.quantity, i.company_id as "companyId"
+      FROM salesone.inventories i JOIN salesone.products p ON i.product_id = p.id
+      WHERE i.quantity <= i.reorder_level AND i.reorder_level > 0
+      AND i.company_id = ${config.companyId}
     `;
     for (const item of lowStock) {
       await notify.send({

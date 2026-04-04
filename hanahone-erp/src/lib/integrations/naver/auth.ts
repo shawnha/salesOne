@@ -43,7 +43,8 @@ export async function getAccessToken(
   });
 
   if (!res.ok) {
-    throw new Error(`Naver token request failed: ${res.status}`);
+    const errorBody = await res.text();
+    throw new Error(`Naver token request failed: ${res.status} - ${errorBody}`);
   }
 
   const data: NaverTokenResponse = await res.json();

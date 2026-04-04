@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { OrderStatusBadge } from "./order-status-badge";
 
 const formatUSD = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -54,30 +55,43 @@ interface RefundData {
 }
 
 export function OrdersTable({ orders }: { orders: OrderRow[] }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [refundData, setRefundData] = useState<Record<string, RefundData>>({});
   const [loading, setLoading] = useState<string | null>(null);
 
-  const handleRowClick = useCallback(async (orderId: string) => {
-    if (expandedId === orderId) {
-      setExpandedId(null);
-      return;
+  function handleChannelFilter(channelKey: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (params.get("channel") === channelKey) {
+      params.delete("channel");
+    } else {
+      params.set("channel", channelKey);
     }
+    router.push(`${pathname}?${params.toString()}`);
+  }
 
-    setExpandedId(orderId);
+  const handleRowClick = useCallback((orderId: string) => {
+    setExpandedId((prev) => {
+      if (prev === orderId) return null;
+      return orderId;
+    });
 
-    if (!refundData[orderId]) {
+    setRefundData((prev) => {
+      if (prev[orderId]) return prev;
+      // Fetch refund data async
       setLoading(orderId);
-      try {
-        const res = await fetch(`/api/orders/${orderId}/refund-timeline`);
-        if (res.ok) {
-          const data = await res.json();
-          setRefundData((prev) => ({ ...prev, [orderId]: data }));
-        }
-      } catch {}
-      setLoading(null);
-    }
-  }, [expandedId, refundData]);
+      fetch(`/api/orders/${orderId}/refund-timeline`)
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => {
+          if (data) setRefundData((p) => ({ ...p, [orderId]: data }));
+        })
+        .catch(() => {})
+        .finally(() => setLoading(null));
+      return prev;
+    });
+  }, []);
 
   return (
     <div className="max-h-[70vh] overflow-y-auto">
@@ -132,13 +146,19 @@ export function OrdersTable({ orders }: { orders: OrderRow[] }) {
                   </td>
                   <td className="py-3 px-4">
                     {isSeeding ? (
-                      <span className="inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full text-violet-600 bg-violet-600/[0.08]">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleChannelFilter("SEEDING"); }}
+                        className="inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full text-violet-600 bg-violet-600/[0.08] hover:ring-1 hover:ring-violet-400 transition-all"
+                      >
                         Seeding
-                      </span>
+                      </button>
                     ) : row.externalSource ? (
-                      <span className={`inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full ${platformBadge[row.externalSource]?.color || "text-[var(--text-tertiary)]"}`}>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleChannelFilter(row.externalSource!); }}
+                        className={`inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full ${platformBadge[row.externalSource]?.color || "text-[var(--text-tertiary)]"} hover:ring-1 hover:ring-current transition-all`}
+                      >
                         {platformBadge[row.externalSource]?.label || row.externalSource}
-                      </span>
+                      </button>
                     ) : (
                       <span className="text-[var(--text-tertiary)]">Manual</span>
                     )}

@@ -104,6 +104,8 @@ enum OrderType {
   PURCHASE
   BROKERAGE
   INTER_COMPANY
+  SEEDING
+  GIFT
 
   @@schema("salesone")
 }

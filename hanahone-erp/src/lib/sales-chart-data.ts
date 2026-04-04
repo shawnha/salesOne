@@ -119,6 +119,8 @@ export async function getChannelSalesData(
     } else if (channel === "NAVER" && order.notes === "공구") {
       channel = "GONGGU";
     }
+    // Seeding is not revenue — always $0
+    if (channel === "SEEDING") continue;
     const raw = Number(order.netAmount ?? order.totalAmount);
     channelTotals[channel] = (channelTotals[channel] || 0) + normalize(raw, order.externalSource);
   }
@@ -170,6 +172,8 @@ export async function getChannelSalesData(
       } else if (channel === "NAVER" && order.notes === "공구") {
         channel = "GONGGU" as typeof channel;
       }
+      // Seeding is not revenue — skip
+      if (channel === "SEEDING") continue;
       if (channel in monthly[idx]) {
         const raw = Number(order.netAmount ?? order.totalAmount);
         monthly[idx][channel] += normalize(raw, order.externalSource);

@@ -29,7 +29,12 @@ export default async function OrdersPage({
 
   const where: any = { orderDate: dateRange };
   if (searchParams.company) where.companyId = searchParams.company;
-  if (searchParams.type) where.type = searchParams.type;
+  if (searchParams.type) {
+    where.type = searchParams.type;
+  } else {
+    // Exclude seeding and gifts from default view
+    where.type = { notIn: ["SEEDING", "GIFT"] };
+  }
   applyChannelFilter(where, searchParams.channel);
   if (searchParams.q) {
     const q = searchParams.q;

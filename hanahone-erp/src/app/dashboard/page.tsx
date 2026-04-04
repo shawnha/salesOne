@@ -109,14 +109,19 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
   const inventoryValue = filteredInventory.reduce((sum, inv) => sum + inv.quantity * Number(inv.product.costPrice), 0)
     + cgetcProducts.reduce((sum, p) => sum + p.quantity * 0, 0); // CGETC products have no costPrice yet
 
-  const [salesOrders, totalOrderCount, fulfilledCount, pendingCount, latestSyncs, exchangeRate] = await Promise.all([
+  const revenueTypes = { in: ["SALE", "BROKERAGE"] as any };
+  const nonRevenueTypes = { notIn: ["SEEDING", "GIFT"] as any };
+  const orderFilter = { ...companyFilter, ...dateFilter, type: nonRevenueTypes };
+  const [salesOrders, totalOrderCount, fulfilledCount, pendingCount, seedingCount, giftCount, latestSyncs, exchangeRate] = await Promise.all([
     prisma.order.findMany({
-      where: { ...companyFilter, ...dateFilter, type: { in: ["SALE", "BROKERAGE"] } },
+      where: { ...companyFilter, ...dateFilter, type: revenueTypes },
       select: { totalAmount: true, externalSource: true },
     }),
-    prisma.order.count({ where: { ...companyFilter, ...dateFilter } }),
-    prisma.order.count({ where: { ...companyFilter, ...dateFilter, fulfillmentStatus: { in: ["FULFILLED", "DELIVERED"] } } }),
-    prisma.order.count({ where: { ...companyFilter, ...dateFilter, fulfillmentStatus: { in: ["UNFULFILLED", "PARTIALLY_FULFILLED"] } } }),
+    prisma.order.count({ where: orderFilter }),
+    prisma.order.count({ where: { ...orderFilter, fulfillmentStatus: { in: ["FULFILLED", "DELIVERED"] } } }),
+    prisma.order.count({ where: { ...orderFilter, fulfillmentStatus: { in: ["UNFULFILLED", "PARTIALLY_FULFILLED"] } } }),
+    prisma.order.count({ where: { ...companyFilter, ...dateFilter, type: "SEEDING" } }),
+    prisma.order.count({ where: { ...companyFilter, ...dateFilter, type: "GIFT" } }),
     prisma.syncJob.findMany({
       where: { status: "SUCCESS" },
       orderBy: { completedAt: "desc" },
@@ -148,7 +153,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
         where: { companyId: c.id, ...dateFilter, type: { in: ["SALE", "BROKERAGE"] } },
         select: { totalAmount: true, externalSource: true },
       });
-      const orderCount = await prisma.order.count({ where: { companyId: c.id, ...dateFilter } });
+      const orderCount = await prisma.order.count({ where: { companyId: c.id, ...dateFilter, type: { notIn: ["SEEDING", "GIFT"] } } });
       const revenueKRW = companyOrders.reduce((sum, o) => sum + toKRW(Number(o.totalAmount), o.externalSource, rate), 0);
       const revenueUSD = companyOrders.reduce((sum, o) => sum + toUSD(Number(o.totalAmount), o.externalSource, rate), 0);
       return { ...c, revenueKRW, revenueUSD, orderCount };
@@ -174,7 +179,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
         </div>
       </div>
       <div className="space-y-4">
-        <KpiRow data={{ totalSalesKRW, totalSalesUSD, totalOrders: totalOrderCount, fulfilledOrders: fulfilledCount, pendingOrders: pendingCount, inventoryValue, productionRuns: productionOrders, salesChange: 0, lowStockCount: lowStock.length, newProductionRuns: 0 }} primaryCurrency={primaryCurrency} />
+        <KpiRow data={{ totalSalesKRW, totalSalesUSD, totalOrders: totalOrderCount, fulfilledOrders: fulfilledCount, pendingOrders: pendingCount, seedingCount, giftCount, inventoryValue, productionRuns: productionOrders, salesChange: 0, lowStockCount: lowStock.length, newProductionRuns: 0 }} primaryCurrency={primaryCurrency} />
         {latestSyncs.length > 0 && (
           <div className="flex gap-3 flex-wrap">
             {latestSyncs.map((sync) => (

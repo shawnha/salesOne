@@ -12,11 +12,12 @@ const ALL_CHANNELS: Channel[] = [
   { value: "NAVER", label: "Naver", color: "text-emerald-600" },
   { value: "GONGGU", label: "공구", color: "text-rose-600" },
   { value: "PHARMACY", label: "Pharmacy", color: "text-blue-600" },
+  { value: "CGETC", label: "CGETC", color: "text-indigo-600" },
 ];
 
 // Company-specific channel keys (excluding "All" which is always shown)
 const COMPANY_CHANNELS: Record<string, string[]> = {
-  HOI: ["SHOPIFY", "TIKTOK", "AMAZON"],
+  HOI: ["SHOPIFY", "TIKTOK", "AMAZON", "CGETC"],
   HOK: ["NAVER", "GONGGU", "PHARMACY"],
   HOR: ["PHARMACY"],
 };

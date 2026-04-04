@@ -464,7 +464,7 @@ function mapCgetcStatus(status: string, deliveryCount: number): { fulfillment: s
   return { fulfillment: "UNFULFILLED", financial: "PAID" };
 }
 
-function mapCgetcChannel(origin: string): { overridePlatform?: Platform; channelNote?: string; skip: boolean } {
+function mapCgetcChannel(origin: string): { overridePlatform?: Platform; channelNote?: string; skip: boolean; isSeeding?: boolean } {
   const o = (origin || "").toLowerCase().trim();
   // Shopify — already synced from Shopify API
   if (o.includes("shopify")) return { skip: true };
@@ -476,7 +476,7 @@ function mapCgetcChannel(origin: string): { overridePlatform?: Platform; channel
   if (o.includes("amazon")) return { overridePlatform: "AMAZON" as Platform, skip: false };
   // Promotion / seeding / gifting / sample — internal CGETC operations
   if (o.includes("gift") || o.includes("seeding") || o.includes("시딩") || o.includes("sample") || o.includes("sponsored") || o.includes("influencer") || o.includes("인플루언서") || o.includes("giveaway") || o.includes("event")) {
-    return { channelNote: origin.trim(), skip: false };
+    return { channelNote: origin.trim(), skip: false, isSeeding: true };
   }
   // PO# — wholesale/retail orders
   if (o.includes("po#")) return { channelNote: origin.trim(), skip: false };
@@ -496,6 +496,16 @@ export const cgetcConnector: Connector = {
       if (channel.skip) continue; // Skip Shopify orders (already from Shopify API)
 
       const statuses = mapCgetcStatus(so.status, so.deliveryCount);
+
+      // Detect non-revenue orders:
+      // - channel.isSeeding = tagged as seeding/gifting/influencer in CGETC reference
+      // - allItemsDollarOne = all items at $1 (gifts/samples, not real sales)
+      const allItemsDollarOne = so.lineItems.length > 0 && so.lineItems.every((li) => li.unitPrice <= 1);
+      const isNotRevenue = channel.isSeeding || allItemsDollarOne;
+      const amount = isNotRevenue ? 0 : so.amount;
+      // Seeding = explicitly tagged; Gift = $1 items without seeding tag
+      const orderType = channel.isSeeding ? "SEEDING" : allItemsDollarOne ? "GIFT" : undefined;
+
       results.push({
         externalOrderId: String(so.id),
         externalOrderNumber: so.soNumber,
@@ -503,17 +513,18 @@ export const cgetcConnector: Connector = {
         orderDate: new Date(so.date || Date.now()),
         fulfillmentStatus: statuses.fulfillment,
         financialStatus: statuses.financial,
-        totalAmount: so.amount,
+        totalAmount: amount,
         customerName: so.customerName || undefined,
         items: so.lineItems.map((li) => ({
           externalItemId: `${so.id}-${li.sku || li.productName}`,
           productName: li.productName,
           sku: li.sku || "",
           quantity: li.quantity,
-          unitPrice: li.unitPrice,
+          unitPrice: isNotRevenue ? 0 : li.unitPrice,
         })),
         overridePlatform: channel.overridePlatform,
         channelNote: channel.channelNote,
+        orderType,
       });
     }
     return results;

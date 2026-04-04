@@ -6,6 +6,8 @@ interface KpiData {
   totalOrders: number;
   fulfilledOrders: number;
   pendingOrders: number;
+  seedingCount: number;
+  giftCount: number;
   inventoryValue: number;
   productionRuns: number;
   salesChange: number;
@@ -39,7 +41,10 @@ export function KpiRow({ data, primaryCurrency = "USD" }: { data: KpiData; prima
       <KpiCard
         label="Orders"
         value={data.totalOrders.toString()}
-        change={{ value: `${data.fulfilledOrders} fulfilled · ${data.pendingOrders} pending`, direction: "neutral" }}
+        change={{
+          value: `${data.fulfilledOrders} fulfilled · ${data.pendingOrders} pending${data.seedingCount > 0 ? ` · ${data.seedingCount} seeding` : ""}${data.giftCount > 0 ? ` · ${data.giftCount} gifted` : ""}`,
+          direction: "neutral",
+        }}
         subtitle="for this period"
       />
       <KpiCard label="Inventory value" value={isUSD ? fmtUSD(data.inventoryValue) : fmtKRW(data.inventoryValue)} change={{ value: `${data.lowStockCount} below reorder`, direction: data.lowStockCount > 0 ? "down" : "neutral" }} subtitle="combined warehouse stock" />

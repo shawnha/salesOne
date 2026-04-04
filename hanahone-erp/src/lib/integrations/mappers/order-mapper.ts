@@ -186,7 +186,7 @@ export async function mapExternalOrder(
         orderNumber,
         companyId,
         customerId,
-        type: OrderType.SALE,
+        type: (extOrder.orderType as OrderType) || OrderType.SALE,
         fulfillmentStatus,
         financialStatus,
         totalAmount: total,

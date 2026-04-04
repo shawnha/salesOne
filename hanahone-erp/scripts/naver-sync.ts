@@ -1,33 +1,31 @@
-import { NextRequest, NextResponse } from "next/server";
+/**
+ * Local Naver sync script.
+ * Runs from home IP to bypass Naver API IP whitelist.
+ * Usage: npx tsx scripts/naver-sync.ts
+ */
 import { prisma } from "@/lib/prisma";
 import { runSync } from "@/lib/integrations/sync-runner";
 import { recalculateHokInventory } from "@/lib/integrations/inventory-calculator";
 import { naverConnector } from "@/lib/integrations/naver";
 import { decrypt } from "@/lib/integrations/encryption";
-import { validateCronSecret } from "@/lib/cron-auth";
 import * as notify from "@/lib/notifications";
 
-export const maxDuration = 300;
-
-export async function GET(req: NextRequest) {
-  if (!validateCronSecret(req.headers.get("authorization"))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+async function main() {
+  console.log(`[${new Date().toISOString()}] Naver sync started`);
 
   const config = await prisma.integrationConfig.findFirst({
     where: { platform: "NAVER", isActive: true },
   });
 
   if (!config) {
-    return NextResponse.json(
-      { error: "No active NAVER integration found" },
-      { status: 404 },
-    );
+    console.error("No active NAVER integration found");
+    process.exit(1);
   }
 
   const result = await runSync(naverConnector, config.companyId);
+  console.log(`Sync result: ${result.recordsProcessed} processed, ${result.recordsFailed} failed`);
 
-  // --- Notifications ---
+  // Notifications
   if (result.errorMessage || result.recordsFailed > 0) {
     await notify.send({
       type: "SYNC_FAILED",
@@ -37,6 +35,7 @@ export async function GET(req: NextRequest) {
       data: { platform: "NAVER", recordsFailed: result.recordsFailed, recordsProcessed: result.recordsProcessed },
       companyId: config.companyId,
     });
+    console.error("Sync failed:", result.errorMessage);
   } else if (result.recordsProcessed > 0) {
     await notify.send({
       type: "NEW_ORDERS",
@@ -48,7 +47,7 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // Check low stock for HOK
+  // Low stock check
   try {
     const lowStock = await prisma.$queryRaw<{ productName: string; quantity: number; companyId: string }[]>`
       SELECT p.name as "productName", i.quantity, i.company_id as "companyId"
@@ -65,48 +64,30 @@ export async function GET(req: NextRequest) {
         companyId: item.companyId,
       });
     }
+    if (lowStock.length > 0) console.log(`Low stock alerts: ${lowStock.length}`);
   } catch (err) {
     console.error("Low stock check failed:", (err as Error).message);
   }
 
-  // Sync ExternalInventory (Naver-specific)
+  // Naver inventory sync
   try {
     const credentials = JSON.parse(decrypt(config.credentials));
     await naverConnector.syncInventory(credentials, config.companyId);
-
-    // Check for broken mappings: mapped products missing from Naver
-    const mappings = await prisma.skuMapping.findMany({
-      where: { companyId: config.companyId, platform: "NAVER", productId: { not: null } },
-      include: { product: { select: { name: true } } },
-    });
-    const naverSkus = await prisma.externalInventory.findMany({
-      where: { companyId: config.companyId, platform: "NAVER" },
-      select: { externalSku: true },
-    });
-    const naverSkuSet = new Set(naverSkus.map((s) => s.externalSku));
-
-    for (const m of mappings) {
-      if (!naverSkuSet.has(m.externalSku)) {
-        await notify.send({
-          type: "MAPPING_BROKEN",
-          priority: "URGENT",
-          title: `매핑 끊어짐: ${m.product?.name || m.displayName}`,
-          message: `네이버 상품번호 ${m.externalSku}가 스마트스토어에서 발견되지 않습니다.`,
-          data: { externalSku: m.externalSku, productName: m.product?.name },
-          companyId: config.companyId,
-        });
-      }
-    }
+    console.log("Naver inventory synced");
   } catch (err) {
     console.error("Naver inventory sync failed:", (err as Error).message);
   }
 
   // Recalculate HOK inventory
   await recalculateHokInventory(config.companyId);
+  console.log("HOK inventory recalculated");
 
-  if (result.errorMessage) {
-    return NextResponse.json(result, { status: 500 });
-  }
-
-  return NextResponse.json(result);
+  console.log(`[${new Date().toISOString()}] Naver sync completed`);
 }
+
+main()
+  .catch((err) => {
+    console.error("Fatal error:", err);
+    process.exit(1);
+  })
+  .finally(() => prisma.$disconnect());

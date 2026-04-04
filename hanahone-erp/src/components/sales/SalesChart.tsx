@@ -47,6 +47,24 @@ export function SalesChart({ donut, monthly, currentMonth, primaryCurrency = "US
   const total = donut.reduce((sum, d) => sum + d.amount, 0);
   const fmt = primaryCurrency === "KRW" ? formatKRW : formatUSD;
 
+  // Reverse lookup: channel label → channel key
+  const LABEL_TO_KEY: Record<string, string> = {
+    Shopify: "SHOPIFY", Amazon: "AMAZON", TikTok: "TIKTOK",
+    Naver: "NAVER", "공구": "GONGGU", Pharmacy: "PHARMACY",
+    CGETC: "CGETC", Seeding: "SEEDING", Manual: "MANUAL",
+  };
+
+  function handleChannelClick(channelKey: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    const current = params.get("channel");
+    if (current === channelKey) {
+      params.delete("channel");
+    } else {
+      params.set("channel", channelKey);
+    }
+    router.push(`${pathname}?${params.toString()}`);
+  }
+
   function handleBarClick(data: any) {
     const yearMonth = data?.payload?.yearMonth || data?.yearMonth;
     if (!yearMonth) return;
@@ -80,6 +98,12 @@ export function SalesChart({ donut, monthly, currentMonth, primaryCurrency = "US
                 innerRadius={55}
                 outerRadius={85}
                 paddingAngle={2}
+                onClick={(_, index) => {
+                  const label = donut[index]?.channel;
+                  const key = label ? LABEL_TO_KEY[label] : null;
+                  if (key) handleChannelClick(key);
+                }}
+                cursor="pointer"
               >
                 {donut.map((entry, i) => (
                   <Cell key={i} fill={entry.color} />
@@ -101,12 +125,22 @@ export function SalesChart({ donut, monthly, currentMonth, primaryCurrency = "US
           </div>
         </div>
         <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 justify-center">
-          {donut.map((d) => (
-            <div key={d.channel} className="flex items-center gap-1 text-[11px]">
-              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
-              <span className="text-[var(--text-secondary)]">{d.channel}</span>
-            </div>
-          ))}
+          {donut.map((d) => {
+            const key = LABEL_TO_KEY[d.channel];
+            const isActive = searchParams.get("channel") === key;
+            return (
+              <button
+                key={d.channel}
+                onClick={() => key && handleChannelClick(key)}
+                className={`flex items-center gap-1 text-[11px] rounded-md px-1.5 py-0.5 transition-colors ${
+                  isActive ? "bg-[var(--hover-bg)] ring-1 ring-accent" : "hover:bg-[var(--hover-bg)]"
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
+                <span className="text-[var(--text-secondary)]">{d.channel}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -143,12 +177,27 @@ export function SalesChart({ donut, monthly, currentMonth, primaryCurrency = "US
               width={50}
             />
             <Tooltip
-              formatter={(value, name) => [fmt(Number(value)), name]}
-              contentStyle={{
-                background: "var(--surface)",
-                border: "1px solid var(--border)",
-                borderRadius: "8px",
-                fontSize: "12px",
+              content={({ active, payload, label }) => {
+                if (!active || !payload?.length) return null;
+                return (
+                  <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
+                    <p style={{ fontWeight: 600, marginBottom: 4 }}>{label}</p>
+                    {payload.filter((p: any) => Number(p.value) > 0).map((p: any) => {
+                      const key = BAR_CHANNELS.find((c) => c.label === p.name)?.key || p.dataKey;
+                      return (
+                        <div
+                          key={p.dataKey}
+                          onClick={(e) => { e.stopPropagation(); handleChannelClick(key); }}
+                          style={{ color: p.fill, cursor: "pointer", padding: "1px 0" }}
+                          onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+                          onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+                        >
+                          {p.name} : {fmt(Number(p.value))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
               }}
             />
             {currentMonthLabel && (

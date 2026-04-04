@@ -27,6 +27,8 @@ export interface ExternalOrderData {
   overridePlatform?: Platform;
   /** Channel label from source (e.g. "free gifting", "기타") */
   channelNote?: string;
+  /** Override order type (e.g. SEEDING for free gifting orders) */
+  orderType?: string;
 }
 
 export interface ExternalOrderItemData {
