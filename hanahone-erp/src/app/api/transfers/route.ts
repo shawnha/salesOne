@@ -6,7 +6,9 @@ import { z } from "zod";
 
 const PatchTransferSchema = z.object({
   transferId: z.string().uuid(),
-  status: z.string().min(1),
+  status: z.string().min(1).optional(),
+  reason: z.string().optional(),
+  costAmount: z.number().optional(),
 });
 
 export async function GET(_req: NextRequest) {
@@ -30,7 +32,23 @@ export async function PATCH(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid input", details: parsed.error.flatten() }, { status: 400 });
   }
-  const { transferId, status } = parsed.data;
+  const { transferId, status, reason, costAmount } = parsed.data;
+
+  // Handle reason/costAmount update (no status change)
+  if (!status && (reason !== undefined || costAmount !== undefined)) {
+    const data: any = {};
+    if (reason !== undefined) data.reason = reason;
+    if (costAmount !== undefined) data.costAmount = costAmount;
+    const updated = await prisma.interCompanyTransfer.update({
+      where: { id: transferId },
+      data,
+    });
+    return NextResponse.json(updated);
+  }
+
+  if (!status) {
+    return NextResponse.json({ error: "Status or update fields required" }, { status: 400 });
+  }
 
   // Look up the transfer to verify access
   const transferRecord = await prisma.interCompanyTransfer.findUnique({ where: { id: transferId } });

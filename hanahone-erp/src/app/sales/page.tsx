@@ -208,15 +208,18 @@ export default async function SalesPage({
               primaryCurrency={primaryCurrency}
             />
           </div>
+          {(seedingCount > 0 || giftCount > 0) && (
+            <div className="w-px h-8 bg-[var(--border-strong)]" />
+          )}
           {seedingCount > 0 && (
             <div className="text-right">
-              <p className="text-xs text-[var(--text-secondary)]">Seeding</p>
+              <p className="text-xs text-violet-400">Seeding</p>
               <p className="text-lg font-semibold text-violet-500">{seedingCount}<span className="text-sm font-normal text-[var(--text-tertiary)]"> ({seedingSets} sets)</span></p>
             </div>
           )}
           {giftCount > 0 && (
             <div className="text-right">
-              <p className="text-xs text-[var(--text-secondary)]">Gifted</p>
+              <p className="text-xs text-rose-400">Gifted</p>
               <p className="text-lg font-semibold text-rose-400">{giftCount}<span className="text-sm font-normal text-[var(--text-tertiary)]"> ({giftSets} sets)</span></p>
             </div>
           )}

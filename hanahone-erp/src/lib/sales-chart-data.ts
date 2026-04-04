@@ -126,6 +126,7 @@ export async function getChannelSalesData(
   }
 
   const donut: ChannelSalesData[] = Object.entries(channelTotals)
+    .filter(([, amount]) => amount > 0)
     .map(([channel, amount]) => ({
       channel: CHANNEL_LABELS[channel] || channel,
       amount,

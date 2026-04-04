@@ -41,12 +41,27 @@ export function KpiRow({ data, primaryCurrency = "USD" }: { data: KpiData; prima
       <KpiCard
         label="Orders"
         value={data.totalOrders.toString()}
-        change={{
-          value: `${data.fulfilledOrders} fulfilled · ${data.pendingOrders} pending${data.seedingCount > 0 ? ` · ${data.seedingCount} seeding` : ""}${data.giftCount > 0 ? ` · ${data.giftCount} gifted` : ""}`,
-          direction: "neutral",
-        }}
         subtitle="for this period"
-      />
+      >
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          <span className="inline-flex items-center text-[12px] font-semibold px-2 py-0.5 rounded-full text-[var(--badge-teal)] bg-[var(--badge-teal-bg)]">
+            {data.fulfilledOrders} fulfilled
+          </span>
+          <span className="inline-flex items-center text-[12px] font-semibold px-2 py-0.5 rounded-full text-amber-400 bg-amber-500/10">
+            {data.pendingOrders} pending
+          </span>
+          {data.seedingCount > 0 && (
+            <span className="inline-flex items-center text-[12px] font-semibold px-2 py-0.5 rounded-full text-violet-400 bg-violet-500/10">
+              {data.seedingCount} seeding
+            </span>
+          )}
+          {data.giftCount > 0 && (
+            <span className="inline-flex items-center text-[12px] font-semibold px-2 py-0.5 rounded-full text-rose-400 bg-rose-400/10">
+              {data.giftCount} gifted
+            </span>
+          )}
+        </div>
+      </KpiCard>
       <KpiCard label="Inventory value" value={isUSD ? fmtUSD(data.inventoryValue) : fmtKRW(data.inventoryValue)} change={{ value: `${data.lowStockCount} below reorder`, direction: data.lowStockCount > 0 ? "down" : "neutral" }} subtitle="combined warehouse stock" />
       <KpiCard label="Production runs" value={data.productionRuns.toString()} change={{ value: `${data.newProductionRuns} active`, direction: "up" }} subtitle="HOK manufacturing" />
     </div>

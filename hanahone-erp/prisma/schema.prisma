@@ -348,6 +348,8 @@ model InterCompanyTransfer {
   status        TransferStatus @default(PENDING)
   transferDate  DateTime       @map("transfer_date")
   receivedDate  DateTime?      @map("received_date")
+  reason        String?        @map("reason")
+  costAmount    Decimal?       @map("cost_amount") @db.Decimal(12, 2)
 
   @@map("inter_company_transfers")
   @@schema("salesone")

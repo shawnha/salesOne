@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/table";
+import { TransferEditFields } from "@/components/transfers/transfer-edit-fields";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
@@ -116,6 +117,27 @@ export default async function TransferDetailPage({
               <span className="text-[var(--text-secondary)]">Total Amount</span>
               <span className="font-semibold">{formatWon(Number(transfer.order.totalAmount))}</span>
             </div>
+            {transfer.reason && (
+              <div className="flex justify-between">
+                <span className="text-[var(--text-secondary)]">Reason</span>
+                <span className="font-semibold">{transfer.reason}</span>
+              </div>
+            )}
+            {transfer.costAmount && (
+              <div className="flex justify-between">
+                <span className="text-[var(--text-secondary)]">Cost</span>
+                <span className="font-semibold text-amber-400">${Number(transfer.costAmount).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-[var(--border)]">
+            <h3 className="text-xs font-bold text-[var(--text-secondary)] mb-3">Edit Details</h3>
+            <TransferEditFields
+              transferId={transfer.id}
+              initialReason={transfer.reason}
+              initialCostAmount={transfer.costAmount ? Number(transfer.costAmount) : null}
+            />
           </div>
         </Card>
 

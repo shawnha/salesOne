@@ -497,14 +497,19 @@ export const cgetcConnector: Connector = {
 
       const statuses = mapCgetcStatus(so.status, so.deliveryCount);
 
+      // Detect inter-company transfers (Hanah One Korea = HOK)
+      const customerName = (so.customerName || "").toLowerCase();
+      const isInterCompany = customerName.includes("hanah one") || customerName.includes("hanahone");
+
       // Detect non-revenue orders:
+      // - isInterCompany = inter-company transfer (not a sale, not a gift)
       // - channel.isSeeding = tagged as seeding/gifting/influencer in CGETC reference
       // - allItemsDollarOne = all items at $1 (gifts/samples, not real sales)
-      const allItemsDollarOne = so.lineItems.length > 0 && so.lineItems.every((li) => li.unitPrice <= 1);
-      const isNotRevenue = channel.isSeeding || allItemsDollarOne;
+      const allItemsDollarOne = !isInterCompany && so.lineItems.length > 0 && so.lineItems.every((li) => li.unitPrice <= 1);
+      const isNotRevenue = isInterCompany || channel.isSeeding || allItemsDollarOne;
       const amount = isNotRevenue ? 0 : so.amount;
-      // Seeding = explicitly tagged; Gift = $1 items without seeding tag
-      const orderType = channel.isSeeding ? "SEEDING" : allItemsDollarOne ? "GIFT" : undefined;
+      // Priority: inter-company > seeding > gift
+      const orderType = isInterCompany ? "INTER_COMPANY" : channel.isSeeding ? "SEEDING" : allItemsDollarOne ? "GIFT" : undefined;
 
       results.push({
         externalOrderId: String(so.id),

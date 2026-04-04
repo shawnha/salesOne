@@ -38,6 +38,7 @@ interface OrderRow {
   refundAmount: number | null;
   netAmount: number | null;
   orderDate: string;
+  type?: string | null;
   notes: string | null;
   items?: OrderItemRow[];
 }
@@ -110,17 +111,22 @@ export function OrdersTable({ orders }: { orders: OrderRow[] }) {
           {orders.map((row) => {
             const isExpanded = expandedId === row.id;
             const hasRefund = row.refundAmount && row.refundAmount > 0;
-            const isSeeding = row.externalSource === "CGETC" && row.notes?.toLowerCase().startsWith("free gifting");
+            const isSeeding = row.type === "SEEDING" || (row.externalSource === "CGETC" && row.notes?.toLowerCase().startsWith("free gifting"));
+            const isGift = row.type === "GIFT";
+
+            const rowBg = isExpanded
+              ? "bg-accent/[0.04]"
+              : isSeeding
+                ? "bg-violet-500/[0.03] hover:bg-violet-500/[0.06]"
+                : isGift
+                  ? "bg-rose-400/[0.03] hover:bg-rose-400/[0.06]"
+                  : "hover:bg-[var(--hover-bg-subtle)]";
 
             return (
               <Fragment key={row.id}>
                 <tr
                   onClick={() => handleRowClick(row.id)}
-                  className={`border-b border-[var(--border)] cursor-pointer transition-colors ${
-                    isExpanded
-                      ? "bg-accent/[0.04]"
-                      : "hover:bg-[var(--hover-bg-subtle)]"
-                  }`}
+                  className={`border-b border-[var(--border)] cursor-pointer transition-colors ${rowBg}`}
                 >
                   <td className="py-3 px-4">
                     <Link

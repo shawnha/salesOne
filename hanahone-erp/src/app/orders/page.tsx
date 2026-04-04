@@ -12,7 +12,9 @@ import { getUsdKrwRate } from "@/lib/exchange-rate";
 import { CurrencyDisplay, getPrimaryCurrency } from "@/components/ui/currency-display";
 import { SearchInput } from "@/components/ui/search-input";
 import { Pagination } from "@/components/ui/pagination";
+import { TypeTabs } from "@/components/orders/type-tabs";
 import { getMonthRange } from "@/lib/date-utils";
+import Link from "next/link";
 
 const KRW_PLATFORMS = new Set(["NAVER", "PHARMACY"]);
 
@@ -33,7 +35,7 @@ export default async function OrdersPage({
     where.type = searchParams.type;
   } else {
     // Exclude seeding and gifts from default view
-    where.type = { notIn: ["SEEDING", "GIFT"] };
+    where.type = { notIn: ["SEEDING", "GIFT", "INTER_COMPANY"] };
   }
   applyChannelFilter(where, searchParams.channel);
   if (searchParams.q) {
@@ -82,6 +84,34 @@ export default async function OrdersPage({
   ]);
   const totalAmount = allSalesOrders.reduce((sum, o) => sum + toUSD(Number(o.totalAmount), o.externalSource, exchangeRate.rate), 0);
 
+  // Seeding & Gift counts (always needed for TypeTabs) + recent items (only in default view)
+  const baseFilter: any = { orderDate: dateRange };
+  if (searchParams.company) baseFilter.companyId = searchParams.company;
+  const showSeedingGiftCards = !searchParams.type;
+
+  const [seedingCount, giftCount, normalOrderCount] = await Promise.all([
+    prisma.order.count({ where: { ...baseFilter, type: "SEEDING" } }),
+    prisma.order.count({ where: { ...baseFilter, type: "GIFT" } }),
+    prisma.order.count({ where: { ...baseFilter, type: { notIn: ["SEEDING", "GIFT", "INTER_COMPANY"] } } }),
+  ]);
+
+  const [recentSeeding, recentGifts] = showSeedingGiftCards
+    ? await Promise.all([
+        prisma.order.findMany({
+          where: { ...baseFilter, type: "SEEDING" },
+          include: { customer: { select: { name: true } }, items: { select: { quantity: true, product: { select: { name: true } } } } },
+          orderBy: { orderDate: "desc" },
+          take: 5,
+        }),
+        prisma.order.findMany({
+          where: { ...baseFilter, type: "GIFT" },
+          include: { customer: { select: { name: true } }, items: { select: { quantity: true, product: { select: { name: true } } } } },
+          orderBy: { orderDate: "desc" },
+          take: 5,
+        }),
+      ])
+    : [[], []];
+
   // Top 3 customers by order count (from all matching orders)
   const allOrdersForCustomers = await prisma.order.findMany({
     where,
@@ -115,6 +145,7 @@ export default async function OrdersPage({
     refundAmount: o.refundAmount ? Number(o.refundAmount) : null,
     netAmount: o.netAmount ? Number(o.netAmount) : null,
     orderDate: o.orderDate.toISOString(),
+    type: o.type,
     notes: o.notes,
     items: o.items.map((item) => ({
       productName: item.product?.name || null,
@@ -126,7 +157,14 @@ export default async function OrdersPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <h1 className="text-xl font-bold tracking-tight">Orders</h1>
+          <h1 className="text-xl font-bold tracking-tight">
+            {searchParams.type === "SEEDING" ? "Seeding" : searchParams.type === "GIFT" ? "Gifted" : "Orders"}
+          </h1>
+          {searchParams.type && (
+            <Link href={`/orders?${new URLSearchParams({ ...(searchParams.company ? { company: searchParams.company } : {}), ...(searchParams.month ? { month: searchParams.month } : {}) }).toString()}`} className="text-[11px] text-accent hover:underline">
+              ← Back to Orders
+            </Link>
+          )}
           <MonthPicker />
           <ChannelFilter companyName={companies.find((c) => c.id === searchParams.company)?.name} />
         </div>
@@ -155,8 +193,21 @@ export default async function OrdersPage({
               primaryCurrency={primaryCurrency}
             />
           </div>
+          {showSeedingGiftCards && seedingCount > 0 && (
+            <Link href={`/orders?${new URLSearchParams({ ...(searchParams.company ? { company: searchParams.company } : {}), ...(searchParams.month ? { month: searchParams.month } : {}), type: "SEEDING" }).toString()}`} className="text-right group">
+              <p className="text-xs text-[var(--text-secondary)]">Seeding</p>
+              <p className="text-lg font-semibold text-violet-500 group-hover:underline">{seedingCount}</p>
+            </Link>
+          )}
+          {showSeedingGiftCards && giftCount > 0 && (
+            <Link href={`/orders?${new URLSearchParams({ ...(searchParams.company ? { company: searchParams.company } : {}), ...(searchParams.month ? { month: searchParams.month } : {}), type: "GIFT" }).toString()}`} className="text-right group">
+              <p className="text-xs text-[var(--text-secondary)]">Gifted</p>
+              <p className="text-lg font-semibold text-rose-400 group-hover:underline">{giftCount}</p>
+            </Link>
+          )}
         </div>
       </div>
+      <TypeTabs orderCount={normalOrderCount} seedingCount={seedingCount} giftCount={giftCount} />
       {/* Orders Line Chart + Top Customers */}
       <div className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-4">
         <Card className="p-5">
@@ -191,6 +242,82 @@ export default async function OrdersPage({
           </>
         )}
       </Card>
+
+      {/* Seeding & Gifted Cards */}
+      {showSeedingGiftCards && (seedingCount > 0 || giftCount > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {seedingCount > 0 && (
+            <Card className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-violet-500" />
+                  <p className="text-xs font-semibold text-[var(--text-secondary)]">Seeding</p>
+                  <span className="text-[11px] text-violet-500 font-semibold">{seedingCount}</span>
+                </div>
+                <Link
+                  href={`/orders?${new URLSearchParams({ ...(searchParams.company ? { company: searchParams.company } : {}), ...(searchParams.month ? { month: searchParams.month } : {}), type: "SEEDING" }).toString()}`}
+                  className="text-[11px] text-accent hover:underline"
+                >
+                  View all →
+                </Link>
+              </div>
+              <div className="space-y-2">
+                {recentSeeding.map((o) => {
+                  const sets = o.items.length > 0 ? Math.max(...o.items.map((i) => i.quantity)) : 0;
+                  const products = o.items.map((i) => i.product?.name || "?").filter((v, i, a) => a.indexOf(v) === i).join(", ");
+                  return (
+                    <Link key={o.id} href={`/orders/${o.id}`} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-[var(--hover-bg)] transition-colors">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-[13px] font-medium truncate">{o.customer?.name || "—"}</span>
+                        <span className="text-[11px] text-[var(--text-tertiary)] truncate">{products}</span>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full text-violet-500 bg-violet-500/10">{sets} {sets === 1 ? "set" : "sets"}</span>
+                        <span className="text-[11px] text-[var(--text-tertiary)]">{new Date(o.orderDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+          {giftCount > 0 && (
+            <Card className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-rose-400" />
+                  <p className="text-xs font-semibold text-[var(--text-secondary)]">Gifted</p>
+                  <span className="text-[11px] text-rose-400 font-semibold">{giftCount}</span>
+                </div>
+                <Link
+                  href={`/orders?${new URLSearchParams({ ...(searchParams.company ? { company: searchParams.company } : {}), ...(searchParams.month ? { month: searchParams.month } : {}), type: "GIFT" }).toString()}`}
+                  className="text-[11px] text-accent hover:underline"
+                >
+                  View all →
+                </Link>
+              </div>
+              <div className="space-y-2">
+                {recentGifts.map((o) => {
+                  const sets = o.items.length > 0 ? Math.max(...o.items.map((i) => i.quantity)) : 0;
+                  const products = o.items.map((i) => i.product?.name || "?").filter((v, i, a) => a.indexOf(v) === i).join(", ");
+                  return (
+                    <Link key={o.id} href={`/orders/${o.id}`} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-[var(--hover-bg)] transition-colors">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-[13px] font-medium truncate">{o.customer?.name || "—"}</span>
+                        <span className="text-[11px] text-[var(--text-tertiary)] truncate">{products}</span>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full text-rose-400 bg-rose-400/10">{sets} {sets === 1 ? "set" : "sets"}</span>
+                        <span className="text-[11px] text-[var(--text-tertiary)]">{new Date(o.orderDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
     </div>
   );
 }

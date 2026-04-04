@@ -129,6 +129,31 @@ export async function runSync(connector: Connector, companyId: string): Promise<
           },
         });
 
+        // Auto-create InterCompanyTransfer for inter-company orders
+        if (extOrder.orderType === "INTER_COMPANY") {
+          try {
+            // HOI → HOK for "Hanah One" customer
+            const toCompany = await prisma.company.findFirst({
+              where: { name: "HOK" },
+            });
+            if (toCompany) {
+              await prisma.interCompanyTransfer.create({
+                data: {
+                  fromCompanyId: companyId,
+                  toCompanyId: toCompany.id,
+                  orderId: mappedOrder.id,
+                  status: "RECEIVED",
+                  transferDate: new Date(extOrder.orderDate),
+                  receivedDate: new Date(extOrder.orderDate),
+                  reason: "Inter-company transfer (auto-detected)",
+                },
+              });
+            }
+          } catch (err) {
+            console.error("Transfer creation failed for order", mappedOrder.id, (err as Error).message);
+          }
+        }
+
         // Auto-deduct inventory for new orders
         try {
           await adjustInventoryForOrder(mappedOrder.id);
