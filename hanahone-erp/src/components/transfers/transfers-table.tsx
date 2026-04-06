@@ -32,8 +32,7 @@ export function TransfersTable({ transfers }: { transfers: TransferRow[] }) {
         <thead className="sticky top-0 z-10 bg-[var(--surface)]">
           <tr className="border-b border-[var(--border)] text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
             <th className="text-left py-3 px-4">Order #</th>
-            <th className="text-left py-3 px-4">From</th>
-            <th className="text-left py-3 px-4">To</th>
+            <th className="text-left py-3 px-4">Transfer</th>
             <th className="text-left py-3 px-4">Status</th>
             <th className="text-left py-3 px-4">Reason</th>
             <th className="text-right py-3 px-4">Cost</th>
@@ -60,10 +59,19 @@ export function TransfersTable({ transfers }: { transfers: TransferRow[] }) {
                       {row.orderNumber}
                     </Link>
                   </td>
-                  <td className="py-3 px-4 font-semibold">{row.fromCompany}</td>
-                  <td className="py-3 px-4 font-semibold">{row.toCompany}</td>
+                  <td className="py-3 px-4 font-semibold">
+                    {row.fromCompany} <span className="text-[var(--text-tertiary)] mx-1">&rarr;</span> {row.toCompany}
+                  </td>
                   <td className="py-3 px-4"><Badge status={row.status} /></td>
-                  <td className="py-3 px-4 text-[var(--text-secondary)]">{row.reason || "—"}</td>
+                  <td className="py-3 px-4">
+                    {row.reason ? (
+                      <span className="inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full text-amber-400 bg-amber-500/10">
+                        {row.reason}
+                      </span>
+                    ) : (
+                      <span className="text-[var(--text-tertiary)]">—</span>
+                    )}
+                  </td>
                   <td className="py-3 px-4 text-right font-semibold">
                     {row.costAmount ? `$${row.costAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—"}
                   </td>
@@ -73,7 +81,7 @@ export function TransfersTable({ transfers }: { transfers: TransferRow[] }) {
                 </tr>
                 {isExpanded && (
                   <tr>
-                    <td colSpan={7} className="bg-[var(--hover-bg-subtle)] border-b border-[var(--border)]">
+                    <td colSpan={6} className="bg-[var(--hover-bg-subtle)] border-b border-[var(--border)]">
                       <div className="px-8 py-4 space-y-3">
                         {row.items.length > 0 ? (
                           <div className="flex items-start gap-3 text-[13px]">
