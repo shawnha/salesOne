@@ -9,6 +9,7 @@ interface TopCustomer {
 }
 
 const formatUSD = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+const formatKRW = (n: number) => `₩${Math.round(n).toLocaleString("ko-KR")}`;
 
 function shortName(fullName: string): string {
   const parts = fullName.trim().split(/\s+/);
@@ -16,7 +17,8 @@ function shortName(fullName: string): string {
   return `${parts[0]} ${parts[parts.length - 1]}`;
 }
 
-export function TopCustomersCard({ customers }: { customers: TopCustomer[] }) {
+export function TopCustomersCard({ customers, currency = "USD" }: { customers: TopCustomer[]; currency?: "USD" | "KRW" }) {
+  const fmt = currency === "KRW" ? formatKRW : formatUSD;
   const styleInjected = useRef(false);
 
   useEffect(() => {
@@ -80,7 +82,7 @@ export function TopCustomersCard({ customers }: { customers: TopCustomer[] }) {
               {shortName(c.name)}
             </button>
             <p className="text-[11px] text-[var(--text-tertiary)]">
-              {c.count} orders · {formatUSD(c.amount)}
+              {c.count} orders · {fmt(c.amount)}
             </p>
           </div>
         </div>

@@ -125,20 +125,28 @@ export default async function OrdersPage({
       ])
     : [[], []];
 
-  // Top 3 customers by order count (from all matching orders)
+  // Top 3 customers by order count (from all matching orders).
+  // Amounts must be normalized to the page's primary currency with each order's
+  // own orderDate rate, otherwise mixed KRW/USD lines are summed as raw numbers
+  // and, e.g., Coupang ₩67,000 shows as $67,000.00 under the customer.
   const allOrdersForCustomers = await prisma.order.findMany({
     where,
-    select: { customer: { select: { name: true } }, netAmount: true, totalAmount: true },
+    select: { customer: { select: { name: true } }, netAmount: true, totalAmount: true, externalSource: true, orderDate: true },
   });
   const customerCounts = new Map<string, { name: string; count: number; amount: number }>();
   for (const order of allOrdersForCustomers) {
     const name = order.customer?.name ?? "Unknown";
+    const raw = Number(order.netAmount ?? order.totalAmount);
+    const r = rateFor(order.orderDate);
+    const normalized = primaryCurrency === "KRW"
+      ? toKRW(raw, order.externalSource, r)
+      : toUSD(raw, order.externalSource, r);
     const existing = customerCounts.get(name);
     if (existing) {
       existing.count++;
-      existing.amount += Number(order.netAmount ?? order.totalAmount);
+      existing.amount += normalized;
     } else {
-      customerCounts.set(name, { name, count: 1, amount: Number(order.netAmount ?? order.totalAmount) });
+      customerCounts.set(name, { name, count: 1, amount: normalized });
     }
   }
   const topCustomers = Array.from(customerCounts.values())
@@ -249,7 +257,7 @@ export default async function OrdersPage({
         </Card>
         <Card className="p-5">
           <p className="text-xs text-[var(--text-secondary)] mb-3">Top Customers</p>
-          <TopCustomersCard customers={topCustomers} />
+          <TopCustomersCard customers={topCustomers} currency={primaryCurrency} />
         </Card>
       </div>
       <div className="flex items-center gap-3">
