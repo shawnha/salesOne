@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getUsdKrwRatesForDates, dateKey } from "@/lib/exchange-rate";
 
 export interface ChannelSalesData {
   channel: string;
@@ -83,11 +84,15 @@ export async function getChannelSalesData(
   channel?: string | undefined,
   options?: { exchangeRate?: number; primaryCurrency?: "USD" | "KRW" },
 ): Promise<{ donut: ChannelSalesData[]; monthly: MonthlyChannelData[] }> {
-  const rate = options?.exchangeRate || 1;
+  const fallbackRate = options?.exchangeRate || 1;
   const primary = options?.primaryCurrency || "USD";
 
-  function normalize(amount: number, source: string | null): number {
+  // Rate lookup is populated below once we know which dates we need.
+  let ratesByDate: Map<string, { rate: number; date: string }> = new Map();
+
+  function normalize(amount: number, source: string | null, orderDate: Date): number {
     const isKrw = KRW_SOURCES.has(source || "");
+    const rate = ratesByDate.get(dateKey(orderDate))?.rate ?? fallbackRate;
     if (primary === "USD" && isKrw) return amount / rate;
     if (primary === "KRW" && !isKrw) return amount * rate;
     return amount;
@@ -111,31 +116,8 @@ export async function getChannelSalesData(
 
   const orders = await prisma.order.findMany({
     where,
-    select: { externalSource: true, netAmount: true, totalAmount: true, notes: true },
+    select: { externalSource: true, netAmount: true, totalAmount: true, notes: true, orderDate: true },
   });
-
-  const channelTotals: Record<string, number> = {};
-  for (const order of orders) {
-    let channel = order.externalSource || "MANUAL";
-    if (channel === "CGETC" && order.notes?.toLowerCase().startsWith("free gifting")) {
-      channel = "SEEDING";
-    } else if (channel === "NAVER" && order.notes === "공구") {
-      channel = "GONGGU";
-    }
-    // Seeding is not revenue — always $0
-    if (channel === "SEEDING") continue;
-    const raw = Number(order.netAmount ?? order.totalAmount);
-    channelTotals[channel] = (channelTotals[channel] || 0) + normalize(raw, order.externalSource);
-  }
-
-  const donut: ChannelSalesData[] = Object.entries(channelTotals)
-    .filter(([, amount]) => amount > 0)
-    .map(([channel, amount]) => ({
-      channel: CHANNEL_LABELS[channel] || channel,
-      amount,
-      color: CHANNEL_COLORS[channel] || "#9CA3AF",
-    }))
-    .sort((a, b) => b.amount - a.amount);
 
   // 5 months centered on selected month: -2 ... selected ... +2
   const RANGE = 5;
@@ -155,6 +137,27 @@ export async function getChannelSalesData(
     where: monthlyWhere,
     select: { externalSource: true, netAmount: true, totalAmount: true, orderDate: true, notes: true },
   });
+
+  // Fetch per-date exchange rates for every order date we'll touch.
+  const allDates: Date[] = [
+    ...orders.map((o) => o.orderDate),
+    ...monthlyOrders.map((o) => o.orderDate),
+  ];
+  ratesByDate = await getUsdKrwRatesForDates(allDates);
+
+  // Donut aggregation (uses per-order rates via normalize)
+  const channelTotals: Record<string, number> = {};
+  for (const order of orders) {
+    let channel = order.externalSource || "MANUAL";
+    if (channel === "CGETC" && order.notes?.toLowerCase().startsWith("free gifting")) {
+      channel = "SEEDING";
+    } else if (channel === "NAVER" && order.notes === "공구") {
+      channel = "GONGGU";
+    }
+    if (channel === "SEEDING") continue;
+    const raw = Number(order.netAmount ?? order.totalAmount);
+    channelTotals[channel] = (channelTotals[channel] || 0) + normalize(raw, order.externalSource, order.orderDate);
+  }
 
   const monthly: MonthlyChannelData[] = [];
   for (let i = 0; i < RANGE; i++) {
@@ -180,10 +183,19 @@ export async function getChannelSalesData(
       if (channel === "SEEDING") continue;
       if (channel in monthly[idx]) {
         const raw = Number(order.netAmount ?? order.totalAmount);
-        monthly[idx][channel] += normalize(raw, order.externalSource);
+        monthly[idx][channel] += normalize(raw, order.externalSource, order.orderDate);
       }
     }
   }
+
+  const donut: ChannelSalesData[] = Object.entries(channelTotals)
+    .filter(([, amount]) => amount > 0)
+    .map(([channel, amount]) => ({
+      channel: CHANNEL_LABELS[channel] || channel,
+      amount,
+      color: CHANNEL_COLORS[channel] || "#9CA3AF",
+    }))
+    .sort((a, b) => b.amount - a.amount);
 
   return { donut, monthly };
 }

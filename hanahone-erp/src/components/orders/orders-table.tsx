@@ -56,10 +56,20 @@ interface RefundData {
   }[];
 }
 
-export function OrdersTable({ orders, viewMode = "orders", exchangeRate }: { orders: OrderRow[]; viewMode?: "orders" | "seeding" | "gifted"; exchangeRate?: number }) {
-  const rate = exchangeRate || 0;
-  function fmtDual(amount: number, platform: string | null) {
+export function OrdersTable({ orders, viewMode = "orders", exchangeRate, ratesByDate }: {
+  orders: OrderRow[];
+  viewMode?: "orders" | "seeding" | "gifted";
+  exchangeRate?: number; // fallback if no per-date rate is available
+  ratesByDate?: Record<string, number>; // YYYY-MM-DD → rate
+}) {
+  const fallbackRate = exchangeRate || 0;
+  const rateFor = (orderDate: string): number => {
+    const key = orderDate.slice(0, 10);
+    return ratesByDate?.[key] ?? fallbackRate;
+  };
+  function fmtDual(amount: number, platform: string | null, orderDate: string) {
     const isKrw = KRW_PLATFORMS.has(platform || "");
+    const rate = rateFor(orderDate);
     const primary = isKrw ? formatKRW(amount) : formatUSD(amount);
     const secondary = !rate
       ? null
@@ -221,7 +231,7 @@ export function OrdersTable({ orders, viewMode = "orders", exchangeRate }: { ord
                               Net: {fmt(row.netAmount ?? row.totalAmount, row.externalSource)}
                             </div>
                             {(() => {
-                              const d = fmtDual(Number(row.netAmount ?? row.totalAmount), row.externalSource);
+                              const d = fmtDual(Number(row.netAmount ?? row.totalAmount), row.externalSource, row.orderDate);
                               return d.secondary ? (
                                 <div className="text-[10px] text-[var(--text-tertiary)]">{d.secondary}</div>
                               ) : null;
@@ -229,7 +239,7 @@ export function OrdersTable({ orders, viewMode = "orders", exchangeRate }: { ord
                           </div>
                         ) : (
                           (() => {
-                            const d = fmtDual(Number(row.totalAmount), row.externalSource);
+                            const d = fmtDual(Number(row.totalAmount), row.externalSource, row.orderDate);
                             return (
                               <div>
                                 <div className="font-semibold">{d.primary}</div>

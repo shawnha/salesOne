@@ -8,7 +8,7 @@ import { TopCustomersCard } from "@/components/orders/TopCustomersCard";
 import { ChannelFilter } from "@/components/orders/channel-filter";
 import { getDailyOrderData } from "@/lib/orders-chart-data";
 import { applyChannelFilter } from "@/lib/sales-chart-data";
-import { getUsdKrwRate } from "@/lib/exchange-rate";
+import { getUsdKrwRate, getUsdKrwRatesForDates, dateKey } from "@/lib/exchange-rate";
 import { CurrencyDisplay, getPrimaryCurrency } from "@/components/ui/currency-display";
 import { SearchInput } from "@/components/ui/search-input";
 import { Pagination } from "@/components/ui/pagination";
@@ -20,6 +20,10 @@ const KRW_PLATFORMS = new Set(["NAVER", "COUPANG", "PHARMACY", "GONGGU"]);
 
 function toUSD(amount: number, platform: string | null, exchangeRate: number) {
   return KRW_PLATFORMS.has(platform || "") ? amount / exchangeRate : amount;
+}
+
+function toKRW(amount: number, platform: string | null, exchangeRate: number) {
+  return KRW_PLATFORMS.has(platform || "") ? amount : amount * exchangeRate;
 }
 
 export default async function OrdersPage({
@@ -76,13 +80,22 @@ export default async function OrdersPage({
   const [allSalesOrders, paidCount, refundedCount, fulfilledCount] = await Promise.all([
     prisma.order.findMany({
       where,
-      select: { totalAmount: true, externalSource: true },
+      select: { totalAmount: true, externalSource: true, orderDate: true },
     }),
     prisma.order.count({ where: { ...where, financialStatus: { in: ["PAID", "PARTIALLY_PAID"] } } }),
     prisma.order.count({ where: { ...where, financialStatus: { in: ["REFUNDED", "PARTIALLY_REFUNDED"] } } }),
     prisma.order.count({ where: { ...where, fulfillmentStatus: { in: ["FULFILLED", "DELIVERED"] } } }),
   ]);
-  const totalAmount = allSalesOrders.reduce((sum, o) => sum + toUSD(Number(o.totalAmount), o.externalSource, exchangeRate.rate), 0);
+
+  const allOrderDates = [...allSalesOrders.map((o) => o.orderDate), ...orders.map((o) => o.orderDate)];
+  const ratesByDate = await getUsdKrwRatesForDates(allOrderDates);
+  const rateFor = (d: Date) => ratesByDate.get(dateKey(d))?.rate ?? exchangeRate.rate;
+
+  const totalAmount = allSalesOrders.reduce((sum, o) => {
+    const r = rateFor(o.orderDate);
+    const amt = Number(o.totalAmount);
+    return sum + (primaryCurrency === "KRW" ? toKRW(amt, o.externalSource, r) : toUSD(amt, o.externalSource, r));
+  }, 0);
 
   // Seeding & Gift counts (always needed for TypeTabs) + recent items (only in default view)
   const baseFilter: any = { orderDate: dateRange };
@@ -252,7 +265,12 @@ export default async function OrdersPage({
           <EmptyState title="No orders" description="No orders found for this month." />
         ) : (
           <>
-            <OrdersTable orders={orderRows} viewMode={searchParams.type === "SEEDING" ? "seeding" : searchParams.type === "GIFT" ? "gifted" : "orders"} exchangeRate={exchangeRate.rate} />
+            <OrdersTable
+              orders={orderRows}
+              viewMode={searchParams.type === "SEEDING" ? "seeding" : searchParams.type === "GIFT" ? "gifted" : "orders"}
+              exchangeRate={exchangeRate.rate}
+              ratesByDate={Object.fromEntries(Array.from(ratesByDate.entries()).map(([k, v]) => [k, v.rate]))}
+            />
             <Pagination currentPage={currentPage} totalPages={totalPages} totalItems={totalOrderCount} pageSize={PAGE_SIZE} />
           </>
         )}

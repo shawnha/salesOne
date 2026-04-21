@@ -8,7 +8,7 @@ import { ProductionSummary } from "@/components/dashboard/production-summary";
 import { DateFilter } from "@/components/ui/date-filter";
 import { fetchCgetcInventory, type CgetcProduct } from "@/lib/integrations/connectors/cgetc";
 import { decrypt } from "@/lib/integrations/encryption";
-import { getUsdKrwRate, convertUsdToKrw, convertKrwToUsd } from "@/lib/exchange-rate";
+import { getUsdKrwRate, getUsdKrwRatesForDates, dateKey, convertUsdToKrw, convertKrwToUsd } from "@/lib/exchange-rate";
 import { getDateRange } from "@/lib/date-utils";
 import { getPrimaryCurrency } from "@/components/ui/currency-display";
 
@@ -115,7 +115,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
   const [salesOrders, totalOrderCount, fulfilledCount, pendingCount, seedingCount, giftCount, latestSyncs, exchangeRate] = await Promise.all([
     prisma.order.findMany({
       where: { ...companyFilter, ...dateFilter, type: revenueTypes },
-      select: { totalAmount: true, externalSource: true },
+      select: { totalAmount: true, externalSource: true, orderDate: true },
     }),
     prisma.order.count({ where: orderFilter }),
     prisma.order.count({ where: { ...orderFilter, fulfillmentStatus: { in: ["FULFILLED", "DELIVERED"] } } }),
@@ -143,22 +143,33 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
   const rate = exchangeRate.rate;
   const primaryCurrency = getPrimaryCurrency(companyId || undefined, companies);
 
-  // Dual currency totals
-  const totalSalesKRW = salesOrders.reduce((sum, o) => sum + toKRW(Number(o.totalAmount), o.externalSource, rate), 0);
-  const totalSalesUSD = salesOrders.reduce((sum, o) => sum + toUSD(Number(o.totalAmount), o.externalSource, rate), 0);
-
-  const companyBreakdowns = await Promise.all(
-    companies.map(async (c) => {
-      const companyOrders = await prisma.order.findMany({
+  // Per-order-date rates for accurate KRW↔USD conversion
+  const companyOrdersForBreakdown = await Promise.all(
+    companies.map((c) =>
+      prisma.order.findMany({
         where: { companyId: c.id, ...dateFilter, type: { in: ["SALE", "BROKERAGE"] } },
-        select: { totalAmount: true, externalSource: true },
-      });
-      const orderCount = await prisma.order.count({ where: { companyId: c.id, ...dateFilter, type: { notIn: ["SEEDING", "GIFT", "INTER_COMPANY"] } } });
-      const revenueKRW = companyOrders.reduce((sum, o) => sum + toKRW(Number(o.totalAmount), o.externalSource, rate), 0);
-      const revenueUSD = companyOrders.reduce((sum, o) => sum + toUSD(Number(o.totalAmount), o.externalSource, rate), 0);
-      return { ...c, revenueKRW, revenueUSD, orderCount };
-    })
+        select: { totalAmount: true, externalSource: true, orderDate: true },
+      }),
+    ),
   );
+  const allDashDates = [
+    ...salesOrders.map((o) => o.orderDate),
+    ...companyOrdersForBreakdown.flat().map((o) => o.orderDate),
+  ];
+  const ratesByDate = await getUsdKrwRatesForDates(allDashDates);
+  const rateFor = (d: Date) => ratesByDate.get(dateKey(d))?.rate ?? rate;
+
+  // Dual currency totals (per-order rate)
+  const totalSalesKRW = salesOrders.reduce((sum, o) => sum + toKRW(Number(o.totalAmount), o.externalSource, rateFor(o.orderDate)), 0);
+  const totalSalesUSD = salesOrders.reduce((sum, o) => sum + toUSD(Number(o.totalAmount), o.externalSource, rateFor(o.orderDate)), 0);
+
+  const companyBreakdowns = companies.map((c, idx) => {
+      const companyOrders = companyOrdersForBreakdown[idx];
+      const orderCount = companyOrders.length;
+      const revenueKRW = companyOrders.reduce((sum, o) => sum + toKRW(Number(o.totalAmount), o.externalSource, rateFor(o.orderDate)), 0);
+      const revenueUSD = companyOrders.reduce((sum, o) => sum + toUSD(Number(o.totalAmount), o.externalSource, rateFor(o.orderDate)), 0);
+      return { ...c, revenueKRW, revenueUSD, orderCount };
+    });
 
   return (
     <div>

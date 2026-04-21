@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { MonthPicker } from "@/components/ui/month-picker";
 import { SalesChart } from "@/components/sales/SalesChart";
 import { getChannelSalesData } from "@/lib/sales-chart-data";
-import { getUsdKrwRate } from "@/lib/exchange-rate";
+import { getUsdKrwRate, getUsdKrwRatesForDates, dateKey } from "@/lib/exchange-rate";
 import { CurrencyDisplay, getPrimaryCurrency } from "@/components/ui/currency-display";
 import Link from "next/link";
 import { ChannelFilter } from "@/components/orders/channel-filter";
@@ -23,6 +23,10 @@ function formatOrderAmount(amount: number, platform: string | null) {
 
 function toUSD(amount: number, platform: string | null, exchangeRate: number) {
   return KRW_PLATFORMS.has(platform || "") ? amount / exchangeRate : amount;
+}
+
+function toKRW(amount: number, platform: string | null, exchangeRate: number) {
+  return KRW_PLATFORMS.has(platform || "") ? amount : amount * exchangeRate;
 }
 
 const platformBadge: Record<string, { label: string; color: string }> = {
@@ -110,15 +114,26 @@ export default async function SalesPage({
   const totalPages = Math.ceil(totalSalesCount / PAGE_SIZE);
   const allSalesForKpi = await prisma.order.findMany({
     where,
-    select: { netAmount: true, totalAmount: true, externalSource: true, commissionAmount: true, settlementAmount: true },
+    select: { netAmount: true, totalAmount: true, externalSource: true, commissionAmount: true, settlementAmount: true, orderDate: true },
   });
+
+  // Per-date exchange rates so each order is converted at its own orderDate rate.
+  const allOrderDates = [...allSalesForKpi.map((o) => o.orderDate), ...orders.map((o) => o.orderDate)];
+  const ratesByDate = await getUsdKrwRatesForDates(allOrderDates);
+  const rateFor = (d: Date) => ratesByDate.get(dateKey(d))?.rate ?? exchangeRate.rate;
+
+  const convertToPrimary = (amount: number, platform: string | null, d: Date) => {
+    const r = rateFor(d);
+    return primaryCurrency === "KRW" ? toKRW(amount, platform, r) : toUSD(amount, platform, r);
+  };
+
   const totalRevenue = allSalesForKpi.reduce((sum, o) => {
     const amount = Number(o.netAmount ?? o.totalAmount);
-    return sum + toUSD(amount, o.externalSource, exchangeRate.rate);
+    return sum + convertToPrimary(amount, o.externalSource, o.orderDate);
   }, 0);
   const totalCommission = allSalesForKpi.reduce((sum, o) => {
     if (!o.commissionAmount) return sum;
-    return sum + toUSD(Number(o.commissionAmount), o.externalSource, exchangeRate.rate);
+    return sum + convertToPrimary(Number(o.commissionAmount), o.externalSource, o.orderDate);
   }, 0);
   const orderCount = totalSalesCount;
 
@@ -180,10 +195,9 @@ export default async function SalesPage({
       render: (row: (typeof orders)[0]) => {
         const amount = Number(row.netAmount ?? row.totalAmount);
         const isKrw = KRW_PLATFORMS.has(row.externalSource || "");
+        const r = rateFor(row.orderDate);
         const primary = isKrw ? formatKRW(amount) : formatUSD(amount);
-        const secondary = isKrw
-          ? formatUSD(amount / exchangeRate.rate)
-          : formatKRW(amount * exchangeRate.rate);
+        const secondary = isKrw ? formatUSD(amount / r) : formatKRW(amount * r);
         return (
           <div className="text-right">
             <div className="font-semibold">{primary}</div>
