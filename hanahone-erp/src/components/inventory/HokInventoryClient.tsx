@@ -546,9 +546,12 @@ export function HokInventoryClient({
                       <p className="text-[11px] text-amber-600 font-medium">
                         공구 할당: {item.allocated.toLocaleString()}
                       </p>
-                      <p className={`text-lg font-bold ${item.available < 0 ? "text-rose-500" : "text-teal-600"}`}>
-                        {item.available.toLocaleString()}
-                      </p>
+                      <div className={`text-lg font-bold flex justify-center ${item.available < 0 ? "text-rose-500" : "text-teal-600"}`}>
+                        <EditableQuantity
+                          value={item.available}
+                          onSave={(val) => handleSaveRegular(item.sku, val)}
+                        />
+                      </div>
                       <p className="text-[10px] text-[var(--text-tertiary)]">스마트스토어 가용</p>
                     </div>
                   )}
