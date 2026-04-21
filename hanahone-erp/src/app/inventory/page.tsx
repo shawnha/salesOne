@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { fetchCgetcInventory, type CgetcProduct } from "@/lib/integrations/connectors/cgetc";
 import { decrypt } from "@/lib/integrations/encryption";
 import { HokInventoryClient, type BomEntry, type GongguInventoryRow, type InventoryRow as HokInventoryRow } from "@/components/inventory/HokInventoryClient";
+import { InventoryBreakdownGrid, type InventoryBreakdownItem, type ChannelSales } from "@/components/inventory/InventoryBreakdown";
 
 type InventoryRow = {
   id: string;
@@ -82,22 +83,47 @@ export default async function InventoryPage({
     where: {
       order: {
         ...(searchParams.company ? { companyId: searchParams.company } : {}),
-        type: { in: ["SALE", "BROKERAGE"] },
         orderDate: { gte: thirtyDaysAgo },
       },
     },
-    include: { product: { select: { sku: true } } },
+    include: {
+      product: { select: { sku: true } },
+      order: { select: { externalSource: true, notes: true, type: true, companyId: true } },
+    },
   });
   const salesByProduct = new Map<string, number>();
   const salesBySku = new Map<string, number>();
+  // Channel breakdown per SKU per company, last 30 days.
+  const channelBreakdown = new Map<string, ChannelSales>(); // key: companyId::sku
   for (const item of recentSales) {
-    if (item.productId) {
-      salesByProduct.set(item.productId, (salesByProduct.get(item.productId) || 0) + item.quantity);
+    const orderType = item.order.type;
+    // Count towards burn rate only for revenue-bearing orders.
+    const isRevenue = orderType === "SALE" || orderType === "BROKERAGE";
+    if (isRevenue) {
+      if (item.productId) {
+        salesByProduct.set(item.productId, (salesByProduct.get(item.productId) || 0) + item.quantity);
+      }
+      if (item.product?.sku) {
+        salesBySku.set(item.product.sku, (salesBySku.get(item.product.sku) || 0) + item.quantity);
+      }
     }
-    if (item.product?.sku) {
-      salesBySku.set(item.product.sku, (salesBySku.get(item.product.sku) || 0) + item.quantity);
-    }
+
+    if (!item.product?.sku) continue;
+    let channel: string = item.order.externalSource || "MANUAL";
+    if (orderType === "SEEDING") channel = "SEEDING";
+    else if (orderType === "GIFT") channel = "GIFT";
+    else if (channel === "NAVER" && item.order.notes === "공구") channel = "GONGGU";
+    else if (channel === "CGETC" && item.order.notes?.toLowerCase().startsWith("free gifting")) channel = "SEEDING";
+
+    const key = `${item.order.companyId}::${item.product.sku}`;
+    const breakdown = channelBreakdown.get(key) || {};
+    (breakdown as any)[channel] = ((breakdown as any)[channel] || 0) + item.quantity;
+    channelBreakdown.set(key, breakdown);
   }
+
+  // Map company name → id for breakdown lookup (rows only carry company name).
+  const companiesAll = await prisma.company.findMany({ select: { id: true, name: true } });
+  const companyIdByName = new Map(companiesAll.map((c) => [c.name, c.id]));
 
   // Merge into unified rows — exclude internal records that overlap with CGETC live data
   const cgetcSkus = new Set(cgetcProducts.map((p) => p.sku));
@@ -382,6 +408,31 @@ export default async function InventoryPage({
       ).sort(([a], [b]) => a.localeCompare(b))
     : null;
 
+  // Build breakdown items (for HOI, HOR, and Group views — HOK uses its
+  // own editable client component). Skip SKUs without a sku.
+  function rowsToBreakdown(rs: InventoryRow[]): InventoryBreakdownItem[] {
+    return rs
+      .filter((r) => r.sku)
+      .map((r) => {
+        const companyId = companyIdByName.get(r.company);
+        const key = companyId ? `${companyId}::${r.sku}` : "";
+        const channels = (channelBreakdown.get(key) || {}) as ChannelSales;
+        return {
+          sku: r.sku,
+          name: r.name,
+          warehouse: r.warehouse,
+          onHand: r.quantity,
+          baseline: r.baseline !== null && r.baselineDate
+            ? { quantity: r.baseline, setAt: r.baselineDate }
+            : null,
+          reorderLevel: r.reorderLevel,
+          reserved: r.reserved,
+          channelSales: channels,
+        };
+      })
+      .sort((a, b) => b.onHand - a.onHand);
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -427,22 +478,35 @@ export default async function InventoryPage({
           regularRows={hokRegularRows as HokInventoryRow[]}
           bomEntries={hokBomEntries}
           companyId={hokCompany!.id}
+          channelSalesBySku={Object.fromEntries(
+            hokRegularRows
+              .filter((r) => r.sku)
+              .map((r) => {
+                const key = `${hokCompany!.id}::${r.sku}`;
+                return [r.sku, (channelBreakdown.get(key) || {}) as ChannelSales];
+              }),
+          )}
         />
       ) : companyGroups ? (
-        companyGroups.map(([companyName, group]) => (
-          <div key={companyName} className="space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
-              {companyName} <span className="text-[var(--text-quaternary)]">({group.rows.length})</span>
-            </h2>
-            <Card>
-              {group.rows.length === 0 ? (
-                <EmptyState title="No inventory" description="No inventory records found." />
+        companyGroups.map(([companyName, group]) => {
+          const items = rowsToBreakdown(group.rows);
+          return (
+            <div key={companyName} className="space-y-3">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+                {companyName} <span className="text-[var(--text-quaternary)]">({group.rows.length})</span>
+              </h2>
+              {items.length === 0 ? (
+                <Card>
+                  <EmptyState title="No inventory" description="No inventory records found." />
+                </Card>
               ) : (
-                <DataTable columns={columns} data={group.rows} />
+                <InventoryBreakdownGrid items={items} />
               )}
-            </Card>
-          </div>
-        ))
+            </div>
+          );
+        })
+      ) : rowsToBreakdown(rows).length > 0 ? (
+        <InventoryBreakdownGrid items={rowsToBreakdown(rows)} />
       ) : (
         <Card>
           {rows.length === 0 ? (

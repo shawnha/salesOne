@@ -150,12 +150,14 @@ export function HokInventoryClient({
   regularRows,
   bomEntries,
   companyId,
+  channelSalesBySku = {},
 }: {
   baselines: BaselineItem[];
   gongguRows: GongguInventoryRow[];
   regularRows: InventoryRow[];
   bomEntries: BomEntry[];
   companyId: string;
+  channelSalesBySku?: Record<string, Partial<Record<string, number>>>;
 }) {
   const router = useRouter();
   const [gongguRows, setGongguRows] = useState(initialGongguRows);
@@ -525,28 +527,67 @@ export function HokInventoryClient({
         <Card className="p-5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)] mb-4">전체 재고</h2>
           <div className="grid grid-cols-2 gap-6">
-            {availableItems.map((item) => (
-              <div key={item.sku} className="text-center">
-                <div className="text-2xl font-bold flex justify-center">
-                  <EditableQuantity
-                    value={item.quantity}
-                    onSave={(val) => handleSaveBaseline(item.sku, val)}
-                  />
-                </div>
-                <p className="text-xs text-[var(--text-secondary)] mt-1">{item.productName}</p>
-                {item.allocated > 0 && (
-                  <div className="mt-2 space-y-0.5">
-                    <p className="text-[11px] text-amber-600 font-medium">
-                      공구 할당: {item.allocated.toLocaleString()}
-                    </p>
-                    <p className={`text-lg font-bold ${item.available < 0 ? "text-rose-500" : "text-teal-600"}`}>
-                      {item.available.toLocaleString()}
-                    </p>
-                    <p className="text-[10px] text-[var(--text-tertiary)]">스마트스토어 가용</p>
+            {availableItems.map((item) => {
+              const channels = channelSalesBySku[item.sku] || {};
+              const channelEntries = Object.entries(channels)
+                .filter(([, v]) => (v ?? 0) > 0)
+                .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0));
+              return (
+                <div key={item.sku} className="text-center">
+                  <div className="text-2xl font-bold flex justify-center">
+                    <EditableQuantity
+                      value={item.quantity}
+                      onSave={(val) => handleSaveBaseline(item.sku, val)}
+                    />
                   </div>
-                )}
-              </div>
-            ))}
+                  <p className="text-xs text-[var(--text-secondary)] mt-1">{item.productName}</p>
+                  {item.allocated > 0 && (
+                    <div className="mt-2 space-y-0.5">
+                      <p className="text-[11px] text-amber-600 font-medium">
+                        공구 할당: {item.allocated.toLocaleString()}
+                      </p>
+                      <p className={`text-lg font-bold ${item.available < 0 ? "text-rose-500" : "text-teal-600"}`}>
+                        {item.available.toLocaleString()}
+                      </p>
+                      <p className="text-[10px] text-[var(--text-tertiary)]">스마트스토어 가용</p>
+                    </div>
+                  )}
+                  {channelEntries.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-[var(--border)]">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)] mb-1.5">
+                        채널별 판매 (30일)
+                      </p>
+                      <div className="flex flex-wrap justify-center gap-1.5">
+                        {channelEntries.map(([ch, qty]) => {
+                          const label =
+                            ch === "NAVER" ? "네이버" :
+                            ch === "COUPANG" ? "쿠팡" :
+                            ch === "GONGGU" ? "공구" :
+                            ch === "PHARMACY" ? "약국" :
+                            ch === "SEEDING" ? "Seeding" :
+                            ch === "GIFT" ? "Gift" :
+                            ch;
+                          const color =
+                            ch === "NAVER" ? "text-emerald-600 bg-emerald-600/[0.08]" :
+                            ch === "COUPANG" ? "text-red-600 bg-red-600/[0.08]" :
+                            ch === "GONGGU" ? "text-rose-600 bg-rose-600/[0.08]" :
+                            ch === "PHARMACY" ? "text-blue-600 bg-blue-600/[0.08]" :
+                            ch === "SEEDING" ? "text-violet-600 bg-violet-600/[0.08]" :
+                            ch === "GIFT" ? "text-amber-600 bg-amber-600/[0.08]" :
+                            "text-slate-500 bg-slate-500/[0.08]";
+                          return (
+                            <span key={ch} className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold rounded-full ${color}`}>
+                              <span>{label}</span>
+                              <span className="opacity-70">{qty!.toLocaleString()}</span>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </Card>
       )}
