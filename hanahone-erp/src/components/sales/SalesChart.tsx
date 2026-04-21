@@ -52,6 +52,7 @@ export function SalesChart({ donut, monthly, currentMonth, primaryCurrency = "US
     Shopify: "SHOPIFY", Amazon: "AMAZON", TikTok: "TIKTOK",
     Naver: "NAVER", "공구": "GONGGU", Pharmacy: "PHARMACY",
     CGETC: "CGETC", Seeding: "SEEDING", Manual: "MANUAL",
+    Coupang: "COUPANG",
   };
 
   function handleChannelClick(channelKey: string) {

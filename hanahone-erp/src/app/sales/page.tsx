@@ -32,6 +32,7 @@ const platformBadge: Record<string, { label: string; color: string }> = {
   NAVER: { label: "Naver", color: "text-emerald-600 bg-emerald-600/[0.08]" },
   PHARMACY: { label: "Pharmacy", color: "text-blue-600 bg-blue-600/[0.08]" },
   CGETC: { label: "CGETC", color: "text-indigo-600 bg-indigo-600/[0.08]" },
+  COUPANG: { label: "Coupang", color: "text-red-600 bg-red-600/[0.08]" },
 };
 
 export default async function SalesPage({
