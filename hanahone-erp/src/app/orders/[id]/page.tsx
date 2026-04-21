@@ -9,7 +9,7 @@ import { OrderStatusChanger } from "@/components/orders/OrderStatusChanger";
 
 const formatUSD = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 const formatKRW = (n: number) => `₩${Math.round(n).toLocaleString("ko-KR")}`;
-const KRW_PLATFORMS = new Set(["NAVER", "PHARMACY"]);
+const KRW_PLATFORMS = new Set(["NAVER", "COUPANG", "PHARMACY", "GONGGU"]);
 const fmt = (n: number, platform: string | null) =>
   KRW_PLATFORMS.has(platform || "") ? formatKRW(n) : formatUSD(n);
 
@@ -17,8 +17,9 @@ const platformLabels: Record<string, string> = {
   SHOPIFY: "Shopify",
   AMAZON: "Amazon",
   TIKTOK: "TikTok",
-  NAVER: "Naver",
-  PHARMACY: "Pharmacy",
+  NAVER: "네이버",
+  COUPANG: "쿠팡",
+  PHARMACY: "약국",
 };
 
 export default async function OrderDetailPage({

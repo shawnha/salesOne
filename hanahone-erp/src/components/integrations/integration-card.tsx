@@ -21,10 +21,10 @@ const platformLabels: Record<Platform, string> = {
   AMAZON: "Amazon",
   TIKTOK: "TikTok",
   CGETC: "CGETC",
-  NAVER: "Naver",
-  PHARMACY: "Pharmacy",
+  NAVER: "네이버",
+  PHARMACY: "약국",
   ORDERDESK: "OrderDesk",
-  COUPANG: "Coupang",
+  COUPANG: "쿠팡",
 };
 
 function getStatus(isActive: boolean, hasCreds: boolean, lastJobStatus: string | null) {

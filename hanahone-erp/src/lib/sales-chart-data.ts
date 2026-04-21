@@ -13,6 +13,7 @@ export interface MonthlyChannelData {
   AMAZON: number;
   TIKTOK: number;
   NAVER: number;
+  COUPANG: number;
   GONGGU: number;
   PHARMACY: number;
   CGETC: number;
@@ -25,6 +26,7 @@ const CHANNEL_COLORS: Record<string, string> = {
   AMAZON: "#FF9900",
   TIKTOK: "#EE1D52",
   NAVER: "#1B9E77",
+  COUPANG: "#DC2626",
   GONGGU: "#E11D48",
   PHARMACY: "#6B7280",
   CGETC: "#4F46E5",
@@ -36,9 +38,10 @@ const CHANNEL_LABELS: Record<string, string> = {
   SHOPIFY: "Shopify",
   AMAZON: "Amazon",
   TIKTOK: "TikTok",
-  NAVER: "Naver",
+  NAVER: "네이버",
+  COUPANG: "쿠팡",
   GONGGU: "공구",
-  PHARMACY: "Pharmacy",
+  PHARMACY: "약국",
   CGETC: "CGETC",
   SEEDING: "Seeding",
   MANUAL: "Manual",
@@ -159,7 +162,7 @@ export async function getChannelSalesData(
     monthly.push({
       month: MONTH_NAMES[m.getMonth()],
       yearMonth: `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`,
-      SHOPIFY: 0, AMAZON: 0, TIKTOK: 0, NAVER: 0, GONGGU: 0, PHARMACY: 0, CGETC: 0, SEEDING: 0, MANUAL: 0,
+      SHOPIFY: 0, AMAZON: 0, TIKTOK: 0, NAVER: 0, COUPANG: 0, GONGGU: 0, PHARMACY: 0, CGETC: 0, SEEDING: 0, MANUAL: 0,
     });
   }
 

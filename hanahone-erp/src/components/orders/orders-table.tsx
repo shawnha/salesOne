@@ -7,7 +7,7 @@ import { OrderStatusBadge } from "./order-status-badge";
 
 const formatUSD = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 const formatKRW = (n: number) => `₩${Math.round(n).toLocaleString("ko-KR")}`;
-const KRW_PLATFORMS = new Set(["NAVER", "PHARMACY"]);
+const KRW_PLATFORMS = new Set(["NAVER", "COUPANG", "PHARMACY", "GONGGU"]);
 const fmt = (n: number, platform: string | null) =>
   KRW_PLATFORMS.has(platform || "") ? formatKRW(n) : formatUSD(n);
 
@@ -15,10 +15,10 @@ const platformBadge: Record<string, { label: string; color: string }> = {
   SHOPIFY: { label: "Shopify", color: "text-green-600 bg-green-600/[0.08]" },
   AMAZON: { label: "Amazon", color: "text-orange-600 bg-orange-600/[0.08]" },
   TIKTOK: { label: "TikTok", color: "text-pink-600 bg-pink-600/[0.08]" },
-  NAVER: { label: "Naver", color: "text-emerald-600 bg-emerald-600/[0.08]" },
-  PHARMACY: { label: "Pharmacy", color: "text-blue-600 bg-blue-600/[0.08]" },
+  NAVER: { label: "네이버", color: "text-emerald-600 bg-emerald-600/[0.08]" },
+  PHARMACY: { label: "약국", color: "text-blue-600 bg-blue-600/[0.08]" },
   CGETC: { label: "CGETC", color: "text-indigo-600 bg-indigo-600/[0.08]" },
-  COUPANG: { label: "Coupang", color: "text-red-600 bg-red-600/[0.08]" },
+  COUPANG: { label: "쿠팡", color: "text-red-600 bg-red-600/[0.08]" },
 };
 
 interface OrderItemRow {

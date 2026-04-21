@@ -13,7 +13,7 @@ interface RecentOrder {
   transferLabel?: string;
 }
 
-const KRW_PLATFORMS = new Set(["NAVER", "PHARMACY"]);
+const KRW_PLATFORMS = new Set(["NAVER", "COUPANG", "PHARMACY", "GONGGU"]);
 
 function formatAmount(n: number, platform: string | null | undefined) {
   if (KRW_PLATFORMS.has(platform || "")) {

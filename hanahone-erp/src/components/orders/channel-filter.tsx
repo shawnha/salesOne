@@ -9,10 +9,10 @@ const ALL_CHANNELS: Channel[] = [
   { value: "SHOPIFY", label: "Shopify", color: "text-green-600" },
   { value: "TIKTOK", label: "TikTok", color: "text-pink-600" },
   { value: "AMAZON", label: "Amazon", color: "text-orange-600" },
-  { value: "NAVER", label: "Naver", color: "text-emerald-600" },
-  { value: "COUPANG", label: "Coupang", color: "text-red-600" },
+  { value: "NAVER", label: "네이버", color: "text-emerald-600" },
+  { value: "COUPANG", label: "쿠팡", color: "text-red-600" },
   { value: "GONGGU", label: "공구", color: "text-rose-600" },
-  { value: "PHARMACY", label: "Pharmacy", color: "text-blue-600" },
+  { value: "PHARMACY", label: "약국", color: "text-blue-600" },
   { value: "CGETC", label: "CGETC", color: "text-indigo-600" },
 ];
 

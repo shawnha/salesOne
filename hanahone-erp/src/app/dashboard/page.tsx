@@ -12,7 +12,7 @@ import { getUsdKrwRate, convertUsdToKrw, convertKrwToUsd } from "@/lib/exchange-
 import { getDateRange } from "@/lib/date-utils";
 import { getPrimaryCurrency } from "@/components/ui/currency-display";
 
-const KRW_PLATFORMS = new Set(["NAVER", "PHARMACY"]);
+const KRW_PLATFORMS = new Set(["NAVER", "COUPANG", "PHARMACY", "GONGGU"]);
 
 function timeAgo(date: Date | null): string {
   if (!date) return "unknown";

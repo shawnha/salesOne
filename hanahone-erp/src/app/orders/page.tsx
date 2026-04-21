@@ -16,7 +16,7 @@ import { TypeTabs } from "@/components/orders/type-tabs";
 import { getMonthRange } from "@/lib/date-utils";
 import Link from "next/link";
 
-const KRW_PLATFORMS = new Set(["NAVER", "PHARMACY"]);
+const KRW_PLATFORMS = new Set(["NAVER", "COUPANG", "PHARMACY", "GONGGU"]);
 
 function toUSD(amount: number, platform: string | null, exchangeRate: number) {
   return KRW_PLATFORMS.has(platform || "") ? amount / exchangeRate : amount;

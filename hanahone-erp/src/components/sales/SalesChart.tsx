@@ -25,9 +25,10 @@ const BAR_CHANNELS = [
   { key: "SHOPIFY", label: "Shopify" },
   { key: "AMAZON", label: "Amazon" },
   { key: "TIKTOK", label: "TikTok" },
-  { key: "NAVER", label: "Naver" },
+  { key: "NAVER", label: "네이버" },
+  { key: "COUPANG", label: "쿠팡" },
   { key: "GONGGU", label: "공구" },
-  { key: "PHARMACY", label: "Pharmacy" },
+  { key: "PHARMACY", label: "약국" },
   { key: "CGETC", label: "CGETC" },
   { key: "SEEDING", label: "Seeding" },
   { key: "MANUAL", label: "Manual" },
@@ -50,9 +51,9 @@ export function SalesChart({ donut, monthly, currentMonth, primaryCurrency = "US
   // Reverse lookup: channel label → channel key
   const LABEL_TO_KEY: Record<string, string> = {
     Shopify: "SHOPIFY", Amazon: "AMAZON", TikTok: "TIKTOK",
-    Naver: "NAVER", "공구": "GONGGU", Pharmacy: "PHARMACY",
+    "네이버": "NAVER", "공구": "GONGGU", "약국": "PHARMACY",
     CGETC: "CGETC", Seeding: "SEEDING", Manual: "MANUAL",
-    Coupang: "COUPANG",
+    "쿠팡": "COUPANG",
   };
 
   function handleChannelClick(channelKey: string) {
