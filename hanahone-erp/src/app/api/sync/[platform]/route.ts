@@ -10,6 +10,7 @@ import { decrypt } from "@/lib/integrations/encryption";
 import { pharmacyConnector } from "@/lib/integrations/connectors/pharmacy";
 import { cgetcConnector } from "@/lib/integrations/connectors/cgetc";
 import { orderdeskConnector } from "@/lib/integrations/connectors/orderdesk";
+import { coupangConnector } from "@/lib/integrations/connectors/coupang";
 import type { Connector } from "@/lib/integrations/types";
 import { z } from "zod";
 
@@ -20,6 +21,7 @@ const connectors: Record<string, Connector> = {
   PHARMACY: pharmacyConnector,
   CGETC: cgetcConnector,
   ORDERDESK: orderdeskConnector,
+  COUPANG: coupangConnector,
 };
 
 const SyncSchema = z.object({

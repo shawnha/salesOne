@@ -176,6 +176,7 @@ enum Platform {
   NAVER
   PHARMACY
   ORDERDESK
+  COUPANG
 
   @@schema("salesone")
 }

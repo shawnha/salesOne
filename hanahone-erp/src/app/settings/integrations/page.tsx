@@ -7,7 +7,7 @@ import type { Platform } from "@prisma/client";
 
 const companyPlatforms: Record<string, Platform[]> = {
   HOI: ["SHOPIFY", "AMAZON", "TIKTOK", "CGETC", "ORDERDESK"],
-  HOK: ["NAVER", "PHARMACY"],
+  HOK: ["NAVER", "COUPANG", "PHARMACY"],
 };
 
 export default async function IntegrationsPage() {
