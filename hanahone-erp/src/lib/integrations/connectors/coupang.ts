@@ -192,13 +192,21 @@ function mapOrdersheet(sheet: CoupangOrdersheet): ExternalOrderData {
   const { fulfillment, financial } = mapCoupangStatus(sheet.status);
   const orderDate = new Date(sheet.paidAt || sheet.orderedAt);
 
-  const items: ExternalOrderItemData[] = (sheet.orderItems || []).map((it) => ({
-    externalItemId: String(it.vendorItemId),
-    productName: it.vendorItemName || it.sellerProductItemName || "",
-    sku: (it.externalVendorSku || "").trim(),
-    quantity: Number(it.shippingCount || 0),
-    unitPrice: Number(it.salesPrice || it.orderPrice || 0),
-  }));
+  const items: ExternalOrderItemData[] = (sheet.orderItems || []).map((it) => {
+    // Prefer the seller-managed SKU when set; fall back to the Coupang
+    // vendorItemId so SkuMapping(platform=COUPANG, externalSku=vendorItemId)
+    // can still resolve to an internal product. The API sometimes serializes
+    // missing values as the literal string "undefined", so treat that as empty.
+    const raw = (it.externalVendorSku || "").trim();
+    const sku = raw && raw !== "undefined" ? raw : String(it.vendorItemId);
+    return {
+      externalItemId: String(it.vendorItemId),
+      productName: it.vendorItemName || it.sellerProductItemName || "",
+      sku,
+      quantity: Number(it.shippingCount || 0),
+      unitPrice: Number(it.salesPrice || it.orderPrice || 0),
+    };
+  });
 
   const totalAmount = items.reduce((sum, it) => sum + it.unitPrice * it.quantity, 0);
 
