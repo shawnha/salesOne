@@ -7,9 +7,6 @@ async function getSystemUserId(): Promise<string> {
   return user?.id || "system";
 }
 
-/**
- * Check if inventory was already adjusted for this order item.
- */
 async function wasAlreadyAdjusted(referenceId: string): Promise<boolean> {
   const existing = await prisma.inventoryAdjustment.findFirst({
     where: { referenceId },
@@ -18,10 +15,14 @@ async function wasAlreadyAdjusted(referenceId: string): Promise<boolean> {
 }
 
 /**
- * Adjust inventory for a single order after sync.
- * Called for new orders and status changes.
+ * Adjust on-hand inventory for a single order after sync.
  *
- * - PAID orders → deduct inventory
+ * Baseline (InventoryBaseline) is a static opening balance — this function
+ * never modifies it. Sales drawdown is represented by InventoryAdjustment
+ * rows + Inventory.quantity movements. Reconciliation derives
+ * expected = baseline - sum(orderItems after setAt) - reconciliationAdjustments.
+ *
+ * - PAID → deduct on-hand
  * - CANCELLED/VOIDED/REFUNDED → restore if previously deducted
  */
 export async function adjustInventoryForOrder(orderId: string) {
@@ -46,7 +47,6 @@ export async function adjustInventoryForOrder(orderId: string) {
 
   const systemUserId = await getSystemUserId();
 
-  // Get BOM data for gonggu products
   const bom = await prisma.billOfMaterials.findMany({
     where: { companyId },
     include: {
@@ -55,7 +55,6 @@ export async function adjustInventoryForOrder(orderId: string) {
     },
   });
 
-  // Get gonggu product IDs
   const gongguMappings = await prisma.skuMapping.findMany({
     where: { companyId, platform: "NAVER", isGonggu: true },
     select: { productId: true },
@@ -72,29 +71,25 @@ export async function adjustInventoryForOrder(orderId: string) {
       if (await wasAlreadyAdjusted(refKey)) continue;
 
       if (isGonggu) {
-        // Gonggu order: deduct gonggu on-hand + baseline via BOM
         await deductGongguOrder(companyId, item.productId, item.product.name, item.quantity, bom, refKey, systemUserId);
       } else {
-        // Regular order: deduct from baseline
-        await deductBaselineForProduct(companyId, item.product.sku || "", item.product.name, item.quantity, refKey, systemUserId);
+        await deductOnHandForProduct(companyId, item.productId, item.product.sku || "", item.product.name, item.quantity, refKey, systemUserId);
       }
     } else if (shouldRestore) {
       const restoreKey = `restore:${orderId}:item:${item.id}`;
       if (await wasAlreadyAdjusted(restoreKey)) continue;
 
-      // Find original deduction adjustments
       const originalAdjs = await prisma.inventoryAdjustment.findMany({
         where: { referenceId: refKey },
       });
 
       if (originalAdjs.length === 0) continue;
 
-      // Reverse each adjustment
       for (const adj of originalAdjs) {
         const inv = await prisma.inventory.findUnique({ where: { id: adj.inventoryId } });
         if (!inv) continue;
 
-        const restoreQty = -adj.quantityChange; // reverse
+        const restoreQty = -adj.quantityChange;
         await prisma.inventory.update({
           where: { id: inv.id },
           data: { quantity: inv.quantity + restoreQty },
@@ -113,9 +108,6 @@ export async function adjustInventoryForOrder(orderId: string) {
           },
         });
       }
-
-      // Restore baseline too
-      await restoreBaseline(companyId, originalAdjs, refKey, order.orderNumber);
     }
   }
 }
@@ -129,7 +121,6 @@ async function deductGongguOrder(
   referenceId: string,
   createdBy: string,
 ) {
-  // 1. Deduct gonggu on-hand
   const gongguInv = await prisma.inventory.findFirst({
     where: { companyId, productId },
   });
@@ -154,87 +145,77 @@ async function deductGongguOrder(
     });
   }
 
-  // 2. Deduct from baseline via BOM
+  // Deduct BOM raw materials from their on-hand inventory (not baseline).
   const productBom = bom.filter((b) => b.finishedProductId === productId);
   for (const entry of productBom) {
-    const rawSku = entry.rawMaterial.sku;
+    const rawProductId = entry.rawMaterial.id;
     const bomQty = Number(entry.quantityRequired) * quantity;
 
-    const baseline = await prisma.inventoryBaseline.findUnique({
-      where: { companyId_sku: { companyId, sku: rawSku } },
+    const rawInv = await prisma.inventory.findFirst({
+      where: { companyId, productId: rawProductId },
     });
-    if (baseline) {
-      await prisma.inventoryBaseline.update({
-        where: { companyId_sku: { companyId, sku: rawSku } },
-        data: { quantity: Math.max(0, baseline.quantity - bomQty) },
-      });
-    }
-  }
-}
+    if (!rawInv) continue;
 
-async function deductBaselineForProduct(
-  companyId: string,
-  sku: string,
-  productName: string,
-  quantity: number,
-  referenceId: string,
-  createdBy: string,
-) {
-  if (!sku) return;
-
-  const baseline = await prisma.inventoryBaseline.findUnique({
-    where: { companyId_sku: { companyId, sku } },
-  });
-  if (!baseline) return;
-
-  await prisma.inventoryBaseline.update({
-    where: { companyId_sku: { companyId, sku } },
-    data: { quantity: Math.max(0, baseline.quantity - quantity) },
-  });
-
-  // Also record adjustment for tracking (use any inventory record for this product)
-  const inv = await prisma.inventory.findFirst({
-    where: { companyId, product: { sku } },
-  });
-  if (inv) {
+    const newQty = Math.max(0, rawInv.quantity - bomQty);
+    await prisma.inventory.update({
+      where: { id: rawInv.id },
+      data: { quantity: newQty },
+    });
     await prisma.inventoryAdjustment.create({
       data: {
-        inventoryId: inv.id,
+        inventoryId: rawInv.id,
         companyId,
         adjustmentType: "SALE",
-        quantityChange: -quantity,
-        previousQuantity: baseline.quantity,
-        newQuantity: Math.max(0, baseline.quantity - quantity),
-        referenceId,
-        reason: `판매 차감: ${productName} x${quantity}`,
+        quantityChange: -bomQty,
+        previousQuantity: rawInv.quantity,
+        newQuantity: newQty,
+        referenceId: `${referenceId}:bom:${entry.rawMaterial.sku}`,
+        reason: `공구 BOM 차감: ${productName} → ${entry.rawMaterial.sku} x${bomQty}`,
         createdBy,
       },
     });
   }
 }
 
-async function restoreBaseline(
+async function deductOnHandForProduct(
   companyId: string,
-  originalAdjs: any[],
-  _referenceId: string,
-  _orderNumber: string,
+  productId: string,
+  sku: string,
+  productName: string,
+  quantity: number,
+  referenceId: string,
+  createdBy: string,
 ) {
-  // Group adjustments by inventory and reverse baseline changes
-  for (const adj of originalAdjs) {
-    const inv = await prisma.inventory.findUnique({
-      where: { id: adj.inventoryId },
-      include: { product: { select: { sku: true } } },
+  // Try productId first. Fall back to SKU lookup — CGETC sync writes
+  // Inventory via SkuMapping.productId, which can differ from the order
+  // item's productId when two Product rows share the same external SKU
+  // (ongoing cleanup per project_shopify_product_review).
+  let inv = await prisma.inventory.findFirst({
+    where: { companyId, productId },
+  });
+  if (!inv && sku) {
+    inv = await prisma.inventory.findFirst({
+      where: { companyId, product: { sku } },
     });
-    if (!inv?.product?.sku) continue;
-
-    const baseline = await prisma.inventoryBaseline.findUnique({
-      where: { companyId_sku: { companyId, sku: inv.product.sku } },
-    });
-    if (baseline) {
-      await prisma.inventoryBaseline.update({
-        where: { companyId_sku: { companyId, sku: inv.product.sku } },
-        data: { quantity: baseline.quantity + Math.abs(adj.quantityChange) },
-      });
-    }
   }
+  if (!inv) return;
+
+  const newQty = Math.max(0, inv.quantity - quantity);
+  await prisma.inventory.update({
+    where: { id: inv.id },
+    data: { quantity: newQty },
+  });
+  await prisma.inventoryAdjustment.create({
+    data: {
+      inventoryId: inv.id,
+      companyId,
+      adjustmentType: "SALE",
+      quantityChange: -quantity,
+      previousQuantity: inv.quantity,
+      newQuantity: newQty,
+      referenceId,
+      reason: `판매 차감: ${productName} x${quantity}`,
+      createdBy,
+    },
+  });
 }
