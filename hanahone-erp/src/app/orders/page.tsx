@@ -252,7 +252,7 @@ export default async function OrdersPage({
           <EmptyState title="No orders" description="No orders found for this month." />
         ) : (
           <>
-            <OrdersTable orders={orderRows} viewMode={searchParams.type === "SEEDING" ? "seeding" : searchParams.type === "GIFT" ? "gifted" : "orders"} />
+            <OrdersTable orders={orderRows} viewMode={searchParams.type === "SEEDING" ? "seeding" : searchParams.type === "GIFT" ? "gifted" : "orders"} exchangeRate={exchangeRate.rate} />
             <Pagination currentPage={currentPage} totalPages={totalPages} totalItems={totalOrderCount} pageSize={PAGE_SIZE} />
           </>
         )}

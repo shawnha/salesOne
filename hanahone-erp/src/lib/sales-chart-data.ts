@@ -75,7 +75,7 @@ export function applyChannelFilter(where: any, channel?: string) {
   }
 }
 
-const KRW_SOURCES = new Set(["NAVER", "PHARMACY"]);
+const KRW_SOURCES = new Set(["NAVER", "COUPANG", "PHARMACY", "GONGGU"]);
 
 export async function getChannelSalesData(
   companyId: string | undefined,

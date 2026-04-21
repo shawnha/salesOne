@@ -177,9 +177,20 @@ export default async function SalesPage({
       key: "netAmount",
       header: "Net Amount",
       align: "right" as const,
-      render: (row: (typeof orders)[0]) => (
-        <span className="font-semibold">{formatOrderAmount(Number(row.netAmount ?? row.totalAmount), row.externalSource)}</span>
-      ),
+      render: (row: (typeof orders)[0]) => {
+        const amount = Number(row.netAmount ?? row.totalAmount);
+        const isKrw = KRW_PLATFORMS.has(row.externalSource || "");
+        const primary = isKrw ? formatKRW(amount) : formatUSD(amount);
+        const secondary = isKrw
+          ? formatUSD(amount / exchangeRate.rate)
+          : formatKRW(amount * exchangeRate.rate);
+        return (
+          <div className="text-right">
+            <div className="font-semibold">{primary}</div>
+            <div className="text-[10px] text-[var(--text-tertiary)]">{secondary}</div>
+          </div>
+        );
+      },
     },
     {
       key: "orderDate",

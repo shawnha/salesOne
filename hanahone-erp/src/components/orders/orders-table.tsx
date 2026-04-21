@@ -56,7 +56,18 @@ interface RefundData {
   }[];
 }
 
-export function OrdersTable({ orders, viewMode = "orders" }: { orders: OrderRow[]; viewMode?: "orders" | "seeding" | "gifted" }) {
+export function OrdersTable({ orders, viewMode = "orders", exchangeRate }: { orders: OrderRow[]; viewMode?: "orders" | "seeding" | "gifted"; exchangeRate?: number }) {
+  const rate = exchangeRate || 0;
+  function fmtDual(amount: number, platform: string | null) {
+    const isKrw = KRW_PLATFORMS.has(platform || "");
+    const primary = isKrw ? formatKRW(amount) : formatUSD(amount);
+    const secondary = !rate
+      ? null
+      : isKrw
+        ? formatUSD(amount / rate)
+        : formatKRW(amount * rate);
+    return { primary, secondary };
+  }
   const isSeedingOrGift = viewMode === "seeding" || viewMode === "gifted";
   const router = useRouter();
   const pathname = usePathname();
@@ -209,9 +220,25 @@ export function OrdersTable({ orders, viewMode = "orders" }: { orders: OrderRow[
                             <div className="text-[11px] text-red-500">
                               Net: {fmt(row.netAmount ?? row.totalAmount, row.externalSource)}
                             </div>
+                            {(() => {
+                              const d = fmtDual(Number(row.netAmount ?? row.totalAmount), row.externalSource);
+                              return d.secondary ? (
+                                <div className="text-[10px] text-[var(--text-tertiary)]">{d.secondary}</div>
+                              ) : null;
+                            })()}
                           </div>
                         ) : (
-                          <span className="font-semibold">{fmt(row.totalAmount, row.externalSource)}</span>
+                          (() => {
+                            const d = fmtDual(Number(row.totalAmount), row.externalSource);
+                            return (
+                              <div>
+                                <div className="font-semibold">{d.primary}</div>
+                                {d.secondary && (
+                                  <div className="text-[10px] text-[var(--text-tertiary)]">{d.secondary}</div>
+                                )}
+                              </div>
+                            );
+                          })()
                         )}
                       </td>
                     </>
