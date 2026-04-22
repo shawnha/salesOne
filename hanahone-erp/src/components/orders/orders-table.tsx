@@ -24,6 +24,7 @@ const platformBadge: Record<string, { label: string; color: string }> = {
 interface OrderItemRow {
   productName: string | null;
   quantity: number;
+  variantName?: string | null;
 }
 
 interface OrderRow {
@@ -307,11 +308,25 @@ function ExpandedRow({
           <div className="flex-1">
             <span className="font-semibold text-[var(--text-secondary)]">Items</span>
             <div className="mt-1 space-y-0.5">
-              {row.items.map((item, i) => (
-                <div key={i} className="text-xs text-[var(--text-secondary)]">
-                  {item.productName || "Unknown product"}{item.quantity > 1 ? ` x${item.quantity}` : ""}
-                </div>
-              ))}
+              {row.items.map((item, i) => {
+                const showVariant =
+                  item.variantName &&
+                  item.variantName.trim() !== "" &&
+                  item.variantName !== item.productName;
+                return (
+                  <div key={i} className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5 flex-wrap">
+                    <span>
+                      {item.productName || "Unknown product"}
+                      {item.quantity > 1 ? ` x${item.quantity}` : ""}
+                    </span>
+                    {showVariant && (
+                      <span className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded text-indigo-600 bg-indigo-500/[0.08]">
+                        {item.variantName}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

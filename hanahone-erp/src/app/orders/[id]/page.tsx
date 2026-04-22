@@ -66,16 +66,41 @@ export default async function OrderDetailPage({
     {
       key: "product",
       header: "Product",
-      render: (row: (typeof order.items)[0]) => (
-        <span className="font-semibold">{row.product.name}</span>
-      ),
+      render: (row: (typeof order.items)[0]) => {
+        const showVariant =
+          row.externalVariantName &&
+          row.externalVariantName.trim() !== "" &&
+          row.externalVariantName !== row.product.name;
+        return (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold">{row.product.name}</span>
+            {showVariant && (
+              <span className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded text-indigo-600 bg-indigo-500/[0.08]">
+                {row.externalVariantName}
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: "sku",
       header: "SKU",
-      render: (row: (typeof order.items)[0]) => (
-        <span className="text-[var(--text-secondary)]">{row.product.sku}</span>
-      ),
+      render: (row: (typeof order.items)[0]) => {
+        const showVariantSku =
+          row.externalVariantSku &&
+          row.externalVariantSku !== row.product.sku;
+        return (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[var(--text-secondary)]">{row.product.sku}</span>
+            {showVariantSku && (
+              <span className="text-[10px] text-[var(--text-tertiary)]">
+                (채널: {row.externalVariantSku})
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: "quantity",

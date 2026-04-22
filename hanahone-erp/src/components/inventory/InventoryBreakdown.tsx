@@ -15,6 +15,8 @@ export interface InventoryBreakdownItem {
   reserved?: number;
   available?: number;
   channelSales: ChannelSales;
+  /** 30-day sales grouped by channel variant name (e.g. "Monthly Plan" → 12). */
+  variantSales?: Record<string, number>;
 }
 
 const CHANNEL_LABELS: Record<string, string> = {

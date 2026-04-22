@@ -151,6 +151,7 @@ export function HokInventoryClient({
   bomEntries,
   companyId,
   channelSalesBySku = {},
+  variantSalesBySku = {},
 }: {
   baselines: BaselineItem[];
   gongguRows: GongguInventoryRow[];
@@ -158,6 +159,7 @@ export function HokInventoryClient({
   bomEntries: BomEntry[];
   companyId: string;
   channelSalesBySku?: Record<string, Partial<Record<string, number>>>;
+  variantSalesBySku?: Record<string, Record<string, number>>;
 }) {
   const router = useRouter();
   const [gongguRows, setGongguRows] = useState(initialGongguRows);

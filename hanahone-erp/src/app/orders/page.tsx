@@ -61,7 +61,14 @@ export default async function OrdersPage({
         customer: { select: { id: true, name: true } },
         company: { select: { name: true } },
         transfer: true,
-        items: { select: { quantity: true, product: { select: { name: true } } } },
+        items: {
+          select: {
+            quantity: true,
+            externalVariantName: true,
+            externalVariantSku: true,
+            product: { select: { name: true } },
+          },
+        },
       },
       orderBy: { orderDate: "desc" },
       skip: (currentPage - 1) * PAGE_SIZE,
@@ -91,10 +98,12 @@ export default async function OrdersPage({
   const ratesByDate = await getUsdKrwRatesForDates(allOrderDates);
   const rateFor = (d: Date) => ratesByDate.get(dateKey(d))?.rate ?? exchangeRate.rate;
 
+  // CurrencyDisplay always takes USD as input and renders primary+secondary itself.
+  // Sum every order in USD using its per-date rate so mixed USD/KRW channels
+  // (Shopify + Coupang etc.) merge correctly.
   const totalAmount = allSalesOrders.reduce((sum, o) => {
     const r = rateFor(o.orderDate);
-    const amt = Number(o.totalAmount);
-    return sum + (primaryCurrency === "KRW" ? toKRW(amt, o.externalSource, r) : toUSD(amt, o.externalSource, r));
+    return sum + toUSD(Number(o.totalAmount), o.externalSource, r);
   }, 0);
 
   // Seeding & Gift counts (always needed for TypeTabs) + recent items (only in default view)
@@ -171,6 +180,7 @@ export default async function OrdersPage({
     items: o.items.map((item) => ({
       productName: item.product?.name || null,
       quantity: item.quantity,
+      variantName: item.externalVariantName || null,
     })),
   }));
 

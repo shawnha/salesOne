@@ -326,14 +326,16 @@ model Order {
 }
 
 model OrderItem {
-  id        String  @id @default(uuid())
-  orderId   String  @map("order_id")
-  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId String  @map("product_id")
-  product   Product @relation(fields: [productId], references: [id])
-  quantity  Int
-  unitPrice Decimal @map("unit_price")
-  subtotal  Decimal
+  id                   String  @id @default(uuid())
+  orderId              String  @map("order_id")
+  order                Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId            String  @map("product_id")
+  product              Product @relation(fields: [productId], references: [id])
+  quantity             Int
+  unitPrice            Decimal @map("unit_price")
+  subtotal             Decimal
+  externalVariantName  String? @map("external_variant_name")
+  externalVariantSku   String? @map("external_variant_sku")
 
   @@index([orderId])
   @@map("order_items")

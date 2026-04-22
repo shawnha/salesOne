@@ -122,18 +122,18 @@ export default async function SalesPage({
   const ratesByDate = await getUsdKrwRatesForDates(allOrderDates);
   const rateFor = (d: Date) => ratesByDate.get(dateKey(d))?.rate ?? exchangeRate.rate;
 
-  const convertToPrimary = (amount: number, platform: string | null, d: Date) => {
-    const r = rateFor(d);
-    return primaryCurrency === "KRW" ? toKRW(amount, platform, r) : toUSD(amount, platform, r);
-  };
+  // CurrencyDisplay always takes USD as input; sum KPIs in USD regardless of
+  // primaryCurrency so mixed USD/KRW channels (Shopify + Coupang etc.) merge correctly.
+  const sumInUsd = (amount: number, platform: string | null, d: Date) =>
+    toUSD(amount, platform, rateFor(d));
 
   const totalRevenue = allSalesForKpi.reduce((sum, o) => {
     const amount = Number(o.netAmount ?? o.totalAmount);
-    return sum + convertToPrimary(amount, o.externalSource, o.orderDate);
+    return sum + sumInUsd(amount, o.externalSource, o.orderDate);
   }, 0);
   const totalCommission = allSalesForKpi.reduce((sum, o) => {
     if (!o.commissionAmount) return sum;
-    return sum + convertToPrimary(Number(o.commissionAmount), o.externalSource, o.orderDate);
+    return sum + sumInUsd(Number(o.commissionAmount), o.externalSource, o.orderDate);
   }, 0);
   const orderCount = totalSalesCount;
 

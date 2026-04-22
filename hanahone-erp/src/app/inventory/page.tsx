@@ -6,6 +6,7 @@ import { fetchCgetcInventory, type CgetcProduct } from "@/lib/integrations/conne
 import { decrypt } from "@/lib/integrations/encryption";
 import { HokInventoryClient, type BomEntry, type GongguInventoryRow, type InventoryRow as HokInventoryRow } from "@/components/inventory/HokInventoryClient";
 import { InventoryBreakdownGrid, type InventoryBreakdownItem, type ChannelSales } from "@/components/inventory/InventoryBreakdown";
+import { ChannelBreakdownCard, type ChannelBreakdownRow } from "@/components/inventory/ChannelBreakdownCard";
 
 type InventoryRow = {
   id: string;
@@ -87,7 +88,7 @@ export default async function InventoryPage({
       },
     },
     include: {
-      product: { select: { sku: true } },
+      product: { select: { sku: true, name: true } },
       order: { select: { externalSource: true, notes: true, type: true, companyId: true } },
     },
   });
@@ -95,6 +96,23 @@ export default async function InventoryPage({
   const salesBySku = new Map<string, number>();
   // Channel breakdown per SKU per company, last 30 days.
   const channelBreakdown = new Map<string, ChannelSales>(); // key: companyId::sku
+  // Variant breakdown per SKU per company (Shopify line_item title etc.)
+  const variantBreakdown = new Map<string, Record<string, number>>(); // key: companyId::sku
+  // Per-channel variant rows per company (for channel cards)
+  // key: companyId::channel::variantName::variantSku::masterSku
+  type ChannelRowKey = string;
+  const channelRowAgg = new Map<
+    ChannelRowKey,
+    {
+      companyId: string;
+      channel: string;
+      variantName: string;
+      variantSku: string | null;
+      masterSku: string;
+      masterName: string;
+      qty: number;
+    }
+  >();
   for (const item of recentSales) {
     const orderType = item.order.type;
     // Count towards burn rate only for revenue-bearing orders.
@@ -119,6 +137,57 @@ export default async function InventoryPage({
     const breakdown = channelBreakdown.get(key) || {};
     (breakdown as any)[channel] = ((breakdown as any)[channel] || 0) + item.quantity;
     channelBreakdown.set(key, breakdown);
+
+    const variant = item.externalVariantName?.trim();
+    if (variant) {
+      const vb = variantBreakdown.get(key) || {};
+      vb[variant] = (vb[variant] || 0) + item.quantity;
+      variantBreakdown.set(key, vb);
+    }
+
+    // Per-channel variant row aggregation (for channel cards below 전체 재고).
+    // Skip non-channel sources (internal/manual) and aux order types (SEEDING/GIFT/TRANSFER)
+    // since those surface elsewhere.
+    const src = item.order.externalSource;
+    if (src && orderType !== "SEEDING" && orderType !== "GIFT" && orderType !== "INTER_COMPANY") {
+      const variantName = (item.externalVariantName || item.product?.name || "").trim();
+      if (variantName) {
+        const variantSku = item.externalVariantSku?.trim() || null;
+        const masterSku = item.product!.sku;
+        const masterName = item.product!.name;
+        const aggKey = `${item.order.companyId}::${src}::${variantName}::${variantSku ?? ""}::${masterSku}`;
+        const row = channelRowAgg.get(aggKey);
+        if (row) {
+          row.qty += item.quantity;
+        } else {
+          channelRowAgg.set(aggKey, {
+            companyId: item.order.companyId,
+            channel: src,
+            variantName,
+            variantSku,
+            masterSku,
+            masterName,
+            qty: item.quantity,
+          });
+        }
+      }
+    }
+  }
+
+  // Group channelRowAgg into Map<companyId, Map<channel, rows>>.
+  const channelRowsByCompany = new Map<string, Map<string, ChannelBreakdownRow[]>>();
+  for (const r of Array.from(channelRowAgg.values())) {
+    const perCompany = channelRowsByCompany.get(r.companyId) || new Map<string, ChannelBreakdownRow[]>();
+    const list = perCompany.get(r.channel) || [];
+    list.push({
+      variantName: r.variantName,
+      variantSku: r.variantSku,
+      masterSku: r.masterSku,
+      masterName: r.masterName,
+      qty30d: r.qty,
+    });
+    perCompany.set(r.channel, list);
+    channelRowsByCompany.set(r.companyId, perCompany);
   }
 
   // Map company name → id for breakdown lookup (rows only carry company name).
@@ -294,6 +363,24 @@ export default async function InventoryPage({
 
   const lowStockCount = inventories.filter((inv) => inv.quantity <= inv.reorderLevel).length;
 
+  // Master on-hand lookup for enriching channel rows with 현 재고.
+  // Keyed by companyId::masterSku — sums across warehouses for the same SKU.
+  const masterOnHandByKey = new Map<string, number>();
+  for (const r of rows) {
+    if (!r.sku) continue;
+    const companyId = companyIdByName.get(r.company);
+    if (!companyId) continue;
+    const k = `${companyId}::${r.sku}`;
+    masterOnHandByKey.set(k, (masterOnHandByKey.get(k) || 0) + r.quantity);
+  }
+  for (const [companyId, perChannel] of Array.from(channelRowsByCompany.entries())) {
+    for (const [, list] of Array.from(perChannel.entries())) {
+      for (const r of list) {
+        r.masterOnHand = masterOnHandByKey.get(`${companyId}::${r.masterSku}`);
+      }
+    }
+  }
+
   // HOK-specific: check if viewing HOK company
   const hokCompany = await prisma.company.findFirst({ where: { name: { contains: "HOK" } }, select: { id: true } });
   const isHokView = searchParams.company === hokCompany?.id;
@@ -432,6 +519,7 @@ export default async function InventoryPage({
         const companyId = companyIdByName.get(r.company);
         const key = companyId ? `${companyId}::${r.sku}` : "";
         const channels = (channelBreakdown.get(key) || {}) as ChannelSales;
+        const variants = variantBreakdown.get(key);
         return {
           sku: r.sku,
           name: r.name,
@@ -443,6 +531,7 @@ export default async function InventoryPage({
           reorderLevel: r.reorderLevel,
           reserved: r.reserved,
           channelSales: channels,
+          variantSales: variants,
         };
       })
       .sort((a, b) => b.onHand - a.onHand);
@@ -491,39 +580,69 @@ export default async function InventoryPage({
 
       {/* HOK: 전체 + 일반/공구 섹션 (client component for inline editing) */}
       {isHokView ? (
-        <HokInventoryClient
-          baselines={hokBaselineItems}
-          gongguRows={hokGongguRows.map((r): GongguInventoryRow => {
-            const inv = inventories.find((i) => i.id === r.id);
-            const naverNo = inv ? naverProductNoByProductId.get(inv.productId) : undefined;
-            return {
-              id: r.id,
-              productId: inv?.productId || "",
-              sku: r.sku,
-              name: r.name,
-              quantity: r.quantity,
-              reserved: r.reserved,
-              available: r.available,
-              naverProductNo: naverNo,
-            };
-          })}
-          regularRows={hokRegularRows as HokInventoryRow[]}
-          bomEntries={hokBomEntries}
-          companyId={hokCompany!.id}
-          channelSalesBySku={Object.fromEntries(
-            hokRegularRows
-              .filter((r) => r.sku)
-              .map((r) => {
-                const key = `${hokCompany!.id}::${r.sku}`;
-                return [r.sku, (channelBreakdown.get(key) || {}) as ChannelSales];
-              }),
-          )}
-        />
+        <>
+          <HokInventoryClient
+            baselines={hokBaselineItems}
+            gongguRows={hokGongguRows.map((r): GongguInventoryRow => {
+              const inv = inventories.find((i) => i.id === r.id);
+              const naverNo = inv ? naverProductNoByProductId.get(inv.productId) : undefined;
+              return {
+                id: r.id,
+                productId: inv?.productId || "",
+                sku: r.sku,
+                name: r.name,
+                quantity: r.quantity,
+                reserved: r.reserved,
+                available: r.available,
+                naverProductNo: naverNo,
+              };
+            })}
+            regularRows={hokRegularRows as HokInventoryRow[]}
+            bomEntries={hokBomEntries}
+            companyId={hokCompany!.id}
+            channelSalesBySku={Object.fromEntries(
+              hokRegularRows
+                .filter((r) => r.sku)
+                .map((r) => {
+                  const key = `${hokCompany!.id}::${r.sku}`;
+                  return [r.sku, (channelBreakdown.get(key) || {}) as ChannelSales];
+                }),
+            )}
+            variantSalesBySku={Object.fromEntries(
+              hokRegularRows
+                .filter((r) => r.sku)
+                .map((r) => {
+                  const key = `${hokCompany!.id}::${r.sku}`;
+                  return [r.sku, variantBreakdown.get(key) || {}];
+                }),
+            )}
+          />
+          {(() => {
+            const hokChannels = channelRowsByCompany.get(hokCompany!.id);
+            if (!hokChannels) return null;
+            // For HOK, 스마트스토어(NAVER regular) and 공구(GONGGU) already
+            // surface above with full interactive tables. Only render the
+            // supplementary channel cards for channels that don't have a
+            // dedicated section — starting with 쿠팡.
+            const SKIP = new Set(["NAVER", "GONGGU"]);
+            return sortedChannels(Array.from(hokChannels.keys()))
+              .filter((ch) => !SKIP.has(ch))
+              .map((ch) => (
+                <ChannelBreakdownCard
+                  key={ch}
+                  channel={ch}
+                  rows={hokChannels.get(ch) || []}
+                />
+              ));
+          })()}
+        </>
       ) : companyGroups ? (
         companyGroups.map(([companyName, group]) => {
           const { primary, channel } = splitPrimaryAndChannel(group.rows);
           const primaryItems = rowsToBreakdown(primary);
           const channelItems = rowsToBreakdown(channel);
+          const companyId = companyIdByName.get(companyName);
+          const channelsForCompany = companyId ? channelRowsByCompany.get(companyId) : null;
           return (
             <div key={companyName} className="space-y-3">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
@@ -541,6 +660,15 @@ export default async function InventoryPage({
                   {channelItems.length > 0 && (
                     <InventoryBreakdownGrid items={channelItems} title={`${companyName} 구독 채널`} />
                   )}
+                  {channelsForCompany &&
+                    sortedChannels(Array.from(channelsForCompany.keys())).map((ch) => (
+                      <ChannelBreakdownCard
+                        key={`${companyName}-${ch}`}
+                        channel={ch}
+                        rows={channelsForCompany.get(ch) || []}
+                        companyLabel={companyName}
+                      />
+                    ))}
                 </>
               )}
             </div>
@@ -551,6 +679,10 @@ export default async function InventoryPage({
           const { primary, channel } = splitPrimaryAndChannel(rows);
           const primaryItems = rowsToBreakdown(primary);
           const channelItems = rowsToBreakdown(channel);
+          const singleCompanyId = searchParams.company;
+          const channelsForCompany = singleCompanyId
+            ? channelRowsByCompany.get(singleCompanyId)
+            : null;
           if (primaryItems.length === 0 && channelItems.length === 0) {
             return (
               <Card>
@@ -566,10 +698,34 @@ export default async function InventoryPage({
               {channelItems.length > 0 && (
                 <InventoryBreakdownGrid items={channelItems} title="구독 채널" />
               )}
+              {channelsForCompany &&
+                sortedChannels(Array.from(channelsForCompany.keys())).map((ch) => (
+                  <ChannelBreakdownCard
+                    key={ch}
+                    channel={ch}
+                    rows={channelsForCompany.get(ch) || []}
+                  />
+                ))}
             </>
           );
         })()
       )}
     </div>
   );
+}
+
+/**
+ * Channel display order: mirror the company-channel map so Shopify/Amazon/TikTok
+ * come first for HOI, 네이버/쿠팡/약국 for HOK, etc. Unknown channels go last.
+ */
+function sortedChannels(channels: string[]): string[] {
+  const order = ["SHOPIFY", "AMAZON", "TIKTOK", "NAVER", "COUPANG", "PHARMACY", "CGETC"];
+  return channels.slice().sort((a, b) => {
+    const ai = order.indexOf(a);
+    const bi = order.indexOf(b);
+    if (ai === -1 && bi === -1) return a.localeCompare(b);
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
 }

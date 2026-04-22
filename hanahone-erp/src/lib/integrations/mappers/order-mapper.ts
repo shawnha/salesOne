@@ -172,6 +172,8 @@ export async function mapExternalOrder(
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         subtotal: item.quantity * item.unitPrice,
+        externalVariantName: item.productName || null,
+        externalVariantSku: item.sku || null,
       };
     })
   );
@@ -212,6 +214,8 @@ export async function mapExternalOrder(
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             subtotal: item.subtotal,
+            externalVariantName: item.externalVariantName,
+            externalVariantSku: item.externalVariantSku,
           })),
         } : undefined,
       },
