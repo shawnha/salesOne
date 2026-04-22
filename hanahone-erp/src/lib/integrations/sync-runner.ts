@@ -4,6 +4,7 @@ import { SyncStatus } from "@prisma/client";
 import type { Connector, SyncResult } from "./types";
 import { mapExternalOrder, mapFulfillmentStatus, mapFinancialStatus } from "./mappers/order-mapper";
 import { adjustInventoryForOrder } from "./inventory-deduction";
+import { fetchShopifyOrderFees } from "./connectors/shopify";
 
 const STALE_JOB_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
 
@@ -237,6 +238,61 @@ export async function runSync(connector: Connector, companyId: string): Promise<
             },
           });
         }
+      }
+    }
+
+    // Shopify: pull payment-processing fees for any mapped order that still
+    // lacks a commissionAmount. Kept in-process so a fresh sync eventually
+    // converges on full fee coverage; errors are logged but don't fail the
+    // overall sync.
+    if (connector.platform === "SHOPIFY") {
+      try {
+        const credentialsForFees = JSON.parse(decrypt(config.credentials));
+        const pending = await prisma.externalOrder.findMany({
+          where: {
+            platform: "SHOPIFY",
+            companyId,
+            mappedOrderId: { not: null },
+            mappedOrder: { commissionAmount: null },
+          },
+          select: {
+            externalOrderId: true,
+            mappedOrder: {
+              select: {
+                id: true,
+                totalAmount: true,
+                refundAmount: true,
+              },
+            },
+          },
+          take: 100, // bound per-sync work; the rest picks up on the next run
+        });
+        for (const eo of pending) {
+          const order = eo.mappedOrder!;
+          try {
+            const { fee, net, hasFees } = await fetchShopifyOrderFees(
+              credentialsForFees,
+              eo.externalOrderId,
+            );
+            if (!hasFees) continue; // leave null so backfill/future syncs retry
+            const totalAmount = Number(order.totalAmount);
+            const refundAmount = Number(order.refundAmount ?? 0);
+            const settlement = net ?? totalAmount - refundAmount - fee;
+            await prisma.order.update({
+              where: { id: order.id },
+              data: { commissionAmount: fee, settlementAmount: settlement },
+            });
+          } catch (e) {
+            console.error(
+              `Shopify fee fetch failed for order ${eo.externalOrderId}:`,
+              (e as Error).message,
+            );
+          }
+          // Simple rate limit: stay under 50 GraphQL points/sec (query is ~10pt).
+          await new Promise((r) => setTimeout(r, 250));
+        }
+      } catch (err) {
+        console.error("Shopify fees sync step failed:", (err as Error).message);
       }
     }
 

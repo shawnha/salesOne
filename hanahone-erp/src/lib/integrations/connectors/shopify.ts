@@ -149,6 +149,97 @@ export const shopifyConnector: Connector = {
   },
 };
 
+/**
+ * Pull payment fees for a single Shopify order via the Admin GraphQL API.
+ *
+ * - Shopify Payments transactions expose per-transaction fees under
+ *   `transactions.fees[]`. Each entry has `amount.amount` as a decimal string.
+ * - Non-Shopify-Payments gateways (e.g. PayPal, tiktok_shop) usually return
+ *   empty `fees` — callers get `{ fee: 0, net: null, hasFees: false }` and
+ *   should treat it as "unknown" rather than "zero fee".
+ *
+ * Returns fee in the store currency (USD for HOI). settlementAmount is the
+ * total sale amount minus fees (net payout), when any fees were reported.
+ */
+export async function fetchShopifyOrderFees(
+  credentials: ShopifyCredentials,
+  externalOrderId: string,
+): Promise<{ fee: number; net: number | null; hasFees: boolean }> {
+  const shop = credentials.shop || credentials.storeUrl;
+  if (!shop) throw new Error("Missing shop URL");
+
+  const token = await getAccessToken({ ...credentials, shop });
+  const url = `https://${shop}/admin/api/2024-01/graphql.json`;
+  const query = `
+    query OrderTransactions($id: ID!) {
+      order(id: $id) {
+        id
+        transactions {
+          id
+          kind
+          status
+          gateway
+          amountSet { shopMoney { amount currencyCode } }
+          fees {
+            amount { amount currencyCode }
+            type
+          }
+        }
+      }
+    }
+  `;
+  const gid = `gid://shopify/Order/${externalOrderId}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "X-Shopify-Access-Token": token,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ query, variables: { id: gid } }),
+  });
+  if (!res.ok) {
+    throw new Error(`Shopify GraphQL error: ${res.status} ${res.statusText}`);
+  }
+  const body = await res.json();
+  if (body.errors) {
+    throw new Error(`Shopify GraphQL errors: ${JSON.stringify(body.errors)}`);
+  }
+  const txs: Array<{
+    kind: string;
+    status: string;
+    gateway: string | null;
+    amountSet?: { shopMoney?: { amount?: string } };
+    fees?: Array<{ amount?: { amount?: string } }>;
+  }> = body.data?.order?.transactions || [];
+
+  let feeTotal = 0;
+  let saleTotal = 0;
+  let refundTotal = 0;
+  let hasFees = false;
+
+  for (const tx of txs) {
+    if (tx.status !== "SUCCESS") continue;
+    const amt = parseFloat(tx.amountSet?.shopMoney?.amount || "0") || 0;
+    const feeSum = (tx.fees || []).reduce(
+      (s, f) => s + (parseFloat(f.amount?.amount || "0") || 0),
+      0,
+    );
+    if (feeSum > 0) hasFees = true;
+    // Refund-kind transactions carry negative-direction fees (Shopify refunds
+    // part of the processing fee). Subtract both sides.
+    if (tx.kind === "REFUND") {
+      refundTotal += amt;
+      feeTotal -= feeSum;
+    } else if (tx.kind === "SALE" || tx.kind === "CAPTURE") {
+      saleTotal += amt;
+      feeTotal += feeSum;
+    }
+  }
+
+  const net = hasFees ? saleTotal - refundTotal - feeTotal : null;
+  return { fee: +feeTotal.toFixed(2), net: net !== null ? +net.toFixed(2) : null, hasFees };
+}
+
 export interface ShopifyProduct {
   id: number;
   title: string;
