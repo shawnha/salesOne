@@ -500,7 +500,7 @@ export default async function InventoryPage({
                   <EmptyState title="No inventory" description="No inventory records found." />
                 </Card>
               ) : (
-                <InventoryBreakdownGrid items={items} />
+                <InventoryBreakdownGrid items={items} title={`${companyName} 전체 재고`} />
               )}
             </div>
           );

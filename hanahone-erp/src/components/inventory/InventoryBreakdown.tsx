@@ -13,6 +13,7 @@ export interface InventoryBreakdownItem {
   baseline?: { quantity: number; setAt: string } | null;
   reorderLevel?: number;
   reserved?: number;
+  available?: number;
   channelSales: ChannelSales;
 }
 
@@ -56,70 +57,88 @@ function ChannelBadge({ channel, qty }: { channel: string; qty: number }) {
 }
 
 /**
- * Breakdown card for a single SKU. Used for HOI, HOR, and Group views to
- * mirror the HOK-style "전체 재고 + channel distribution" display.
+ * Centered tile for a single SKU, matching HOK's 전체 재고 tile layout:
+ * big on-hand number, product name, optional reserved/available split,
+ * baseline reference, channel-sales badges.
  */
-export function InventoryBreakdownCard({ item }: { item: InventoryBreakdownItem }) {
+function InventoryTile({ item }: { item: InventoryBreakdownItem }) {
   const diff = item.baseline ? item.onHand - item.baseline.quantity : null;
-  const channels = Object.entries(item.channelSales).sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0));
-  const totalSold30d = channels.reduce((s, [, v]) => s + (v ?? 0), 0);
+  const channels = Object.entries(item.channelSales)
+    .filter(([, v]) => (v ?? 0) > 0)
+    .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0));
+  const hasReserved = typeof item.reserved === "number" && item.reserved > 0;
+  const availableQty = item.available ?? item.onHand - (item.reserved ?? 0);
+  const lowStock = item.reorderLevel !== undefined && item.onHand <= item.reorderLevel;
 
   return (
-    <Card className="p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold truncate">{item.name}</p>
-          <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5">
-            {item.sku} · {item.warehouse}
-          </p>
-        </div>
-        <div className="text-right shrink-0">
-          <div className={`text-2xl font-bold ${item.reorderLevel !== undefined && item.onHand <= item.reorderLevel ? "text-rose-500" : ""}`}>
-            {item.onHand.toLocaleString()}
-          </div>
-          {item.baseline && (
-            <div className="text-[10px] text-[var(--text-tertiary)] mt-0.5">
-              기준 {item.baseline.quantity.toLocaleString()}
-              {diff !== null && diff !== 0 && (
-                <span className={`ml-1 font-medium ${diff < 0 ? "text-rose-500" : "text-amber-500"}`}>
-                  ({diff > 0 ? "+" : ""}{diff})
-                </span>
-              )}
-            </div>
-          )}
-        </div>
+    <div className="text-center">
+      <div className={`text-2xl font-bold ${lowStock ? "text-rose-500" : ""}`}>
+        {item.onHand.toLocaleString()}
       </div>
+      <p className="text-xs text-[var(--text-secondary)] mt-1">{item.name}</p>
+      <p className="text-[10px] text-[var(--text-quaternary)] mt-0.5">
+        {item.sku} · {item.warehouse}
+      </p>
 
-      <div className="mt-4 pt-4 border-t border-[var(--border)]">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
-            채널별 판매 (30일)
+      {item.baseline && (
+        <p className="text-[11px] text-[var(--text-tertiary)] mt-2">
+          기준 {item.baseline.quantity.toLocaleString()}
+          {diff !== null && diff !== 0 && (
+            <span className={`ml-1 font-medium ${diff < 0 ? "text-rose-500" : "text-amber-500"}`}>
+              ({diff > 0 ? "+" : ""}{diff.toLocaleString()})
+            </span>
+          )}
+        </p>
+      )}
+
+      {hasReserved && (
+        <div className="mt-2 space-y-0.5">
+          <p className="text-[11px] text-amber-600 font-medium">
+            예약: {item.reserved!.toLocaleString()}
           </p>
-          <p className="text-[10px] text-[var(--text-quaternary)]">
-            합계 {totalSold30d.toLocaleString()}
+          <p className={`text-lg font-bold ${availableQty < 0 ? "text-rose-500" : "text-teal-600"}`}>
+            {availableQty.toLocaleString()}
           </p>
+          <p className="text-[10px] text-[var(--text-tertiary)]">가용</p>
         </div>
+      )}
+
+      <div className="mt-3 pt-3 border-t border-[var(--border)]">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)] mb-1.5">
+          채널별 판매 (30일)
+        </p>
         {channels.length === 0 ? (
           <p className="text-[11px] text-[var(--text-quaternary)]">최근 30일 판매 없음</p>
         ) : (
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap justify-center gap-1.5">
             {channels.map(([ch, qty]) => (
               <ChannelBadge key={ch} channel={ch} qty={qty ?? 0} />
             ))}
           </div>
         )}
       </div>
-    </Card>
+    </div>
   );
 }
 
-export function InventoryBreakdownGrid({ items }: { items: InventoryBreakdownItem[] }) {
+/**
+ * HOK-style 전체 재고 card: one outer Card, all SKUs rendered as centered
+ * tiles in a grid. Used for HOI / HOR / Group views to mirror how HOK
+ * surfaces its stock + channel breakdown.
+ */
+export function InventoryBreakdownGrid({ items, title = "전체 재고" }: { items: InventoryBreakdownItem[]; title?: string }) {
   if (items.length === 0) return null;
+  const gridCols = items.length === 1 ? "grid-cols-1" : "grid-cols-2";
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {items.map((it) => (
-        <InventoryBreakdownCard key={it.sku + ":" + it.warehouse} item={it} />
-      ))}
-    </div>
+    <Card className="p-5">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)] mb-4">
+        {title}
+      </h2>
+      <div className={`grid ${gridCols} gap-6`}>
+        {items.map((it) => (
+          <InventoryTile key={it.sku + ":" + it.warehouse} item={it} />
+        ))}
+      </div>
+    </Card>
   );
 }
