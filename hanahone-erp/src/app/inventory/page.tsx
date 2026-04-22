@@ -417,6 +417,12 @@ export default async function InventoryPage({
     return true;
   }
 
+  // Hide zero-quantity phantom channel rows (e.g. Monthly Subscription after
+  // its SkuMapping was pointed at the real Refill product).
+  function isVisibleChannelRow(r: InventoryRow): boolean {
+    return r.quantity > 0;
+  }
+
   // Build breakdown items (for HOI, HOR, and Group views — HOK uses its
   // own editable client component). Skip SKUs without a sku.
   function rowsToBreakdown(rs: InventoryRow[]): InventoryBreakdownItem[] {
@@ -450,8 +456,11 @@ export default async function InventoryPage({
     const primary: InventoryRow[] = [];
     const channel: InventoryRow[] = [];
     for (const r of rs) {
-      if (isChannelAllocationRow(r)) channel.push(r);
-      else primary.push(r);
+      if (isChannelAllocationRow(r)) {
+        if (isVisibleChannelRow(r)) channel.push(r);
+      } else {
+        primary.push(r);
+      }
     }
     return { primary, channel };
   }
