@@ -408,6 +408,15 @@ export default async function InventoryPage({
       ).sort(([a], [b]) => a.localeCompare(b))
     : null;
 
+  // Channel-allocation products: internal records for HOI subscription-style
+  // SKUs (e.g. Monthly Subscription) that duplicate a CGETC master product.
+  // They surface under a separate "구독 채널" section, not 전체 재고.
+  function isChannelAllocationRow(r: InventoryRow): boolean {
+    if (r.source !== "internal") return false;
+    if (!/subscription|subscribe|구독|monthly/i.test(r.name)) return false;
+    return true;
+  }
+
   // Build breakdown items (for HOI, HOR, and Group views — HOK uses its
   // own editable client component). Skip SKUs without a sku.
   function rowsToBreakdown(rs: InventoryRow[]): InventoryBreakdownItem[] {
@@ -431,6 +440,20 @@ export default async function InventoryPage({
         };
       })
       .sort((a, b) => b.onHand - a.onHand);
+  }
+
+  // Split rows into primary (전체 재고) vs channel allocation (구독 등).
+  function splitPrimaryAndChannel(rs: InventoryRow[]): {
+    primary: InventoryRow[];
+    channel: InventoryRow[];
+  } {
+    const primary: InventoryRow[] = [];
+    const channel: InventoryRow[] = [];
+    for (const r of rs) {
+      if (isChannelAllocationRow(r)) channel.push(r);
+      else primary.push(r);
+    }
+    return { primary, channel };
   }
 
   return (
@@ -489,32 +512,54 @@ export default async function InventoryPage({
         />
       ) : companyGroups ? (
         companyGroups.map(([companyName, group]) => {
-          const items = rowsToBreakdown(group.rows);
+          const { primary, channel } = splitPrimaryAndChannel(group.rows);
+          const primaryItems = rowsToBreakdown(primary);
+          const channelItems = rowsToBreakdown(channel);
           return (
             <div key={companyName} className="space-y-3">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
                 {companyName} <span className="text-[var(--text-quaternary)]">({group.rows.length})</span>
               </h2>
-              {items.length === 0 ? (
+              {primaryItems.length === 0 && channelItems.length === 0 ? (
                 <Card>
                   <EmptyState title="No inventory" description="No inventory records found." />
                 </Card>
               ) : (
-                <InventoryBreakdownGrid items={items} title={`${companyName} 전체 재고`} />
+                <>
+                  {primaryItems.length > 0 && (
+                    <InventoryBreakdownGrid items={primaryItems} title={`${companyName} 전체 재고`} />
+                  )}
+                  {channelItems.length > 0 && (
+                    <InventoryBreakdownGrid items={channelItems} title={`${companyName} 구독 채널`} />
+                  )}
+                </>
               )}
             </div>
           );
         })
-      ) : rowsToBreakdown(rows).length > 0 ? (
-        <InventoryBreakdownGrid items={rowsToBreakdown(rows)} />
       ) : (
-        <Card>
-          {rows.length === 0 ? (
-            <EmptyState title="No inventory" description="No inventory records found." />
-          ) : (
-            <DataTable columns={columns} data={rows} />
-          )}
-        </Card>
+        (() => {
+          const { primary, channel } = splitPrimaryAndChannel(rows);
+          const primaryItems = rowsToBreakdown(primary);
+          const channelItems = rowsToBreakdown(channel);
+          if (primaryItems.length === 0 && channelItems.length === 0) {
+            return (
+              <Card>
+                <EmptyState title="No inventory" description="No inventory records found." />
+              </Card>
+            );
+          }
+          return (
+            <>
+              {primaryItems.length > 0 && (
+                <InventoryBreakdownGrid items={primaryItems} />
+              )}
+              {channelItems.length > 0 && (
+                <InventoryBreakdownGrid items={channelItems} title="구독 채널" />
+              )}
+            </>
+          );
+        })()
       )}
     </div>
   );
