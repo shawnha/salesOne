@@ -40,7 +40,14 @@ export interface ExternalOrderItemData {
   productName: string;
   sku: string;
   quantity: number;
+  /** Customer-paid unit price (post-discount). */
   unitPrice: number;
+  /** List/sticker price before discount, when the channel exposes it. */
+  originalUnitPrice?: number;
+  /** Total discount allocated to this line item (positive number). */
+  discountAmount?: number;
+  /** Subscription program identifier (Shopify _selling_plan_id). */
+  sellingPlanId?: string;
 }
 
 export interface ExternalInventoryData {

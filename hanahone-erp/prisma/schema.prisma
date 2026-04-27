@@ -336,6 +336,9 @@ model OrderItem {
   subtotal             Decimal
   externalVariantName  String? @map("external_variant_name")
   externalVariantSku   String? @map("external_variant_sku")
+  originalUnitPrice    Decimal? @map("original_unit_price")
+  discountAmount       Decimal? @map("discount_amount")
+  sellingPlanId        String?  @map("selling_plan_id")
 
   @@index([orderId])
   @@map("order_items")

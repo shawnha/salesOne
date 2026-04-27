@@ -11,6 +11,7 @@ import Link from "next/link";
 import { ChannelFilter } from "@/components/orders/channel-filter";
 import { Pagination } from "@/components/ui/pagination";
 import { getMonthRange } from "@/lib/date-utils";
+import { categorize, type ProductCategory } from "@/lib/product-category";
 
 const formatUSD = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 const formatKRW = (n: number) => `₩${Math.round(n).toLocaleString("ko-KR")}`;
@@ -136,6 +137,41 @@ export default async function SalesPage({
     return sum + sumInUsd(Number(o.commissionAmount), o.externalSource, o.orderDate);
   }, 0);
   const orderCount = totalSalesCount;
+
+  // Per-category 30-day-window USD revenue (within the active month filter).
+  const categoryItems = await prisma.orderItem.findMany({
+    where: { order: where },
+    select: {
+      quantity: true,
+      unitPrice: true,
+      externalVariantName: true,
+      sellingPlanId: true,
+      product: { select: { sku: true } },
+      order: { select: { externalSource: true, orderDate: true } },
+    },
+  });
+  const revenueByCategory: Record<ProductCategory, number> = {
+    starter: 0,
+    refill: 0,
+    subscription: 0,
+    other: 0,
+  };
+  const qtyByCategory: Record<ProductCategory, number> = {
+    starter: 0,
+    refill: 0,
+    subscription: 0,
+    other: 0,
+  };
+  for (const it of categoryItems) {
+    const cat = categorize({
+      masterSku: it.product?.sku ?? null,
+      variantName: it.externalVariantName,
+      sellingPlanId: it.sellingPlanId,
+    });
+    const lineRevenue = Number(it.unitPrice) * it.quantity;
+    revenueByCategory[cat] += sumInUsd(lineRevenue, it.order.externalSource, it.order.orderDate);
+    qtyByCategory[cat] += it.quantity;
+  }
 
   const columns = [
     {
@@ -265,6 +301,42 @@ export default async function SalesPage({
           )}
         </div>
       </div>
+      {/* Category breakdown — Starter Kit / 30day Refill / Subscription */}
+      <Card className="p-5">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)] mb-3">
+          Category breakdown
+        </h2>
+        <div className="grid grid-cols-3 gap-4">
+          {(["starter", "refill", "subscription"] as ProductCategory[]).map((cat) => {
+            const label =
+              cat === "starter" ? "Starter Kit"
+              : cat === "refill" ? "30day Refill"
+              : "Subscription";
+            const color =
+              cat === "starter" ? "text-amber-600"
+              : cat === "refill" ? "text-teal-600"
+              : "text-violet-600";
+            return (
+              <div key={cat} className="rounded-lg border border-[var(--border)] p-4">
+                <div className="flex items-center justify-between">
+                  <span className={`text-xs font-semibold ${color}`}>{label}</span>
+                  <span className="text-[10px] text-[var(--text-tertiary)]">
+                    {qtyByCategory[cat].toLocaleString()} units
+                  </span>
+                </div>
+                <div className="mt-2">
+                  <CurrencyDisplay
+                    amount={revenueByCategory[cat]}
+                    exchangeRate={exchangeRate.rate}
+                    primaryCurrency={primaryCurrency}
+                    size="sm"
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
       {/* Channel Sales Charts */}
       <Card className="p-5">
         <div className="flex items-center justify-end mb-1">

@@ -25,6 +25,8 @@ interface OrderItemRow {
   productName: string | null;
   quantity: number;
   variantName?: string | null;
+  listPrice?: number | null;
+  category?: "starter" | "refill" | "subscription" | "other";
 }
 
 interface OrderRow {
@@ -313,12 +315,32 @@ function ExpandedRow({
                   item.variantName &&
                   item.variantName.trim() !== "" &&
                   item.variantName !== item.productName;
+                const catLabel =
+                  item.category === "starter" ? "Starter Kit"
+                  : item.category === "refill" ? "30day Refill"
+                  : item.category === "subscription" ? "Subscription"
+                  : null;
+                const catColor =
+                  item.category === "starter" ? "text-amber-600 bg-amber-500/[0.10]"
+                  : item.category === "refill" ? "text-teal-600 bg-teal-500/[0.10]"
+                  : item.category === "subscription" ? "text-violet-600 bg-violet-500/[0.10]"
+                  : "text-slate-500 bg-slate-500/[0.10]";
                 return (
                   <div key={i} className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5 flex-wrap">
                     <span>
                       {item.productName || "Unknown product"}
                       {item.quantity > 1 ? ` x${item.quantity}` : ""}
                     </span>
+                    {catLabel && (
+                      <span className={`inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded ${catColor}`}>
+                        {catLabel}
+                      </span>
+                    )}
+                    {item.listPrice != null && (
+                      <span className="text-[10px] text-[var(--text-tertiary)]">
+                        정가 ${item.listPrice}
+                      </span>
+                    )}
                     {showVariant && (
                       <span className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded text-indigo-600 bg-indigo-500/[0.08]">
                         {item.variantName}

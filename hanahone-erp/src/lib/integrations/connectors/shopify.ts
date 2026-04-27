@@ -126,13 +126,30 @@ export const shopifyConnector: Connector = {
             : undefined,
           customerEmail: order.customer?.email,
           customerPhone: order.customer?.phone || order.billing_address?.phone || order.shipping_address?.phone,
-          items: (order.line_items || []).map((item: any) => ({
-            externalItemId: String(item.id),
-            productName: item.title,
-            sku: item.sku || "",
-            quantity: item.quantity,
-            unitPrice: parseFloat(item.price),
-          })),
+          items: (order.line_items || []).map((item: any) => {
+            const listPrice = parseFloat(item.price || "0");
+            const totalDiscount = parseFloat(item.total_discount || "0");
+            const qty = item.quantity || 1;
+            // Shopify line_item.price is the per-unit list price (정가).
+            // total_discount is allocated across the whole line, so per-unit
+            // paid = list - (totalDiscount/qty).
+            const paidUnit = qty > 0 ? listPrice - totalDiscount / qty : listPrice;
+            const sellingPlanProp = (item.properties || []).find(
+              (p: any) => p.name === "_selling_plan_id",
+            );
+            return {
+              externalItemId: String(item.id),
+              productName: item.title,
+              sku: item.sku || "",
+              quantity: qty,
+              unitPrice: +paidUnit.toFixed(2),
+              originalUnitPrice: listPrice || undefined,
+              discountAmount: totalDiscount > 0 ? totalDiscount : undefined,
+              sellingPlanId: sellingPlanProp?.value
+                ? String(sellingPlanProp.value)
+                : undefined,
+            };
+          }),
         });
       }
 

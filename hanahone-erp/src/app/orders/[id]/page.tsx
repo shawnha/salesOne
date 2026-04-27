@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 import { OrderStatusChanger } from "@/components/orders/OrderStatusChanger";
+import { categorize, CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/product-category";
 
 const formatUSD = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 const formatKRW = (n: number) => `₩${Math.round(n).toLocaleString("ko-KR")}`;
@@ -71,9 +72,19 @@ export default async function OrderDetailPage({
           row.externalVariantName &&
           row.externalVariantName.trim() !== "" &&
           row.externalVariantName !== row.product.name;
+        const cat = categorize({
+          masterSku: row.product.sku,
+          variantName: row.externalVariantName,
+          sellingPlanId: row.sellingPlanId,
+        });
         return (
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold">{row.product.name}</span>
+            {cat !== "other" && (
+              <span className={`inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded ${CATEGORY_COLORS[cat]}`}>
+                {CATEGORY_LABELS[cat]}
+              </span>
+            )}
             {showVariant && (
               <span className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded text-indigo-600 bg-indigo-500/[0.08]">
                 {row.externalVariantName}
@@ -114,9 +125,21 @@ export default async function OrderDetailPage({
       key: "unitPrice",
       header: "Unit Price",
       align: "right" as const,
-      render: (row: (typeof order.items)[0]) => (
-        <span className="text-[var(--text-secondary)]">{fmt(Number(row.unitPrice), order.externalSource)}</span>
-      ),
+      render: (row: (typeof order.items)[0]) => {
+        const list = row.originalUnitPrice != null ? Number(row.originalUnitPrice) : null;
+        const paid = Number(row.unitPrice);
+        const showList = list != null && Math.abs(list - paid) > 0.01;
+        return (
+          <div className="text-right">
+            <span className="text-[var(--text-secondary)]">{fmt(paid, order.externalSource)}</span>
+            {showList && (
+              <div className="text-[10px] text-[var(--text-tertiary)]">
+                정가 {fmt(list, order.externalSource)}
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: "subtotal",

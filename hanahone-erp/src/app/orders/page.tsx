@@ -8,6 +8,7 @@ import { TopCustomersCard } from "@/components/orders/TopCustomersCard";
 import { ChannelFilter } from "@/components/orders/channel-filter";
 import { getDailyOrderData } from "@/lib/orders-chart-data";
 import { applyChannelFilter } from "@/lib/sales-chart-data";
+import { categorize } from "@/lib/product-category";
 import { getUsdKrwRate, getUsdKrwRatesForDates, dateKey } from "@/lib/exchange-rate";
 import { CurrencyDisplay, getPrimaryCurrency } from "@/components/ui/currency-display";
 import { SearchInput } from "@/components/ui/search-input";
@@ -66,7 +67,9 @@ export default async function OrdersPage({
             quantity: true,
             externalVariantName: true,
             externalVariantSku: true,
-            product: { select: { name: true } },
+            originalUnitPrice: true,
+            sellingPlanId: true,
+            product: { select: { name: true, sku: true } },
           },
         },
       },
@@ -177,11 +180,20 @@ export default async function OrdersPage({
     orderDate: o.orderDate.toISOString(),
     type: o.type,
     notes: o.notes,
-    items: o.items.map((item) => ({
-      productName: item.product?.name || null,
-      quantity: item.quantity,
-      variantName: item.externalVariantName || null,
-    })),
+    items: o.items.map((item) => {
+      const cat = categorize({
+        masterSku: item.product?.sku ?? null,
+        variantName: item.externalVariantName,
+        sellingPlanId: item.sellingPlanId,
+      });
+      return {
+        productName: item.product?.name || null,
+        quantity: item.quantity,
+        variantName: item.externalVariantName || null,
+        listPrice: item.originalUnitPrice != null ? Number(item.originalUnitPrice) : null,
+        category: cat,
+      };
+    }),
   }));
 
   return (
