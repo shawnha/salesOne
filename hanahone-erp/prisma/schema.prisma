@@ -48,6 +48,7 @@ model Company {
   reconciliationAdjustments   ReconciliationAdjustment[]
   inventoryBaselines          InventoryBaseline[]
   shippingBatches             ShippingBatch[]
+  settlementReconciliations   SettlementReconciliation[]
   notifications               Notification[]
 
   @@map("companies")
@@ -342,6 +343,29 @@ model OrderItem {
 
   @@index([orderId])
   @@map("order_items")
+  @@schema("salesone")
+}
+
+/// Monthly settlement reconciliation per (company, platform).
+/// expectedAmount is computed from Order.settlementAmount in the period; the
+/// user enters actualAmount manually after checking the bank deposit. variance
+/// is computed at read time and not stored.
+model SettlementReconciliation {
+  id             String    @id @default(uuid())
+  companyId      String    @map("company_id")
+  company        Company   @relation(fields: [companyId], references: [id])
+  platform       Platform
+  periodStart    DateTime  @map("period_start")
+  periodEnd      DateTime  @map("period_end")
+  expectedAmount Decimal   @map("expected_amount") @db.Decimal(14, 2)
+  actualAmount   Decimal?  @map("actual_amount")   @db.Decimal(14, 2)
+  notes          String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt      @map("updated_at")
+
+  @@unique([companyId, platform, periodStart])
+  @@index([companyId, platform, periodStart])
+  @@map("settlement_reconciliations")
   @@schema("salesone")
 }
 

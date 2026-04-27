@@ -7,6 +7,7 @@ import { decrypt } from "@/lib/integrations/encryption";
 import { buildBaselineRows } from "@/lib/reconciliation";
 import { ReconciliationTable } from "@/components/reconciliation/reconciliation-table";
 import { SetBaselineButton } from "@/components/reconciliation/set-baseline-button";
+import { SettlementSection } from "@/components/reconciliation/SettlementSection";
 
 type AdjustmentRow = {
   id: string;
@@ -171,6 +172,52 @@ export default async function ReconciliationPage({
     memo: adj.memo,
   }));
 
+  // Settlement reconciliation rows (Naver only, for now). Builds expected
+  // amount per month from Order.settlementAmount and merges any manual
+  // actual-deposit entries already saved in SettlementReconciliation.
+  const settlementOrders = await prisma.order.findMany({
+    where: {
+      companyId,
+      externalSource: "NAVER",
+      type: "SALE",
+      settlementAmount: { not: null },
+    },
+    select: { orderDate: true, settlementAmount: true, financialStatus: true },
+  });
+  const expectedByMonth = new Map<string, { expected: number; orderCount: number }>();
+  for (const o of settlementOrders) {
+    if (o.financialStatus === "VOIDED") continue;
+    const ym = o.orderDate.toISOString().slice(0, 7);
+    const e = expectedByMonth.get(ym) ?? { expected: 0, orderCount: 0 };
+    e.expected += Number(o.settlementAmount ?? 0);
+    e.orderCount++;
+    expectedByMonth.set(ym, e);
+  }
+  const savedSettlements = await prisma.settlementReconciliation.findMany({
+    where: { companyId, platform: "NAVER" },
+  });
+  const savedByPeriod = new Map(
+    savedSettlements.map((s) => [s.periodStart.toISOString().slice(0, 7), s]),
+  );
+  const settlementRows = Array.from(expectedByMonth.entries())
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([ym, agg]) => {
+      const [year, month] = ym.split("-").map(Number);
+      const periodStart = new Date(Date.UTC(year, month - 1, 1));
+      const periodEnd = new Date(Date.UTC(year, month, 1));
+      const saved = savedByPeriod.get(ym);
+      return {
+        period: ym,
+        periodStart: periodStart.toISOString(),
+        periodEnd: periodEnd.toISOString(),
+        expectedAmount: Math.round(agg.expected),
+        actualAmount: saved?.actualAmount ? Number(saved.actualAmount) : null,
+        notes: saved?.notes ?? null,
+        orderCount: agg.orderCount,
+      };
+    });
+  const hasNaverSettlements = settlementRows.length > 0;
+
   const adjColumns = [
     {
       key: "date",
@@ -318,6 +365,10 @@ export default async function ReconciliationPage({
             <DataTable columns={adjColumns} data={adjustmentRows} />
           </Card>
         </div>
+      )}
+
+      {hasNaverSettlements && (
+        <SettlementSection companyId={companyId} platform="NAVER" rows={settlementRows} />
       )}
     </div>
   );
