@@ -165,6 +165,13 @@ export default async function OrderDetailPage({
           fulfillmentStatus={order.fulfillmentStatus}
           financialStatus={order.financialStatus}
         />
+        <Link
+          href={`/orders/${order.id}/invoice`}
+          target="_blank"
+          className="ml-auto px-3 py-1.5 text-[12px] font-medium rounded bg-[var(--bg)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] hover:text-accent"
+        >
+          인보이스 보기 ↗
+        </Link>
       </div>
 
       <div className="grid grid-cols-2 gap-6">
