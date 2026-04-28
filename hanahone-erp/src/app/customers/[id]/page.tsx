@@ -77,7 +77,7 @@ export default async function CustomerDetailPage({
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Link href="/customers" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm">
-          &larr; Customers
+          &larr; 고객
         </Link>
         <h1 className="text-xl font-bold tracking-tight">{customer.name}</h1>
         <Badge status={customer.type} />
@@ -85,68 +85,74 @@ export default async function CustomerDetailPage({
 
       <div className="grid grid-cols-2 gap-6">
         <Card>
-          <h2 className="text-sm font-bold mb-4">Contact Information</h2>
+          <h2 className="text-sm font-bold mb-4">연락처 정보</h2>
           <div className="space-y-3 text-[13px]">
             <div className="flex justify-between">
-              <span className="text-[var(--text-secondary)]">Company</span>
+              <span className="text-[var(--text-secondary)]">회사</span>
               <span className="font-semibold">{customer.company.name}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[var(--text-secondary)]">Email</span>
-              <EditableEmail customerId={customer.id} currentEmail={customer.email} />
+              <span className="text-[var(--text-secondary)]">이메일</span>
+              <EditableEmail customerId={customer.id} currentEmail={customer.email ?? contactInfo?.email ?? null} />
             </div>
+            {contactInfo?.recipientName && contactInfo.recipientName !== customer.name && (
+              <div className="flex justify-between">
+                <span className="text-[var(--text-secondary)]">수령인</span>
+                <span className="font-semibold">{contactInfo.recipientName}</span>
+              </div>
+            )}
             {contactInfo?.phone && (
               <div className="flex justify-between">
-                <span className="text-[var(--text-secondary)]">Phone</span>
-                <span className="text-[var(--text-secondary)]">{contactInfo.phone}</span>
+                <span className="text-[var(--text-secondary)]">전화</span>
+                <span className="font-semibold font-mono text-xs">{contactInfo.phone}</span>
               </div>
             )}
             {contactInfo?.address && (
-              <div className="flex justify-between">
-                <span className="text-[var(--text-secondary)]">Address</span>
-                <span className="text-[var(--text-secondary)] text-right max-w-[200px]">
+              <div className="flex justify-between gap-3">
+                <span className="text-[var(--text-secondary)] shrink-0">주소</span>
+                <span className="font-semibold text-right">
                   {[contactInfo.address, contactInfo.city, contactInfo.state, contactInfo.zip].filter(Boolean).join(", ")}
                 </span>
               </div>
             )}
             <div className="flex justify-between">
-              <span className="text-[var(--text-secondary)]">Since</span>
-              <span className="font-semibold">{new Date(customer.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+              <span className="text-[var(--text-secondary)]">가입일</span>
+              <span className="font-semibold">{new Date(customer.createdAt).toLocaleDateString("ko-KR")}</span>
             </div>
           </div>
         </Card>
 
         <Card>
-          <h2 className="text-sm font-bold mb-4">Summary</h2>
+          <h2 className="text-sm font-bold mb-4">요약</h2>
           <div className="space-y-3 text-[13px]">
             <div className="flex justify-between">
-              <span className="text-[var(--text-secondary)]">Total Orders</span>
+              <span className="text-[var(--text-secondary)]">전체 주문</span>
               <span className="font-semibold">{totalOrders}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[var(--text-secondary)]">Paid</span>
+              <span className="text-[var(--text-secondary)]">결제 완료</span>
               <span className="font-semibold text-teal-600">{paidOrders.length}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[var(--text-secondary)]">Refunded</span>
+              <span className="text-[var(--text-secondary)]">환불</span>
               <span className="font-semibold text-red-500">{refundedOrders.length}</span>
             </div>
             {totalRefunded > 0 && (
               <div className="flex justify-between">
-                <span className="text-[var(--text-secondary)]">Total Refunded</span>
+                <span className="text-[var(--text-secondary)]">환불 합계</span>
                 <span className="font-semibold text-red-500">-{formatAmount(totalRefunded, currency)}</span>
               </div>
             )}
             <div className="border-t border-[var(--border)] my-2" />
             <div className="flex justify-between">
-              <span className="text-[var(--text-secondary)]">Net Revenue</span>
+              <span className="text-[var(--text-secondary)]">순매출</span>
               <span className="font-bold text-base">{formatAmount(netRevenue, currency)}</span>
             </div>
             {topProducts.length > 0 && (
               <>
                 <div className="border-t border-[var(--border)] my-2" />
                 <div>
-                  <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Products Purchased</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">구매 상품</span>
                   <div className="mt-2 space-y-1.5">
                     {topProducts.map(([name, qty]) => (
                       <div key={name} className="flex justify-between">
@@ -163,20 +169,20 @@ export default async function CustomerDetailPage({
       </div>
 
       <Card>
-        <h2 className="text-sm font-bold mb-4">Order History</h2>
+        <h2 className="text-sm font-bold mb-4">주문 내역</h2>
         {customer.orders.length === 0 ? (
-          <p className="text-xs text-[var(--text-tertiary)]">No orders yet.</p>
+          <p className="text-xs text-[var(--text-tertiary)]">주문 없음</p>
         ) : (
           <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
             <table className="w-full text-[13px]">
               <thead className="sticky top-0 z-10 bg-[var(--surface)]">
                 <tr className="border-b border-[var(--border)] text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
-                  <th className="text-left py-3 px-4">Order #</th>
-                  <th className="text-left py-3 px-4">Date</th>
-                  <th className="text-left py-3 px-4">Products</th>
-                  <th className="text-left py-3 px-4">Channel</th>
-                  <th className="text-left py-3 px-4">Status</th>
-                  <th className="text-right py-3 px-4">Amount</th>
+                  <th className="text-left py-3 px-4">주문 #</th>
+                  <th className="text-left py-3 px-4">일자</th>
+                  <th className="text-left py-3 px-4">상품</th>
+                  <th className="text-left py-3 px-4">채널</th>
+                  <th className="text-left py-3 px-4">상태</th>
+                  <th className="text-right py-3 px-4">금액</th>
                 </tr>
               </thead>
               <tbody>
