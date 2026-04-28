@@ -83,6 +83,9 @@ export async function runSync(connector: Connector, companyId: string): Promise<
             existing.mappedOrder.financialStatus !== newFinancial ||
             Number(existing.mappedOrder.totalAmount) !== extOrder.totalAmount;
 
+          const oldRefund = Number(existing.mappedOrder.refundAmount ?? 0);
+          const refundChanged = refund !== oldRefund;
+
           if (needsUpdate) {
             await prisma.order.update({
               where: { id: existing.mappedOrder.id },
@@ -108,6 +111,31 @@ export async function runSync(connector: Connector, companyId: string): Promise<
               await adjustInventoryForOrder(existing.mappedOrder.id);
             } catch (err) {
               console.error("Inventory adjustment failed for order", existing.mappedOrder.id, (err as Error).message);
+            }
+          }
+
+          // Re-fetch Shopify fees when refund changes — Shopify Payments
+          // typically refunds a portion of the processing fee, so the original
+          // commission/settlement values go stale on a refund.
+          if (refundChanged && connector.platform === "SHOPIFY") {
+            try {
+              const credsForRefetch = JSON.parse(decrypt(config.credentials));
+              const { fee, net: feeNet, hasFees } = await fetchShopifyOrderFees(
+                credsForRefetch,
+                extOrder.externalOrderId,
+              );
+              if (hasFees) {
+                const settlement = feeNet ?? extOrder.totalAmount - refund - fee;
+                await prisma.order.update({
+                  where: { id: existing.mappedOrder.id },
+                  data: { commissionAmount: fee, settlementAmount: settlement },
+                });
+              }
+            } catch (err) {
+              console.error(
+                `Shopify fee re-fetch failed for ${extOrder.externalOrderId}:`,
+                (err as Error).message,
+              );
             }
           }
           processed++;
