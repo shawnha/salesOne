@@ -13,6 +13,7 @@ interface Customer {
   type: string;
   email: string | null;
   phone: string | null;
+  recipientName: string | null;
   companyName: string;
 }
 
@@ -144,10 +145,10 @@ export function CustomersTable({ customers, companyId, companyName }: { customer
                       className="rounded border-[var(--border)] accent-accent"
                     />
                   </th>
-                  <th className="text-left py-3 px-4">Name</th>
-                  <th className="text-left py-3 px-4">Type</th>
-                  <th className="text-left py-3 px-4">Contact</th>
-                  <th className="text-left py-3 px-4">Company</th>
+                  <th className="text-left py-3 px-4">이름</th>
+                  <th className="text-left py-3 px-4">유형</th>
+                  <th className="text-left py-3 px-4">연락처</th>
+                  <th className="text-left py-3 px-4">회사</th>
                 </tr>
               </thead>
               <tbody>
@@ -172,12 +173,22 @@ export function CustomersTable({ customers, companyId, companyName }: { customer
                       <Link href={`/customers/${row.id}`} className="font-semibold text-accent hover:underline">
                         {row.name}
                       </Link>
+                      {row.recipientName && (
+                        <div className="text-[11px] text-[var(--text-tertiary)] mt-0.5">→ {row.recipientName}</div>
+                      )}
                     </td>
                     <td className="py-3 px-4">
                       <Badge status={row.type} />
                     </td>
                     <td className="py-3 px-4 text-[var(--text-secondary)]">
-                      {row.email || row.phone || "\u2014"}
+                      {row.email || row.phone ? (
+                        <div className="space-y-0.5">
+                          {row.email && <div>{row.email}</div>}
+                          {row.phone && <div className="font-mono text-xs">{row.phone}</div>}
+                        </div>
+                      ) : (
+                        "\u2014"
+                      )}
                     </td>
                     <td className="py-3 px-4 text-[var(--text-secondary)]">{row.companyName}</td>
                   </tr>

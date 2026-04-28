@@ -29,6 +29,7 @@ export default async function CustomersPage({
       type: c.type,
       email: c.email || info?.email || null,
       phone: info?.phone || null,
+      recipientName: info?.recipientName && info.recipientName !== c.name ? info.recipientName : null,
       companyId: c.companyId,
       companyName: c.company.name,
     };
@@ -50,8 +51,8 @@ export default async function CustomersPage({
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <h1 className="text-xl font-bold tracking-tight">Customers</h1>
-        <SearchInput placeholder="Name or email..." />
+        <h1 className="text-xl font-bold tracking-tight">고객</h1>
+        <SearchInput placeholder="이름 또는 이메일..." />
       </div>
       {companyGroups ? (
         companyGroups.map(([companyId, group]) => (
