@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { Card } from "@/components/ui/card";
 import { MonthlyRevenueChart, HorizontalBarChart } from "@/components/reports/ReportCharts";
+import { MonthlyExportButton } from "@/components/reports/MonthlyExportButton";
 
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -129,11 +130,14 @@ export default async function ReportsPage({ searchParams }: { searchParams: { co
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight">Sales Analytics</h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">
-          {companyName ? `${companyName} — ` : "Group — "}Last 12 months
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight">Sales Analytics</h1>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">
+            {companyName ? `${companyName} — ` : "Group — "}Last 12 months
+          </p>
+        </div>
+        <MonthlyExportButton companyId={companyId} />
       </div>
 
       {/* KPI Row */}
