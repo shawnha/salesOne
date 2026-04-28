@@ -33,6 +33,12 @@ export interface ExternalOrderData {
   settlementAmount?: number;
   /** Platform commission/fees */
   commissionAmount?: number;
+  /** Carrier tracking number (e.g. CJ대한통운 송장 번호, FedEx tracking #) */
+  trackingNumber?: string;
+  /** Carrier name (e.g. "CJ대한통운", "FedEx", "WILL CALL") */
+  trackingCarrier?: string;
+  /** Actual ship date from carrier/picking record */
+  shipDate?: Date;
 }
 
 export interface ExternalOrderItemData {

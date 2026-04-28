@@ -38,6 +38,9 @@ export interface CgetcSaleOrder {
   warehouseId: number;
   warehouseName: string;
   lineItems: CgetcLineItem[];
+  trackingNumber?: string;
+  trackingCarrier?: string;
+  shipDate?: string; // YYYY-MM-DD HH:mm:ss
 }
 
 export interface CgetcOrderDetail {
@@ -161,7 +164,7 @@ export async function fetchCgetcSaleOrders(
       fields: [
         "name", "partner_id", "partner_shipping_id", "origin",
         "date_order", "amount_total", "state", "warehouse_id", "delivery_count", "order_line",
-        "write_date",
+        "write_date", "picking_ids",
       ],
     });
 
@@ -194,6 +197,37 @@ export async function fetchCgetcSaleOrders(
       }
     }
 
+    // Fetch pickings (delivery orders) for tracking info. Pick the most recent
+    // "done" picking per SO; fall back to any non-cancelled picking.
+    const allPickIds: number[] = [];
+    for (const r of batchRecords) {
+      if (Array.isArray(r.picking_ids)) allPickIds.push(...r.picking_ids);
+    }
+    const pickByOrigin = new Map<string, { tracking: string; carrier: string; dateDone: string | null }>();
+    if (allPickIds.length > 0) {
+      const pickRecords = await odooRpc(credentials.url, sessionId, "stock.picking", "read", [allPickIds], {
+        fields: ["origin", "state", "carrier_tracking_ref", "carrier_id", "date_done"],
+      });
+      if (Array.isArray(pickRecords)) {
+        for (const p of pickRecords) {
+          if (!p.origin || p.state === "cancel") continue;
+          const tracking = String(p.carrier_tracking_ref || "").trim();
+          const carrier = Array.isArray(p.carrier_id) ? (p.carrier_id[1] || "") : "";
+          const dateDone = p.date_done || null;
+          const existing = pickByOrigin.get(p.origin);
+          if (
+            !existing ||
+            // Prefer one with tracking
+            (!existing.tracking && tracking) ||
+            // Then prefer the most recent date_done
+            (existing.dateDone && dateDone && dateDone > existing.dateDone)
+          ) {
+            pickByOrigin.set(p.origin, { tracking, carrier, dateDone });
+          }
+        }
+      }
+    }
+
     for (const r of batchRecords) {
       const orderDate = r.date_order ? r.date_order.split(" ")[0] : "";
       let channel = "";
@@ -220,6 +254,7 @@ export async function fetchCgetcSaleOrders(
         });
       }
 
+      const pick = pickByOrigin.get(r.name || "");
       allOrders.push({
         id: r.id,
         soNumber: r.name || "",
@@ -236,6 +271,9 @@ export async function fetchCgetcSaleOrders(
         warehouseId: r.warehouse_id?.[0] || 0,
         warehouseName: r.warehouse_id?.[1] || "",
         lineItems,
+        trackingNumber: pick?.tracking || undefined,
+        trackingCarrier: pick?.carrier || undefined,
+        shipDate: pick?.dateDone || undefined,
       });
     }
   }
@@ -530,6 +568,9 @@ export const cgetcConnector: Connector = {
         overridePlatform: channel.overridePlatform,
         channelNote: channel.channelNote,
         orderType,
+        trackingNumber: so.trackingNumber,
+        trackingCarrier: so.trackingCarrier,
+        shipDate: so.shipDate ? new Date(so.shipDate.replace(" ", "T") + "Z") : undefined,
       });
     }
     return results;

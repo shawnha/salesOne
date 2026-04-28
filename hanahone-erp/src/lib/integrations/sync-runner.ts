@@ -86,7 +86,19 @@ export async function runSync(connector: Connector, companyId: string): Promise<
           const oldRefund = Number(existing.mappedOrder.refundAmount ?? 0);
           const refundChanged = refund !== oldRefund;
 
-          if (needsUpdate) {
+          // Pick up tracking fields whenever they change too — needed so
+          // a SHIPPED transition (post-creation) updates the row.
+          const newTracking = extOrder.trackingNumber ?? null;
+          const newCarrier = extOrder.trackingCarrier ?? null;
+          const newShipDate = extOrder.shipDate ?? null;
+          const trackingChanged =
+            (newTracking ?? "") !== (existing.mappedOrder.trackingNumber ?? "") ||
+            (newCarrier ?? "") !== (existing.mappedOrder.trackingCarrier ?? "") ||
+            (newShipDate?.getTime() ?? 0) !== (existing.mappedOrder.shipDate?.getTime() ?? 0);
+
+          const reallyNeedsUpdate = needsUpdate || trackingChanged;
+
+          if (reallyNeedsUpdate) {
             await prisma.order.update({
               where: { id: existing.mappedOrder.id },
               data: {
@@ -98,6 +110,9 @@ export async function runSync(connector: Connector, companyId: string): Promise<
                 deliveredAt: newFulfillment === "DELIVERED" && !existing.mappedOrder.deliveredAt
                   ? new Date()
                   : existing.mappedOrder.deliveredAt,
+                trackingNumber: newTracking,
+                trackingCarrier: newCarrier,
+                shipDate: newShipDate,
               },
             });
             // Update raw data

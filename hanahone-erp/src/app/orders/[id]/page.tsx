@@ -228,6 +228,15 @@ export default async function OrderDetailPage({
                 <span className="font-semibold">{new Date(order.deliveredAt).toLocaleDateString("en-US")}</span>
               </div>
             )}
+            {order.trackingNumber && (
+              <div className="flex justify-between">
+                <span className="text-[var(--text-secondary)]">Tracking</span>
+                <span className="font-mono text-xs">
+                  {order.trackingCarrier ? `${order.trackingCarrier} · ` : ""}
+                  {order.trackingNumber}
+                </span>
+              </div>
+            )}
             {order.notes && (
               <div className="flex justify-between">
                 <span className="text-[var(--text-secondary)]">Notes</span>

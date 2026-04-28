@@ -306,6 +306,8 @@ model Order {
   recipientPhone        String?   @map("recipient_phone")
   settlementAmount      Decimal?  @map("settlement_amount") @db.Decimal(12, 2)
   commissionAmount      Decimal?  @map("commission_amount") @db.Decimal(12, 2)
+  trackingNumber        String?   @map("tracking_number")
+  trackingCarrier       String?   @map("tracking_carrier")
 
   items     OrderItem[]
   transfer  InterCompanyTransfer?
