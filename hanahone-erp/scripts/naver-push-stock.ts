@@ -11,7 +11,7 @@
  */
 import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/integrations/encryption";
-import { updateNaverStock } from "@/lib/integrations/naver/products";
+import { updateNaverStock, NaverNotOriginProduct } from "@/lib/integrations/naver/products";
 import type { NaverCredentials } from "@/lib/integrations/naver/types";
 
 async function main() {
@@ -123,20 +123,28 @@ async function main() {
 
   let ok = 0;
   let failed = 0;
+  let skippedNonOrigin = 0;
   for (const item of pushItems) {
     try {
       await updateNaverStock(credentials, item.naverProductNo, item.quantity);
       console.log(`  ✓ ${item.label} [${item.naverProductNo}] → ${item.quantity}`);
       ok++;
     } catch (err) {
-      console.error(
-        `  ✗ ${item.label} [${item.naverProductNo}]: ${(err as Error).message}`,
-      );
-      failed++;
+      if (err instanceof NaverNotOriginProduct) {
+        // Channel products inherit stock from their origin, so an origin push
+        // already covered them. Option stocks live behind a separate endpoint.
+        console.log(`  ⊘ ${item.label} [${item.naverProductNo}]: not an origin product (covered or unsupported)`);
+        skippedNonOrigin++;
+      } else {
+        console.error(
+          `  ✗ ${item.label} [${item.naverProductNo}]: ${(err as Error).message}`,
+        );
+        failed++;
+      }
     }
   }
 
-  console.log(`Done — ok=${ok} failed=${failed}`);
+  console.log(`Done — ok=${ok} skipped=${skippedNonOrigin} failed=${failed}`);
   await prisma.$disconnect();
   if (failed > 0) process.exit(1);
 }

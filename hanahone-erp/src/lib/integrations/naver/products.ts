@@ -3,6 +3,19 @@ import type { ExternalInventoryData } from "../types";
 import { naverFetch } from "./auth";
 
 /**
+ * Thrown when the given Naver number isn't an origin product (it's a channel
+ * product or option-stock, which live behind different endpoints). Channel
+ * products share their origin's stockQuantity, so they should be removed from
+ * SkuMapping rather than pushed separately.
+ */
+export class NaverNotOriginProduct extends Error {
+  constructor(public readonly externalSku: string, public readonly status: number) {
+    super(`Naver ${externalSku} is not an origin product (GET ${status})`);
+    this.name = "NaverNotOriginProduct";
+  }
+}
+
+/**
  * Update stock quantity for a Naver origin product.
  *
  * Naver V2 PUT /v2/products/origin-products/{id} is a full-document update.
@@ -25,6 +38,10 @@ export async function updateNaverStock(
     credentials,
     `/v2/products/origin-products/${originProductNo}`,
   );
+  if (getRes.status === 403 || getRes.status === 404) {
+    // Channel-product (covered by its origin) or option-stock (different endpoint)
+    throw new NaverNotOriginProduct(originProductNo, getRes.status);
+  }
   if (!getRes.ok) {
     const body = await getRes.text();
     throw new Error(`Naver product fetch failed (${getRes.status}): ${body}`);
