@@ -13,10 +13,8 @@ set +a
 npx tsx scripts/naver-sync.ts 2>&1 | tee -a /tmp/naver-sync.log
 
 # 2) Push HOK 스마트스토어 가용 재고 → Naver
-#    DISABLED 2026-04-28: Naver Commerce API V2 PUT origin-products now
-#    requires detailAttribute + a different endpoint for channel/option
-#    products. Needs a full rewrite (tracked separately). The pull above
-#    is enough to keep ExternalInventory + dashboards accurate; the only
-#    thing missing is auto-pushing our gonggu allocations back to the
-#    smartstore listing.
-# npx tsx scripts/naver-push-stock.ts 2>&1 | tee -a /tmp/naver-sync.log || true
+#    Origin products (12xxx Naver product number) work via GET → patch
+#    stockQuantity → PUT. Channel-products and option products are still
+#    skipped (failed=N in the log) — those need a separate endpoint and
+#    will be added later. Failures here don't fail the script.
+npx tsx scripts/naver-push-stock.ts 2>&1 | tee -a /tmp/naver-sync.log || true

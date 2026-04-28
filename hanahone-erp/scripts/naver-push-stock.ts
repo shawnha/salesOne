@@ -86,18 +86,37 @@ async function main() {
   }
 
   // Build push items for non-gonggu mappings (regular smartstore SKUs).
+  // Skip rows where gonggu allocations exceed master stock — pushing 0 in that
+  // case would silently mark the listing OUTOFSTOCK while we figure out the
+  // BOM/oversell mismatch.
   const pushItems: { naverProductNo: string; quantity: number; label: string }[] = [];
+  const skippedOversold: { label: string; master: number; allocated: number }[] = [];
   for (const m of mappings) {
     if (m.isGonggu) continue;
     const inv = invByProduct.get(m.productId);
     if (!inv) continue;
     const allocated = allocationByMasterProductId.get(m.productId) ?? 0;
-    const available = Math.max(0, inv.quantity - allocated);
+    const available = inv.quantity - allocated;
+    if (available < 0) {
+      skippedOversold.push({
+        label: m.displayName ?? inv.product.name ?? "(unnamed)",
+        master: inv.quantity,
+        allocated,
+      });
+      continue;
+    }
     pushItems.push({
       naverProductNo: m.externalSku,
       quantity: available,
       label: m.displayName ?? inv.product.name ?? "(unnamed)",
     });
+  }
+
+  if (skippedOversold.length > 0) {
+    console.log(`Skipping ${skippedOversold.length} oversold SKU(s) — fix BOM or stock first:`);
+    for (const s of skippedOversold) {
+      console.log(`  ⚠ ${s.label}: master=${s.master} allocated=${s.allocated} (deficit ${s.allocated - s.master})`);
+    }
   }
 
   console.log(`Pushing ${pushItems.length} regular SKUs to Naver`);

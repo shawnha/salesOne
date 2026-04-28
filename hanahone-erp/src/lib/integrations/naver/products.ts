@@ -5,17 +5,22 @@ import { naverFetch } from "./auth";
 /**
  * Update stock quantity for a Naver origin product.
  *
- * Naver V2 PUT /v2/products/origin-products/{id} is a full update — it requires
- * statusType (SALE/SUSPENSION/etc) and rejects partial bodies. We GET the
- * current product first, then PUT back with the same statusType plus the new
- * stockQuantity, so we never accidentally toggle the listing state.
+ * Naver V2 PUT /v2/products/origin-products/{id} is a full-document update.
+ * Sending only stockQuantity returns NotEmpty errors on statusType,
+ * detailAttribute, etc. The robust pattern is GET → patch stockQuantity →
+ * PUT the full originProduct body back, which preserves every other field
+ * (status, name, options, content) untouched.
+ *
+ * Channel products (smartstoreChannelProduct.channelProductNo) and option
+ * combinations (detailAttribute.optionInfo.optionCombinations[].stockQuantity)
+ * have separate update flows and aren't covered here.
  */
 export async function updateNaverStock(
   credentials: NaverCredentials,
   originProductNo: string,
   stockQuantity: number,
 ): Promise<void> {
-  // 1. Fetch current product to preserve statusType
+  // 1. Fetch current product
   const getRes = await naverFetch(
     credentials,
     `/v2/products/origin-products/${originProductNo}`,
@@ -24,30 +29,32 @@ export async function updateNaverStock(
     const body = await getRes.text();
     throw new Error(`Naver product fetch failed (${getRes.status}): ${body}`);
   }
-  const current = await getRes.json();
-  const statusType: string =
-    current?.originProduct?.statusType ||
-    current?.statusType ||
-    "SALE";
+  const product = await getRes.json();
+  if (!product?.originProduct) {
+    throw new Error("Naver GET response missing originProduct");
+  }
 
-  // 2. PUT back with the statusType we just read
-  const res = await naverFetch(
+  // 2. Patch stockQuantity in-place. Naver auto-flips statusType to
+  //    OUTOFSTOCK when stock hits 0, but OUTOFSTOCK is not a valid PUT input —
+  //    coerce back to SALE so a restock works.
+  product.originProduct.stockQuantity = stockQuantity;
+  if (product.originProduct.statusType === "OUTOFSTOCK") {
+    product.originProduct.statusType = "SALE";
+  }
+
+  // 3. PUT back the full originProduct body
+  const putRes = await naverFetch(
     credentials,
     `/v2/products/origin-products/${originProductNo}`,
     {
       method: "PUT",
-      body: JSON.stringify({
-        originProduct: {
-          statusType,
-          stockQuantity,
-        },
-      }),
+      body: JSON.stringify({ originProduct: product.originProduct }),
     },
   );
 
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Naver stock update failed (${res.status}): ${body}`);
+  if (!putRes.ok) {
+    const body = await putRes.text();
+    throw new Error(`Naver stock update failed (${putRes.status}): ${body}`);
   }
 }
 
