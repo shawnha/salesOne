@@ -12,6 +12,7 @@ const commands: Record<string, CommandHandler> = {
   동기화: handleSyncStatus,
   정산: handleSettlement,
   수수료: handleCommission,
+  알림: handleAlerts,
   도움말: handleHelp,
   help: handleHelp,
 };
@@ -402,6 +403,43 @@ async function handleCommission(args: string): Promise<string> {
   return lines.join("\n");
 }
 
+async function handleAlerts(_args: string): Promise<string> {
+  // Show unread urgent + recent normal notifications, max 10
+  const recent = await prisma.notification.findMany({
+    where: {
+      OR: [
+        { readAt: null },
+        { createdAt: { gte: new Date(Date.now() - 7 * 24 * 3600 * 1000) } },
+      ],
+    },
+    orderBy: [{ readAt: "asc" }, { createdAt: "desc" }],
+    take: 10,
+  });
+
+  const lines = ["[알림]"];
+  if (recent.length === 0) {
+    lines.push("최근 알림 없음");
+    return lines.join("\n");
+  }
+
+  for (const n of recent) {
+    const ago = Math.round((Date.now() - n.createdAt.getTime()) / 60000);
+    const when =
+      ago < 60 ? `${ago}분 전` :
+      ago < 1440 ? `${Math.round(ago / 60)}시간 전` :
+      `${Math.round(ago / 1440)}일 전`;
+    const tag = n.priority === "URGENT" ? "🔴" : "🔵";
+    const readMark = n.readAt ? "" : " · 미확인";
+    lines.push(`${tag} ${n.title} (${when}${readMark})`);
+  }
+
+  const unreadCount = recent.filter((n) => !n.readAt).length;
+  if (unreadCount > 0) {
+    lines.push("", `미확인 알림: ${unreadCount}건`);
+  }
+  return lines.join("\n");
+}
+
 async function handleHelp(_args: string): Promise<string> {
   return [
     "[HanahOne ERP Bot]",
@@ -415,6 +453,7 @@ async function handleHelp(_args: string): Promise<string> {
     "- 동기화 — 모든 채널 sync 상태",
     "- 정산 — 네이버 월별 정산 대사 (예상 vs 실제)",
     "- 수수료 [HOK] — 이번 달 채널별 수수료",
+    "- 알림 — 최근 알림 + 미확인 건수",
     "- 도움말",
     "",
     "회사명을 포함하면 해당 회사만 조회합니다.",

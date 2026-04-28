@@ -293,6 +293,23 @@ export default async function OrderDetailPage({
                 <span className="font-semibold">{fmt(Number(order.marginAmount), order.externalSource)}</span>
               </div>
             )}
+            {(order.commissionAmount || order.settlementAmount) && (
+              <>
+                <div className="border-t border-[var(--border)] my-2" />
+                {order.commissionAmount && (
+                  <div className="flex justify-between">
+                    <span className="text-[var(--text-secondary)]">수수료</span>
+                    <span className="font-semibold text-amber-600">-{fmt(Number(order.commissionAmount), order.externalSource)}</span>
+                  </div>
+                )}
+                {order.settlementAmount && (
+                  <div className="flex justify-between">
+                    <span className="text-[var(--text-secondary)]">정산 금액</span>
+                    <span className="font-semibold">{fmt(Number(order.settlementAmount), order.externalSource)}</span>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           {order.transfer && (
