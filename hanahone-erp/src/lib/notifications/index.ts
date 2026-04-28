@@ -12,8 +12,8 @@ export async function send(params: {
   data?: Record<string, any>;
   companyId?: string;
 }): Promise<void> {
-  // Dedup: skip LOW_STOCK/MAPPING_BROKEN with same title within 24h
-  if (params.type === "LOW_STOCK" || params.type === "MAPPING_BROKEN") {
+  // Dedup: skip LOW_STOCK/MAPPING_BROKEN/SYNC_FAILED with same title within 24h
+  if (params.type === "LOW_STOCK" || params.type === "MAPPING_BROKEN" || params.type === "SYNC_FAILED") {
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const existing = await prisma.notification.findFirst({
       where: {

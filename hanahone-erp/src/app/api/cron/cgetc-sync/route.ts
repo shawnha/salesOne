@@ -78,27 +78,6 @@ export async function GET(req: NextRequest) {
     shippingResult = { synced: 0, total: 0 };
   }
 
-  // Check if Naver sync is stale (runs locally, not on Vercel)
-  try {
-    const naverConfig = await prisma.integrationConfig.findFirst({
-      where: { platform: "NAVER", isActive: true },
-    });
-    if (naverConfig?.lastSyncAt) {
-      const hoursSinceNaverSync = (Date.now() - naverConfig.lastSyncAt.getTime()) / (1000 * 60 * 60);
-      if (hoursSinceNaverSync > 26) {
-        await notify.send({
-          type: "SYNC_FAILED",
-          priority: "URGENT",
-          title: "Naver Sync Stale",
-          message: `Last sync: ${Math.round(hoursSinceNaverSync)}h ago. Local sync may not be running.`,
-          companyId: naverConfig.companyId,
-        });
-      }
-    }
-  } catch (err) {
-    console.error("Naver stale check failed:", (err as Error).message);
-  }
-
   if (result.errorMessage) {
     return NextResponse.json({ ...result, shipping: shippingResult }, { status: 500 });
   }
