@@ -12,7 +12,11 @@ set +a
 # 1) Pull orders + inventory from Naver, recalc HOK inventory
 npx tsx scripts/naver-sync.ts 2>&1 | tee -a /tmp/naver-sync.log
 
-# 2) Push HOK 스마트스토어 가용 재고 → Naver (after recalc settles).
-#    Failures here don't fail the whole script — push is best-effort and the
-#    nightly cron will retry the next day.
-npx tsx scripts/naver-push-stock.ts 2>&1 | tee -a /tmp/naver-sync.log || true
+# 2) Push HOK 스마트스토어 가용 재고 → Naver
+#    DISABLED 2026-04-28: Naver Commerce API V2 PUT origin-products now
+#    requires detailAttribute + a different endpoint for channel/option
+#    products. Needs a full rewrite (tracked separately). The pull above
+#    is enough to keep ExternalInventory + dashboards accurate; the only
+#    thing missing is auto-pushing our gonggu allocations back to the
+#    smartstore listing.
+# npx tsx scripts/naver-push-stock.ts 2>&1 | tee -a /tmp/naver-sync.log || true

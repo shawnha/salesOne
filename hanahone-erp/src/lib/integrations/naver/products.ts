@@ -4,13 +4,33 @@ import { naverFetch } from "./auth";
 
 /**
  * Update stock quantity for a Naver origin product.
- * Uses PATCH /v2/products/origin-products/{originProductNo}
+ *
+ * Naver V2 PUT /v2/products/origin-products/{id} is a full update — it requires
+ * statusType (SALE/SUSPENSION/etc) and rejects partial bodies. We GET the
+ * current product first, then PUT back with the same statusType plus the new
+ * stockQuantity, so we never accidentally toggle the listing state.
  */
 export async function updateNaverStock(
   credentials: NaverCredentials,
   originProductNo: string,
   stockQuantity: number,
 ): Promise<void> {
+  // 1. Fetch current product to preserve statusType
+  const getRes = await naverFetch(
+    credentials,
+    `/v2/products/origin-products/${originProductNo}`,
+  );
+  if (!getRes.ok) {
+    const body = await getRes.text();
+    throw new Error(`Naver product fetch failed (${getRes.status}): ${body}`);
+  }
+  const current = await getRes.json();
+  const statusType: string =
+    current?.originProduct?.statusType ||
+    current?.statusType ||
+    "SALE";
+
+  // 2. PUT back with the statusType we just read
   const res = await naverFetch(
     credentials,
     `/v2/products/origin-products/${originProductNo}`,
@@ -18,6 +38,7 @@ export async function updateNaverStock(
       method: "PUT",
       body: JSON.stringify({
         originProduct: {
+          statusType,
           stockQuantity,
         },
       }),
