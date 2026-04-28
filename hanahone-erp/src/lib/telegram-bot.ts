@@ -10,6 +10,8 @@ const commands: Record<string, CommandHandler> = {
   오늘: handleToday,
   베스트: handleBestsellers,
   동기화: handleSyncStatus,
+  정산: handleSettlement,
+  수수료: handleCommission,
   도움말: handleHelp,
   help: handleHelp,
 };
@@ -297,6 +299,109 @@ async function handleSyncStatus(_args: string): Promise<string> {
   return lines.join("\n");
 }
 
+async function handleSettlement(_args: string): Promise<string> {
+  // Naver settlement reconciliation: expected (sum settlementAmount) vs actual (manual entry)
+  const HOK_NAME = "HOK";
+  const hok = await prisma.company.findFirst({ where: { name: HOK_NAME }, select: { id: true } });
+  if (!hok) return "HOK 회사를 찾을 수 없습니다.";
+
+  const orders = await prisma.order.findMany({
+    where: { companyId: hok.id, externalSource: "NAVER", settlementAmount: { not: null } },
+    select: { orderDate: true, settlementAmount: true },
+  });
+
+  const buckets = new Map<string, number>();
+  for (const o of orders) {
+    const ym = o.orderDate.toISOString().slice(0, 7);
+    buckets.set(ym, (buckets.get(ym) ?? 0) + Number(o.settlementAmount ?? 0));
+  }
+
+  const recon = await prisma.settlementReconciliation.findMany({
+    where: { companyId: hok.id, platform: "NAVER" },
+  });
+  const actualByYm = new Map<string, { actual: number | null; notes: string | null }>();
+  for (const r of recon) {
+    const ym = r.periodStart.toISOString().slice(0, 7);
+    actualByYm.set(ym, { actual: r.actualAmount ? Number(r.actualAmount) : null, notes: r.notes });
+  }
+
+  const sortedYms = Array.from(buckets.keys()).sort().reverse().slice(0, 6);
+  const lines = ["[네이버 정산 대사 (HOK)]"];
+  for (const ym of sortedYms) {
+    const expected = buckets.get(ym) ?? 0;
+    const r = actualByYm.get(ym);
+    const actual = r?.actual ?? null;
+    if (actual === null) {
+      lines.push(`${ym}  예상 ₩${Math.round(expected).toLocaleString()}  · 미입력`);
+    } else {
+      const variance = actual - expected;
+      const tag = Math.abs(variance) < 1 ? "≈" : variance < 0 ? "▼" : "▲";
+      lines.push(
+        `${ym}  예상 ₩${Math.round(expected).toLocaleString()}  실제 ₩${Math.round(actual).toLocaleString()}  ${tag}${Math.round(Math.abs(variance)).toLocaleString()}`,
+      );
+    }
+  }
+  if (sortedYms.length === 0) lines.push("정산 데이터 없음");
+  return lines.join("\n");
+}
+
+async function handleCommission(args: string): Promise<string> {
+  const company = await resolveCompany(args);
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const where: any = {
+    orderDate: { gte: startOfMonth },
+    type: "SALE",
+    commissionAmount: { not: null },
+  };
+  if (company) where.companyId = company.id;
+
+  const orders = await prisma.order.findMany({
+    where,
+    select: { companyId: true, externalSource: true, commissionAmount: true, totalAmount: true },
+  });
+
+  const companies = await prisma.company.findMany({ select: { id: true, name: true } });
+  const cm = new Map(companies.map((c) => [c.id, c.name]));
+
+  // Group by company × source
+  const byKey = new Map<string, { count: number; commission: number; total: number }>();
+  for (const o of orders) {
+    const key = `${o.companyId}|${o.externalSource ?? "?"}`;
+    const c = byKey.get(key) || { count: 0, commission: 0, total: 0 };
+    c.count++;
+    c.commission += Number(o.commissionAmount ?? 0);
+    c.total += Number(o.totalAmount);
+    byKey.set(key, c);
+  }
+
+  const monthStr = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
+  const lines = [`[${monthStr} 수수료 MTD]`];
+  if (byKey.size === 0) {
+    lines.push("수수료 데이터 없음");
+  } else {
+    const rows = Array.from(byKey.entries())
+      .map(([key, d]) => {
+        const [cid, src] = key.split("|");
+        const co = cm.get(cid) ?? "?";
+        const rate = d.total > 0 ? ((d.commission / d.total) * 100).toFixed(1) : "0.0";
+        return { co, src, count: d.count, commission: d.commission, rate };
+      })
+      .sort((a, b) => b.commission - a.commission);
+    for (const r of rows) {
+      // Pick currency by company (HOI=USD, others=KRW). For mixed Group totals fall back to ₩.
+      const isUsd = r.co === "HOI";
+      const symbol = isUsd ? "$" : "₩";
+      const num = isUsd
+        ? r.commission.toFixed(2)
+        : Math.round(r.commission).toLocaleString();
+      lines.push(`${r.co} ${r.src}: ${symbol}${num} (${r.rate}% / ${r.count}건)`);
+    }
+  }
+  return lines.join("\n");
+}
+
 async function handleHelp(_args: string): Promise<string> {
   return [
     "[HanahOne ERP Bot]",
@@ -308,6 +413,8 @@ async function handleHelp(_args: string): Promise<string> {
     "- 오늘 / 오늘 HOK — 오늘 매출 실시간",
     "- 베스트 / 베스트 30 / 베스트 HOK — 베스트셀러",
     "- 동기화 — 모든 채널 sync 상태",
+    "- 정산 — 네이버 월별 정산 대사 (예상 vs 실제)",
+    "- 수수료 [HOK] — 이번 달 채널별 수수료",
     "- 도움말",
     "",
     "회사명을 포함하면 해당 회사만 조회합니다.",
