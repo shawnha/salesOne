@@ -1,24 +1,46 @@
 /**
- * Backfill OrderItem.externalVariantName/Sku from ExternalOrder.rawData.line_items[].
+ * Backfill OrderItem.externalVariantName/Sku from ExternalOrder.rawData.
  *
- * Why: 9d19bd5 rerouted 24 Shopify OrderItems to the real Refill product, collapsing
- * all channel-level variant visibility. The original line_item.title ("Monthly Plan",
- * "5 Bottle Pack", etc.) only survives in ExternalOrder.rawData. This script surfaces
- * that string on OrderItem for channel-breakdown reporting.
+ * Per-platform extractors recover the original channel-level title/sku for each
+ * line item, then we walk OrderItems and fill missing variant fields. Matching
+ * uses productId first (via SkuMapping → Product.sku) with a positional fallback
+ * — same logic as order-mapper.ts on initial sync.
  *
- * Matching strategy: walk line_items in order, resolve productId via SkuMapping →
- * Product.sku (same resolver as order-mapper.ts), then pop the first unvisited
- * OrderItem with the matching productId. This mirrors how sync originally ordered
- * the rows, and is idempotent (missing fields are the only thing we fill).
- *
- * Scoped to Shopify ExternalOrders today; extend `PLATFORMS` to run for others.
+ * Idempotent: only fills rows where externalVariantName/Sku is currently null.
  *
  * Dry run by default. Pass --apply to commit.
  */
 import { prisma } from "../src/lib/prisma";
 import { Platform } from "@prisma/client";
 
-const PLATFORMS: Platform[] = [Platform.SHOPIFY];
+const PLATFORMS: Platform[] = [Platform.SHOPIFY, Platform.NAVER];
+
+interface RawLine {
+  title: string;
+  sku: string;
+}
+
+function extractLines(platform: Platform, raw: any): RawLine[] {
+  if (!raw) return [];
+  if (platform === Platform.SHOPIFY) {
+    return (raw.line_items || []).map((li: any) => ({
+      title: String(li.title ?? ""),
+      sku: String(li.sku ?? ""),
+    }));
+  }
+  if (platform === Platform.NAVER) {
+    const po = raw.productOrder;
+    if (!po) return [];
+    const title = po.productOption
+      ? `${po.productName ?? ""} - ${po.productOption}`
+      : (po.productName ?? "");
+    return [{
+      title: String(title).trim(),
+      sku: String(po.optionCode ?? po.itemNo ?? ""),
+    }];
+  }
+  return [];
+}
 
 const APPLY = process.argv.includes("--apply");
 
@@ -77,7 +99,7 @@ async function main() {
     for (const eo of exts) {
       const order = eo.mappedOrder;
       if (!order) continue;
-      const lineItems = (eo.rawData as any)?.line_items || [];
+      const lineItems = extractLines(platform, eo.rawData);
       if (!lineItems.length) continue;
 
       totalOrders++;
@@ -89,11 +111,11 @@ async function main() {
       const available = new Set(queue.map((it) => it.id));
 
       // Pass 1: exact productId match (reliable when SkuMapping is intact)
-      const pendingLi: { title: string; sku: string }[] = [];
+      const pendingLi: RawLine[] = [];
       for (const li of lineItems) {
         totalLineItems++;
-        const title: string = String(li.title ?? "");
-        const sku: string = String(li.sku ?? "");
+        const title = li.title;
+        const sku = li.sku;
         const targetPid = await resolveProductId(eo.companyId, platform, sku || null);
 
         const hit = targetPid
