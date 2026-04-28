@@ -7,6 +7,7 @@ import Link from "next/link";
 import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 import { OrderStatusChanger } from "@/components/orders/OrderStatusChanger";
 import { categorize, CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/product-category";
+import { getTrackingUrl } from "@/lib/tracking-url";
 
 const formatUSD = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 const formatKRW = (n: number) => `₩${Math.round(n).toLocaleString("ko-KR")}`;
@@ -228,15 +229,31 @@ export default async function OrderDetailPage({
                 <span className="font-semibold">{new Date(order.deliveredAt).toLocaleDateString("en-US")}</span>
               </div>
             )}
-            {order.trackingNumber && (
-              <div className="flex justify-between">
-                <span className="text-[var(--text-secondary)]">Tracking</span>
-                <span className="font-mono text-xs">
-                  {order.trackingCarrier ? `${order.trackingCarrier} · ` : ""}
-                  {order.trackingNumber}
-                </span>
-              </div>
-            )}
+            {order.trackingNumber && (() => {
+              const trackUrl = getTrackingUrl(order.trackingCarrier, order.trackingNumber);
+              return (
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">Tracking</span>
+                  <span className="text-xs">
+                    {order.trackingCarrier && (
+                      <span className="text-[var(--text-secondary)]">{order.trackingCarrier} · </span>
+                    )}
+                    {trackUrl ? (
+                      <a
+                        href={trackUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-accent hover:underline"
+                      >
+                        {order.trackingNumber}
+                      </a>
+                    ) : (
+                      <span className="font-mono">{order.trackingNumber}</span>
+                    )}
+                  </span>
+                </div>
+              );
+            })()}
             {order.notes && (
               <div className="flex justify-between">
                 <span className="text-[var(--text-secondary)]">Notes</span>
