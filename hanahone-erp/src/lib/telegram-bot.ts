@@ -7,6 +7,9 @@ const commands: Record<string, CommandHandler> = {
   재고: handleInventory,
   주문: handleOrders,
   매출: handleSales,
+  오늘: handleToday,
+  베스트: handleBestsellers,
+  동기화: handleSyncStatus,
   도움말: handleHelp,
   help: handleHelp,
 };
@@ -180,14 +183,131 @@ async function handleSales(args: string): Promise<string> {
   return lines.join("\n");
 }
 
+async function handleToday(args: string): Promise<string> {
+  const company = await resolveCompany(args);
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+
+  const where: any = {
+    orderDate: { gte: start },
+    type: "SALE",
+  };
+  if (company) where.companyId = company.id;
+
+  const orders = await prisma.order.findMany({
+    where,
+    select: { companyId: true, netAmount: true, financialStatus: true, externalSource: true },
+  });
+
+  const companies = await prisma.company.findMany({ select: { id: true, name: true } });
+  const companyMap = new Map(companies.map((c) => [c.id, c.name]));
+
+  const byCompany = new Map<string, { count: number; paid: number; total: number }>();
+  for (const o of orders) {
+    const c = byCompany.get(o.companyId) || { count: 0, paid: 0, total: 0 };
+    c.count++;
+    if (o.financialStatus === "PAID") c.paid++;
+    c.total += Number(o.netAmount ?? 0);
+    byCompany.set(o.companyId, c);
+  }
+
+  const lines = [`[오늘 매출 (${start.toLocaleDateString("ko-KR")})]`];
+  if (byCompany.size === 0) {
+    lines.push("주문 없음");
+  } else {
+    for (const [cid, d] of Array.from(byCompany)) {
+      lines.push(`${companyMap.get(cid) || cid}: ${d.count}건 (결제 ${d.paid}) / ${Math.round(d.total).toLocaleString()}원`);
+    }
+  }
+  return lines.join("\n");
+}
+
+async function handleBestsellers(args: string): Promise<string> {
+  // Default 7d, support "베스트 30" for 30d
+  const company = await resolveCompany(args);
+  const m = args.match(/(\d+)/);
+  const days = m ? Math.min(Number(m[1]), 90) : 7;
+  const since = new Date(Date.now() - days * 24 * 3600 * 1000);
+
+  const where: any = {
+    order: {
+      orderDate: { gte: since },
+      type: { notIn: ["SEEDING", "GIFT", "INTER_COMPANY"] },
+    },
+  };
+  if (company) where.order.companyId = company.id;
+
+  const items = await prisma.orderItem.findMany({
+    where,
+    select: {
+      quantity: true,
+      product: { select: { name: true, sku: true } },
+    },
+  });
+
+  const counts = new Map<string, { name: string; qty: number }>();
+  for (const it of items) {
+    const key = it.product.sku;
+    const c = counts.get(key) || { name: it.product.name, qty: 0 };
+    c.qty += it.quantity;
+    counts.set(key, c);
+  }
+
+  const ranked = Array.from(counts.entries())
+    .sort((a, b) => b[1].qty - a[1].qty)
+    .slice(0, 10);
+
+  const lines = [`[베스트셀러 ${days}일${company ? " · " + company.name : ""}]`];
+  if (ranked.length === 0) {
+    lines.push("판매 데이터 없음");
+  } else {
+    ranked.forEach(([sku, d], i) => {
+      lines.push(`${i + 1}. ${d.name} (${sku}): ${d.qty}개`);
+    });
+  }
+  return lines.join("\n");
+}
+
+async function handleSyncStatus(_args: string): Promise<string> {
+  const configs = await prisma.integrationConfig.findMany({
+    where: { isActive: true },
+    select: { platform: true, lastSyncAt: true, companyId: true },
+    orderBy: { lastSyncAt: "desc" },
+  });
+
+  const companies = await prisma.company.findMany({ select: { id: true, name: true } });
+  const companyMap = new Map(companies.map((c) => [c.id, c.name]));
+
+  const lines = ["[동기화 상태]"];
+  if (configs.length === 0) {
+    lines.push("활성 채널 없음");
+  } else {
+    for (const c of configs) {
+      const co = companyMap.get(c.companyId) ?? "?";
+      if (!c.lastSyncAt) {
+        lines.push(`${c.platform} (${co}): 한 번도 sync 안 됨`);
+        continue;
+      }
+      const hours = (Date.now() - c.lastSyncAt.getTime()) / 3600000;
+      const tag = hours > 26 ? "⚠️" : hours > 6 ? "🟡" : "✅";
+      const ago = hours < 1 ? `${Math.round(hours * 60)}분` : `${Math.round(hours)}시간`;
+      lines.push(`${tag} ${c.platform} (${co}): ${ago} 전`);
+    }
+  }
+  return lines.join("\n");
+}
+
 async function handleHelp(_args: string): Promise<string> {
   return [
     "[HanahOne ERP Bot]",
     "",
     "사용 가능한 명령어:",
     "- 재고 / 재고 HOK / 재고 HOI",
-    "- 주문 / 주문 HOK",
-    "- 매출 / 매출 HOI",
+    "- 주문 (어제) / 주문 HOK",
+    "- 매출 (이번 달) / 매출 HOI",
+    "- 오늘 / 오늘 HOK — 오늘 매출 실시간",
+    "- 베스트 / 베스트 30 / 베스트 HOK — 베스트셀러",
+    "- 동기화 — 모든 채널 sync 상태",
     "- 도움말",
     "",
     "회사명을 포함하면 해당 회사만 조회합니다.",
