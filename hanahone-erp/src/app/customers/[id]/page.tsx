@@ -62,6 +62,22 @@ export default async function CustomerDetailPage({
   );
   const netRevenue = customer.orders.reduce((s, o) => s + Number(o.netAmount ?? o.totalAmount), 0);
   const totalRefunded = refundedOrders.reduce((s, o) => s + Number(o.refundAmount || o.totalAmount), 0);
+  const avgOrderValue = paidOrders.length > 0
+    ? paidOrders.reduce((s, o) => s + Number(o.netAmount ?? o.totalAmount), 0) / paidOrders.length
+    : 0;
+  // Orders are already orderBy: orderDate desc → first = most recent
+  const lastOrderDate = customer.orders[0]?.orderDate ?? null;
+  const firstOrderDate = customer.orders[customer.orders.length - 1]?.orderDate ?? null;
+  const daysSinceLast = lastOrderDate
+    ? Math.floor((Date.now() - lastOrderDate.getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+  // Channel breakdown
+  const channelCounts = new Map<string, number>();
+  for (const o of customer.orders) {
+    const k = o.externalSource ?? "Manual";
+    channelCounts.set(k, (channelCounts.get(k) ?? 0) + 1);
+  }
+  const channelBreakdown = Array.from(channelCounts.entries()).sort((a, b) => b[1] - a[1]);
 
   // Product purchase summary
   const productCounts = new Map<string, number>();
@@ -148,6 +164,46 @@ export default async function CustomerDetailPage({
               <span className="text-[var(--text-secondary)]">순매출</span>
               <span className="font-bold text-base">{formatAmount(netRevenue, currency)}</span>
             </div>
+            {avgOrderValue > 0 && (
+              <div className="flex justify-between">
+                <span className="text-[var(--text-secondary)]">평균 주문가</span>
+                <span className="font-semibold">{formatAmount(avgOrderValue, currency)}</span>
+              </div>
+            )}
+            {firstOrderDate && lastOrderDate && (
+              <>
+                <div className="border-t border-[var(--border)] my-2" />
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">첫 주문</span>
+                  <span className="font-semibold">{firstOrderDate.toLocaleDateString("ko-KR")}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-secondary)]">최근 주문</span>
+                  <span className="font-semibold">
+                    {lastOrderDate.toLocaleDateString("ko-KR")}
+                    {daysSinceLast !== null && (
+                      <span className="ml-1.5 text-[11px] text-[var(--text-tertiary)]">({daysSinceLast}일 전)</span>
+                    )}
+                  </span>
+                </div>
+              </>
+            )}
+            {channelBreakdown.length > 1 && (
+              <>
+                <div className="border-t border-[var(--border)] my-2" />
+                <div>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">채널 분포</span>
+                  <div className="mt-2 space-y-1">
+                    {channelBreakdown.map(([ch, n]) => (
+                      <div key={ch} className="flex justify-between">
+                        <span className="text-[var(--text-secondary)]">{ch}</span>
+                        <span className="font-semibold">{n}건</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
             {topProducts.length > 0 && (
               <>
                 <div className="border-t border-[var(--border)] my-2" />
