@@ -13,7 +13,7 @@
 import { prisma } from "../src/lib/prisma";
 import { Platform } from "@prisma/client";
 
-const PLATFORMS: Platform[] = [Platform.SHOPIFY, Platform.NAVER];
+const PLATFORMS: Platform[] = [Platform.SHOPIFY, Platform.NAVER, Platform.CGETC];
 
 interface RawLine {
   title: string;
@@ -38,6 +38,12 @@ function extractLines(platform: Platform, raw: any): RawLine[] {
       title: String(title).trim(),
       sku: String(po.optionCode ?? po.itemNo ?? ""),
     }];
+  }
+  if (platform === Platform.CGETC) {
+    return (raw.lineItems || []).map((li: any) => ({
+      title: String(li.productName ?? ""),
+      sku: String(li.sku ?? ""),
+    }));
   }
   return [];
 }
