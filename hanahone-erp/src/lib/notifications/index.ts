@@ -1,7 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { sendTelegram } from "./telegram";
 
-export type NotificationType = "SYNC_FAILED" | "LOW_STOCK" | "NEW_ORDERS" | "MAPPING_BROKEN";
+export type NotificationType =
+  | "SYNC_FAILED"
+  | "LOW_STOCK"
+  | "NEW_ORDERS"
+  | "MAPPING_BROKEN"
+  | "DISPATCH_COMPLETE"
+  | "DISPATCH_FAILED";
 export type NotificationPriority = "URGENT" | "NORMAL";
 
 export async function send(params: {
@@ -11,6 +17,8 @@ export async function send(params: {
   message: string;
   data?: Record<string, any>;
   companyId?: string;
+  /** Force-send telegram even if priority is NORMAL (e.g. dispatch success notifications). */
+  forceTelegram?: boolean;
 }): Promise<void> {
   // Dedup: skip LOW_STOCK/MAPPING_BROKEN/SYNC_FAILED with same title within 24h
   if (params.type === "LOW_STOCK" || params.type === "MAPPING_BROKEN" || params.type === "SYNC_FAILED") {
@@ -36,7 +44,7 @@ export async function send(params: {
     },
   });
 
-  if (params.priority === "URGENT") {
+  if (params.priority === "URGENT" || params.forceTelegram) {
     const success = await sendTelegram(params.title, params.message);
     if (success) {
       await prisma.notification.update({

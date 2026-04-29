@@ -19,6 +19,7 @@ import {
 } from "@/lib/integrations/coupang/dispatch";
 import type { NaverCredentials } from "@/lib/integrations/naver/types";
 import type { CoupangCredentials } from "@/lib/integrations/connectors/coupang";
+import * as notify from "@/lib/notifications";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const { error } = await requireAuth();
@@ -208,6 +209,45 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       where: { id: { in: Array.from(successfulOrderIds) } },
       data: { fulfillmentStatus: "FULFILLED", shipDate: new Date() },
     });
+  }
+
+  // === 텔레그램 알림 ===
+  const totalFailed = result.naver.failed.length + result.coupang.failed.length;
+  const totalOk = result.naver.ok + result.coupang.ok;
+  const shortId = batchId.slice(0, 8);
+  const summaryParts: string[] = [];
+  if (naverItems.length > 0) summaryParts.push(`네이버 ${result.naver.ok}/${naverItems.length}`);
+  if (coupangItems.length > 0) summaryParts.push(`쿠팡 ${result.coupang.ok}/${coupangItems.length}`);
+
+  if (totalFailed === 0) {
+    // 전부 성공
+    await notify
+      .send({
+        type: "DISPATCH_COMPLETE",
+        priority: "NORMAL",
+        forceTelegram: true,
+        title: `📦 라운드 ${shortId} dispatch 완료`,
+        message: `${summaryParts.join(" · ")} — 총 ${totalOk}건 송장 등록 완료`,
+        companyId: batch.companyId,
+        data: { batchId, naverOk: result.naver.ok, coupangOk: result.coupang.ok },
+      })
+      .catch(() => null);
+  } else {
+    // 부분 실패 또는 전부 실패
+    const failedSummary = [
+      ...result.naver.failed.slice(0, 2).map((f) => `N ${f.productOrderId}: ${f.error.slice(0, 60)}`),
+      ...result.coupang.failed.slice(0, 2).map((f) => `C ${f.shipmentBoxId}: ${f.error.slice(0, 60)}`),
+    ].join("\n");
+    await notify
+      .send({
+        type: "DISPATCH_FAILED",
+        priority: "URGENT",
+        title: `⚠ 라운드 ${shortId} dispatch ${totalOk > 0 ? "부분 실패" : "실패"}`,
+        message: `${summaryParts.join(" · ")} — ${totalFailed}건 실패\n\n${failedSummary}${totalFailed > 4 ? `\n... (+${totalFailed - 4}건 더)` : ""}`,
+        companyId: batch.companyId,
+        data: { batchId, naverFailed: result.naver.failed.length, coupangFailed: result.coupang.failed.length },
+      })
+      .catch(() => null);
   }
 
   return NextResponse.json({
