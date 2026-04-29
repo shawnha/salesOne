@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { NaverShippingManager } from "@/components/shipping/NaverShippingManager";
+import { UnifiedShippingManager } from "@/components/shipping/UnifiedShippingManager";
 
 export default async function ShippingPage({
   searchParams,
@@ -19,7 +19,7 @@ export default async function ShippingPage({
   if (!companyId) {
     return (
       <div className="space-y-6">
-        <h1 className="text-xl font-bold tracking-tight">Naver 배송 관리</h1>
+        <h1 className="text-xl font-bold tracking-tight">배송 관리</h1>
         <p className="text-sm text-[var(--text-secondary)]">회사를 선택해주세요.</p>
       </div>
     );
@@ -27,8 +27,11 @@ export default async function ShippingPage({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-bold tracking-tight">Naver 배송 관리</h1>
-      <NaverShippingManager companyId={companyId} />
+      <div>
+        <h1 className="text-xl font-bold tracking-tight">배송 관리</h1>
+        <p className="text-sm text-[var(--text-secondary)] mt-1">네이버 + 쿠팡 통합 발주 → 송장 → dispatch</p>
+      </div>
+      <UnifiedShippingManager companyId={companyId} />
     </div>
   );
 }

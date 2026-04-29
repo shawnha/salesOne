@@ -673,10 +673,13 @@ model ShippingBatch {
   id          String              @id @default(uuid())
   companyId   String              @map("company_id")
   company     Company             @relation(fields: [companyId], references: [id])
+  // legacy: 단일 채널 라운드. 다채널 라운드는 'MULTI'로 표시 + items[].platform 사용.
   platform    Platform            @default(NAVER)
   status      ShippingBatchStatus @default(PENDING)
   carrier     String              @default("CJ대한통운")
   totalOrders Int                 @map("total_orders")
+  // per-channel dispatch state (e.g. {"NAVER":"COMPLETED","COUPANG":"PENDING"})
+  channelDispatch Json?           @map("channel_dispatch")
   createdAt   DateTime            @default(now()) @map("created_at")
   updatedAt   DateTime            @updatedAt @map("updated_at")
 
@@ -694,7 +697,10 @@ model ShippingBatchItem {
   rowNumber      Int           @map("row_number")
   orderId        String        @map("order_id")
   order          Order         @relation(fields: [orderId], references: [id])
+  // 채널별 외부 ID. NAVER=productOrderId, COUPANG=shipmentBoxId.
   productOrderId String        @map("product_order_id")
+  // 다채널 라운드에서 어느 채널 주문인지 식별 (NAVER / COUPANG).
+  platform       Platform?
   trackingNumber String?       @map("tracking_number")
 
   @@unique([batchId, rowNumber])

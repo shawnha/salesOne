@@ -29,10 +29,16 @@ export async function POST(req: NextRequest) {
   const { companyId, orderIds, carrier } = parsed.data;
 
   const orders = await prisma.order.findMany({
-    where: { id: { in: orderIds }, companyId, externalSource: "NAVER" },
+    where: {
+      id: { in: orderIds },
+      companyId,
+      externalSource: { in: ["NAVER", "COUPANG"] },
+      // ROCKET_GROWTH는 쿠팡 풀필먼트라 발주서 흐름 자체 X.
+      NOT: { shipmentType: "ROCKET_GROWTH" },
+    },
     include: {
       items: { include: { product: true } },
-      externalOrders: { where: { platform: "NAVER" }, take: 1 },
+      externalOrders: { take: 1 },
     },
   });
 
@@ -40,12 +46,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No matching orders found" }, { status: 404 });
   }
 
+  // 라운드의 platform: 단일 채널이면 그 채널, 다채널이면 NAVER 기본값 (items[].platform로 추적)
+  const channelSet = new Set(orders.map((o) => o.externalSource));
+  const batchPlatform = channelSet.size === 1 ? (orders[0].externalSource ?? "NAVER") : "NAVER";
+  const channelDispatch: Record<string, string> = {};
+  for (const ch of Array.from(channelSet)) {
+    if (ch) channelDispatch[ch] = "PENDING";
+  }
+
   const batch = await prisma.shippingBatch.create({
     data: {
       companyId,
-      platform: "NAVER",
+      platform: batchPlatform,
       carrier: carrier || "CJ대한통운",
       totalOrders: orders.length,
+      channelDispatch,
       items: {
         create: orders.map((order, index) => {
           const extOrder = order.externalOrders[0];
@@ -53,6 +68,7 @@ export async function POST(req: NextRequest) {
             rowNumber: index + 1,
             orderId: order.id,
             productOrderId: extOrder?.externalOrderId || "",
+            platform: order.externalSource,
           };
         }),
       },
@@ -62,10 +78,15 @@ export async function POST(req: NextRequest) {
 
   const inputs: PurchaseOrderInput[] = orders.map((order, index) => {
     const extOrder = order.externalOrders[0];
+    // NAVER + COUPANG raw shape이 다름 — 양쪽 다 시도해서 가장 풍부한 값 추출.
     const rawData = extOrder?.rawData as
       | {
+          // NAVER shape
           order?: { ordererName?: string; ordererTel?: string };
           productOrder?: { productName?: string };
+          // COUPANG shape
+          orderer?: { name?: string; safeNumber?: string; ordererNumber?: string };
+          orderItems?: Array<{ vendorItemName?: string }>;
         }
       | null
       | undefined;
@@ -75,15 +96,20 @@ export async function POST(req: NextRequest) {
 
     const productName =
       rawData?.productOrder?.productName ||
+      rawData?.orderItems?.[0]?.vendorItemName ||
       product?.name ||
       "";
 
     const recipientName =
       order.recipientName ||
       rawData?.order?.ordererName ||
+      rawData?.orderer?.name ||
       "";
 
-    const ordererTel = rawData?.order?.ordererTel;
+    const ordererTel =
+      rawData?.order?.ordererTel ||
+      rawData?.orderer?.ordererNumber ||
+      rawData?.orderer?.safeNumber;
     const ordererPhone =
       ordererTel && ordererTel !== order.recipientPhone ? ordererTel : undefined;
 

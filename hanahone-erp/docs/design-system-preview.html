@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>HanahOne ERP — Design System Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f8f9fa;
+    --surface: #ffffff;
+    --surface-2: #f1f5f9;
+    --border: rgba(0,0,0,0.06);
+    --border-strong: rgba(0,0,0,0.10);
+    --text-primary: #0f1419;
+    --text-secondary: #536471;
+    --text-tertiary: #8899a6;
+    --text-quaternary: rgba(0,0,0,0.20);
+
+    --accent: #0d9488;
+    --accent-dim: rgba(13,148,136,0.08);
+    --accent-strong: #0f766e;
+
+    --success: #10b981;     --success-bg: rgba(16,185,129,0.08);
+    --info:    #2563eb;     --info-bg:    rgba(37,99,235,0.08);
+    --warning: #d97706;     --warning-bg: rgba(217,119,6,0.08);
+    --danger:  #dc2626;     --danger-bg:  rgba(220,38,38,0.08);
+    --neutral: #64748b;     --neutral-bg: rgba(100,116,139,0.08);
+
+    --ch-shopify: #1c8847;  --ch-shopify-bg: rgba(28,136,71,0.10);
+    --ch-amazon:  #ea580c;  --ch-amazon-bg:  rgba(234,88,12,0.10);
+    --ch-tiktok:  #db2777;  --ch-tiktok-bg:  rgba(219,39,119,0.10);
+    --ch-naver:   #03C75A;  --ch-naver-bg:   rgba(3,199,90,0.10);
+    --ch-coupang: #ef4444;  --ch-coupang-bg: rgba(239,68,68,0.10);
+    --ch-pharmacy:#2563eb;  --ch-pharmacy-bg:rgba(37,99,235,0.10);
+    --ch-cgetc:   #6366f1;  --ch-cgetc-bg:   rgba(99,102,241,0.10);
+    --ch-gonggu:  #f43f5e;  --ch-gonggu-bg:  rgba(244,63,94,0.10);
+
+    --font-display: 'Geist', 'Pretendard', system-ui, sans-serif;
+    --font-body:    'Geist', 'Pretendard', system-ui, sans-serif;
+    --font-mono:    'Geist Mono', ui-monospace, monospace;
+  }
+  [data-theme="dark"] {
+    --bg: #0a0a0c;
+    --surface: #16161a;
+    --surface-2: #1f1f24;
+    --border: rgba(255,255,255,0.08);
+    --border-strong: rgba(255,255,255,0.15);
+    --text-primary: #f0f0f0;
+    --text-secondary: #94a3b8;
+    --text-tertiary: #64748b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text-primary);
+    line-height: 1.5;
+    padding: 32px;
+    transition: background 200ms ease-out, color 200ms ease-out;
+  }
+  .container { max-width: 1180px; margin: 0 auto; }
+
+  /* Header */
+  .toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 36px; padding-bottom: 24px; border-bottom: 1px solid var(--border); }
+  .brand { font-family: var(--font-display); font-weight: 800; font-size: 24px; letter-spacing: -0.02em; }
+  .brand-accent { color: var(--accent); }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); padding: 6px 14px; border-radius: 9999px; cursor: pointer; font-size: 12px; font-weight: 600; }
+
+  /* Section */
+  section { margin-bottom: 56px; }
+  .section-label { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-tertiary); margin-bottom: 16px; }
+  .section-title { font-family: var(--font-display); font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 8px; }
+  .section-desc { color: var(--text-secondary); font-size: 13px; margin-bottom: 24px; max-width: 680px; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; }
+  .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .stack { display: flex; flex-direction: column; gap: 12px; }
+  .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+  /* Type specimens */
+  .specimen { padding: 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+  .specimen-label { font-size: 11px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; font-family: var(--font-mono); }
+  .display { font-family: var(--font-display); font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
+  .card-title-spec { font-family: var(--font-display); font-size: 16px; font-weight: 700; }
+  .stat-spec { font-family: var(--font-display); font-size: 22px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .body-spec { font-size: 13px; }
+  .meta-spec { font-size: 11px; font-weight: 500; color: var(--text-secondary); }
+  .micro-spec { font-size: 10px; font-weight: 600; }
+  .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+  /* Color swatches */
+  .swatch { padding: 14px; border-radius: 10px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; }
+  .swatch-name { font-size: 11px; font-weight: 600; }
+  .swatch-hex { font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); }
+
+  /* Badge */
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; }
+  .badge-success { background: var(--success-bg); color: var(--success); }
+  .badge-info { background: var(--info-bg); color: var(--info); }
+  .badge-warning { background: var(--warning-bg); color: var(--warning); }
+  .badge-danger { background: var(--danger-bg); color: var(--danger); }
+  .badge-neutral { background: var(--neutral-bg); color: var(--neutral); }
+
+  .ch-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; }
+  .ch-shopify { background: var(--ch-shopify-bg); color: var(--ch-shopify); }
+  .ch-amazon  { background: var(--ch-amazon-bg);  color: var(--ch-amazon); }
+  .ch-tiktok  { background: var(--ch-tiktok-bg);  color: var(--ch-tiktok); }
+  .ch-naver   { background: var(--ch-naver-bg);   color: var(--ch-naver); }
+  .ch-coupang { background: var(--ch-coupang-bg); color: var(--ch-coupang); }
+  .ch-pharmacy{ background: var(--ch-pharmacy-bg);color: var(--ch-pharmacy); }
+  .ch-cgetc   { background: var(--ch-cgetc-bg);   color: var(--ch-cgetc); }
+  .ch-gonggu  { background: var(--ch-gonggu-bg);  color: var(--ch-gonggu); }
+  .ch-rg { background: var(--ch-coupang-bg); color: var(--ch-coupang); }
+  .ch-rg::before { content: '⚡'; }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text-primary); transition: all 200ms ease-out; }
+  .btn:hover { border-color: var(--border-strong); }
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-primary:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
+  .btn-ghost { background: transparent; border-color: transparent; color: var(--text-secondary); }
+  .btn-ghost:hover { background: var(--surface-2); }
+
+  /* KpiCard demo */
+  .kpi-row { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
+  .kpi { padding: 14px 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+  .kpi-big { padding: 18px 22px; }
+  .kpi-label { font-size: 11px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; }
+  .kpi-value { font-family: var(--font-display); font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .kpi-big .kpi-value { font-size: 28px; }
+  .kpi-sub { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+
+  /* StepRail */
+  .step-rail { display: flex; gap: 6px; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+  .step { flex: 1; padding: 12px 14px; border-radius: 10px; transition: background 200ms; }
+  .step.active { background: var(--accent-dim); }
+  .step.done { background: var(--success-bg); }
+  .step-num { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 9999px; background: var(--border-strong); color: var(--surface); font-size: 10px; font-weight: 700; margin-right: 6px; }
+  .step.active .step-num { background: var(--accent); color: #fff; }
+  .step.done .step-num { background: var(--success); color: #fff; }
+  .step-label { font-size: 12px; font-weight: 600; }
+  .step-desc { font-size: 11px; color: var(--text-tertiary); margin-left: 26px; margin-top: 2px; }
+  .step.active .step-label { color: var(--accent-strong); }
+
+  /* ChannelSection */
+  .channel-section { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+  .channel-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .channel-row { padding: 11px 18px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 1fr 100px 80px; align-items: center; gap: 12px; font-size: 13px; }
+  .channel-row:last-child { border-bottom: none; }
+  .row-name { font-weight: 600; }
+  .row-meta { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+  .row-num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
+
+  /* EmptyState */
+  .empty { padding: 48px 24px; text-align: center; border: 1px dashed var(--border-strong); border-radius: 16px; background: var(--surface); }
+  .empty-icon { font-size: 22px; margin-bottom: 10px; opacity: 0.6; }
+  .empty-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .empty-desc { font-size: 12px; color: var(--text-secondary); margin-bottom: 16px; }
+
+  /* Tabs */
+  .tabs { display: inline-flex; gap: 4px; padding: 4px; background: var(--surface-2); border-radius: 10px; }
+  .tab { padding: 8px 14px; font-size: 12px; font-weight: 600; border-radius: 8px; cursor: pointer; color: var(--text-secondary); }
+  .tab.active { background: var(--surface); color: var(--text-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+
+  /* Hero example */
+  .hero-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px 32px; }
+  .hero-eyebrow { font-size: 11px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; }
+  .hero-headline { font-family: var(--font-display); font-size: 36px; font-weight: 800; letter-spacing: -0.02em; margin-top: 6px; }
+  .hero-headline .accent { color: var(--accent); }
+  .hero-meta { color: var(--text-secondary); margin-top: 8px; font-size: 14px; }
+  .hero-cta { margin-top: 20px; display: flex; gap: 10px; }
+  .alert-warn { padding: 12px 16px; background: var(--warning-bg); border: 1px solid rgba(217,119,6,0.20); border-radius: 12px; color: var(--warning); font-size: 12px; margin-top: 16px; display: flex; gap: 8px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <div class="brand">Hanah<span class="brand-accent">One</span> · Design System</div>
+    <button class="toggle" id="theme-toggle">🌙 Dark</button>
+  </div>
+
+  <!-- HERO EXAMPLE -->
+  <section>
+    <div class="section-label">Hero — 1 hero rule</div>
+    <p class="section-desc">매 페이지 첫 viewport는 1개 핵심 정보 + 1개 핵심 행동. 4-stat 균등 그리드 X. 매일 9시 운영자가 "오늘 뭐 해야 하지" 답을 0.5초에 받음.</p>
+    <div class="hero-card">
+      <div class="hero-eyebrow">2026-04-29 · 발송 라운드</div>
+      <div class="hero-headline">오늘 발송 <span class="accent">27건</span></div>
+      <div class="hero-meta">네이버 18 · 쿠팡 9 · 로켓그로스 1건은 자동 처리됨</div>
+      <div class="hero-cta">
+        <button class="btn btn-primary">새 라운드 시작 →</button>
+        <button class="btn">지난 라운드 보기</button>
+      </div>
+      <div class="alert-warn"><span>⚠</span><div>로켓그로스 30개입 재고 16개 — 32일 후 소진 예상. 입고 검토 권장.</div></div>
+    </div>
+  </section>
+
+  <!-- TYPOGRAPHY -->
+  <section>
+    <div class="section-label">Typography</div>
+    <p class="section-desc">Geist (영문/숫자) + Pretendard (한국어) + Geist Mono (데이터). 시스템 fallback 대신 Pretendard 추가로 OS 무관 일관성.</p>
+    <div class="grid-2">
+      <div class="specimen">
+        <div class="specimen-label">display · 24px · 800</div>
+        <div class="display">매출 분석 / Sales Analytics</div>
+      </div>
+      <div class="specimen">
+        <div class="specimen-label">card-title · 16px · 700</div>
+        <div class="card-title-spec">최근 발송 라운드</div>
+      </div>
+      <div class="specimen">
+        <div class="specimen-label">stat-value · 22px · 700 · tabular-nums</div>
+        <div class="stat-spec">₩6,318,800</div>
+      </div>
+      <div class="specimen">
+        <div class="specimen-label">body · 13px · 400</div>
+        <div class="body-spec">한로제 · 010-7701-2732 · 5개입 ×1 · ODD-M01-5</div>
+      </div>
+      <div class="specimen">
+        <div class="specimen-label">meta · 11px · 500 · text-secondary</div>
+        <div class="meta-spec">최근 24시간 자동 sync · 마지막 sync 18:25</div>
+      </div>
+      <div class="specimen">
+        <div class="specimen-label">micro · 10px · 600</div>
+        <div class="micro-spec"><span class="badge badge-success">DELIVERED</span> <span class="ch-badge ch-naver">네이버</span></div>
+      </div>
+      <div class="specimen">
+        <div class="specimen-label">mono · 송장/SKU/주문번호</div>
+        <div class="mono">95241053251 · CJ 12345678 · 18100186631303</div>
+      </div>
+      <div class="specimen">
+        <div class="specimen-label">한국어 + 영문 혼용 본문</div>
+        <div class="body-spec">로켓그로스 (Rocket Growth) 주문은 자동 처리 — vendorItemId <span class="mono">95241053251</span> 매핑 완료.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COLOR -->
+  <section>
+    <div class="section-label">Color · Accent + Semantic + Channel</div>
+    <p class="section-desc">단일 accent (teal). Semantic (5개) + Channel (8개) 두 축으로 분리. 한 색 → 한 의미.</p>
+
+    <div class="section-title" style="margin-top: 8px;">Accent</div>
+    <div class="grid-4" style="margin-bottom: 24px;">
+      <div class="swatch" style="background: var(--accent); color: #fff;"><div class="swatch-name">accent</div><div class="swatch-hex" style="color: rgba(255,255,255,0.7)">#0d9488</div></div>
+      <div class="swatch" style="background: var(--accent-strong); color: #fff;"><div class="swatch-name">accent-strong</div><div class="swatch-hex" style="color: rgba(255,255,255,0.7)">#0f766e</div></div>
+      <div class="swatch" style="background: var(--accent-dim); color: var(--accent);"><div class="swatch-name">accent-dim</div><div class="swatch-hex" style="color: var(--accent)">teal/8%</div></div>
+      <div class="swatch" style="background: var(--surface);"><div class="swatch-name">surface</div><div class="swatch-hex">#ffffff</div></div>
+    </div>
+
+    <div class="section-title">Semantic — 상태 의미</div>
+    <div class="grid-4" style="margin-bottom: 8px;">
+      <div class="swatch" style="background: var(--success-bg);"><div class="swatch-name" style="color: var(--success)">success</div><div class="swatch-hex">#10b981 · 완료</div></div>
+      <div class="swatch" style="background: var(--info-bg);"><div class="swatch-name" style="color: var(--info)">info</div><div class="swatch-hex">#2563eb · 진행 중</div></div>
+      <div class="swatch" style="background: var(--warning-bg);"><div class="swatch-name" style="color: var(--warning)">warning</div><div class="swatch-hex">#d97706 · 대기/경고</div></div>
+      <div class="swatch" style="background: var(--danger-bg);"><div class="swatch-name" style="color: var(--danger)">danger</div><div class="swatch-hex">#dc2626 · 실패/환불</div></div>
+    </div>
+    <div class="row" style="margin-bottom: 24px;">
+      <span class="badge badge-success">DELIVERED</span>
+      <span class="badge badge-info">DISPATCHED</span>
+      <span class="badge badge-warning">PENDING</span>
+      <span class="badge badge-danger">FAILED</span>
+      <span class="badge badge-neutral">VOIDED</span>
+    </div>
+
+    <div class="section-title">Channel — 브랜드 색</div>
+    <div class="grid-4">
+      <div class="swatch" style="background: var(--ch-shopify-bg);"><div class="swatch-name" style="color: var(--ch-shopify)">SHOPIFY</div><div class="swatch-hex">#1c8847</div></div>
+      <div class="swatch" style="background: var(--ch-amazon-bg);"><div class="swatch-name" style="color: var(--ch-amazon)">AMAZON</div><div class="swatch-hex">#ea580c</div></div>
+      <div class="swatch" style="background: var(--ch-tiktok-bg);"><div class="swatch-name" style="color: var(--ch-tiktok)">TIKTOK</div><div class="swatch-hex">#db2777</div></div>
+      <div class="swatch" style="background: var(--ch-naver-bg);"><div class="swatch-name" style="color: var(--ch-naver)">NAVER</div><div class="swatch-hex">#03C75A</div></div>
+      <div class="swatch" style="background: var(--ch-coupang-bg);"><div class="swatch-name" style="color: var(--ch-coupang)">COUPANG</div><div class="swatch-hex">#ef4444</div></div>
+      <div class="swatch" style="background: var(--ch-pharmacy-bg);"><div class="swatch-name" style="color: var(--ch-pharmacy)">PHARMACY</div><div class="swatch-hex">#2563eb</div></div>
+      <div class="swatch" style="background: var(--ch-cgetc-bg);"><div class="swatch-name" style="color: var(--ch-cgetc)">CGETC</div><div class="swatch-hex">#6366f1</div></div>
+      <div class="swatch" style="background: var(--ch-gonggu-bg);"><div class="swatch-name" style="color: var(--ch-gonggu)">GONGGU</div><div class="swatch-hex">#f43f5e</div></div>
+    </div>
+    <div class="row" style="margin-top: 14px;">
+      <span class="ch-badge ch-shopify">Shopify</span>
+      <span class="ch-badge ch-amazon">Amazon</span>
+      <span class="ch-badge ch-tiktok">TikTok</span>
+      <span class="ch-badge ch-naver">네이버</span>
+      <span class="ch-badge ch-coupang">쿠팡</span>
+      <span class="ch-badge ch-rg">로켓그로스</span>
+      <span class="ch-badge ch-pharmacy">약국</span>
+      <span class="ch-badge ch-cgetc">CGETC</span>
+      <span class="ch-badge ch-gonggu">공구</span>
+    </div>
+  </section>
+
+  <!-- KPI CARD — 1 hero rule -->
+  <section>
+    <div class="section-label">KpiCard — 비대칭 weight</div>
+    <p class="section-desc">4-stat 균등 그리드 X. 의미 무게에 맞게 비대칭. 첫 카드 (오늘 매출) 가장 큰 무게.</p>
+    <div class="kpi-row">
+      <div class="kpi kpi-big">
+        <div class="kpi-label">오늘 매출</div>
+        <div class="kpi-value">₩6,318,800</div>
+        <div class="kpi-sub">$4,367.31 · 65건</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">대기 주문</div>
+        <div class="kpi-value">27</div>
+        <div class="kpi-sub">N 18 · C 9</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">출고율</div>
+        <div class="kpi-value" style="color: var(--success)">94.2%</div>
+        <div class="kpi-sub">전월 대비 +1.8%</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP RAIL -->
+  <section>
+    <div class="section-label">StepRail — 워크플로우 진행</div>
+    <p class="section-desc">활성 step만 강조. 균등 너비지만 시각 무게는 다름. 다음 step도 명확히 보임.</p>
+    <div class="step-rail">
+      <div class="step done">
+        <div><span class="step-num">✓</span><span class="step-label">주문 선택</span></div>
+        <div class="step-desc">12건 선택됨</div>
+      </div>
+      <div class="step active">
+        <div><span class="step-num">2</span><span class="step-label">3PL 발주서</span></div>
+        <div class="step-desc">통합 Excel 다운로드</div>
+      </div>
+      <div class="step">
+        <div><span class="step-num">3</span><span class="step-label">송장 회신</span></div>
+        <div class="step-desc">CJ 송장 Excel 업로드</div>
+      </div>
+      <div class="step">
+        <div><span class="step-num">4</span><span class="step-label">채널 dispatch</span></div>
+        <div class="step-desc">네이버 + 쿠팡 동시 처리</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHANNEL SECTION -->
+  <section>
+    <div class="section-label">ChannelSection — 다채널 표 분리</div>
+    <p class="section-desc">채널별 sub-section. 헤더 + 표 row. 채널이 늘어나도 가독성 유지.</p>
+    <div class="channel-section" style="margin-bottom: 12px;">
+      <div class="channel-header">
+        <div class="row">
+          <span class="ch-badge ch-naver">네이버</span>
+          <strong style="font-size: 13px;">스마트스토어 (3)</strong>
+          <span class="meta-spec">5개입 2 · 30개입 1</span>
+        </div>
+        <button class="btn btn-ghost">전체 선택</button>
+      </div>
+      <div class="channel-row">
+        <div>
+          <div class="row-name">2026033147438741 <span class="ch-badge ch-naver">N</span></div>
+          <div class="row-meta">한로제 · 010-7701-2732 · 5개입 ×1</div>
+        </div>
+        <div class="row-num">₩39,800</div>
+        <div class="row-num"><span class="badge badge-warning">대기</span></div>
+      </div>
+      <div class="channel-row">
+        <div>
+          <div class="row-name">2026031864402751 <span class="ch-badge ch-naver">N</span></div>
+          <div class="row-meta">조지형 · 010-4477-1905 · 30개입 ×2</div>
+        </div>
+        <div class="row-num">₩134,000</div>
+        <div class="row-num"><span class="badge badge-warning">대기</span></div>
+      </div>
+    </div>
+    <div class="channel-section">
+      <div class="channel-header">
+        <div class="row">
+          <span class="ch-badge ch-coupang">쿠팡</span>
+          <strong style="font-size: 13px;">마켓플레이스 (1)</strong>
+          <span class="meta-spec">로켓그로스 1건 자동 처리</span>
+        </div>
+      </div>
+      <div class="channel-row">
+        <div>
+          <div class="row-name">8100187302749 <span class="ch-badge ch-coupang">C</span></div>
+          <div class="row-meta">윤승재 · 0504-4370-4896 · 5개입 ×1</div>
+        </div>
+        <div class="row-num">₩67,000</div>
+        <div class="row-num"><span class="badge badge-warning">대기</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ROCKET GROWTH BADGE -->
+  <section>
+    <div class="section-label">RocketGrowthBadge — COUPANG 빨강과 구분</div>
+    <p class="section-desc">로켓그로스는 쿠팡 풀필먼트라 같은 빨강이지만, ⚡ icon prefix로 구분. customer null인 행에 customer 자리에 표시.</p>
+    <div class="card">
+      <div style="display: grid; grid-template-columns: 200px 1fr 100px 80px; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--border); font-size: 13px; align-items: center;">
+        <span class="mono">8100187302749</span>
+        <span>윤승재</span>
+        <div><span class="ch-badge ch-coupang">쿠팡</span></div>
+        <div class="row-num">₩67,000</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 200px 1fr 100px 80px; gap: 12px; padding: 11px 0; font-size: 13px; align-items: center;">
+        <span class="mono">18100186631303</span>
+        <span><span class="ch-badge ch-rg">로켓그로스</span></span>
+        <div><span class="ch-badge ch-coupang">쿠팡</span></div>
+        <div class="row-num">₩39,800</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TABS -->
+  <section>
+    <div class="section-label">Tabs — 진짜 컨텍스트 전환</div>
+    <p class="section-desc">탭은 view 전환 도구. pill처럼 보이지만 클릭 시 실제 다른 화면. 시각 anchor로만 쓰면 사용자 신뢰 깨짐.</p>
+    <div class="tabs">
+      <div class="tab active">고객 발송</div>
+      <div class="tab">로켓그로스 입고</div>
+      <div class="tab">이메일 알림</div>
+      <div class="tab">라운드 이력</div>
+    </div>
+  </section>
+
+  <!-- BUTTONS -->
+  <section>
+    <div class="section-label">Button</div>
+    <p class="section-desc">primary는 단일 brand color (teal). secondary는 surface tone. ghost는 transparent.</p>
+    <div class="row">
+      <button class="btn btn-primary">새 라운드 시작</button>
+      <button class="btn btn-primary" disabled style="opacity: 0.4;">처리 중...</button>
+      <button class="btn">취소</button>
+      <button class="btn btn-ghost">전체 선택</button>
+    </div>
+  </section>
+
+  <!-- EMPTY STATE -->
+  <section>
+    <div class="section-label">EmptyState — feature임</div>
+    <p class="section-desc">"데이터 없음" cold copy 금지. title + description + action 3요소. 운영자에게 따뜻하게.</p>
+    <div class="grid-2">
+      <div class="empty">
+        <div class="empty-icon">✓</div>
+        <div class="empty-title">오늘 발송할 주문 없음</div>
+        <div class="empty-desc">모든 주문이 dispatch 완료됨. 잘 했어요.</div>
+        <button class="btn">지난 라운드 보기</button>
+      </div>
+      <div class="empty">
+        <div class="empty-icon">📋</div>
+        <div class="empty-title">아직 발주 라운드를 시작하지 않았습니다</div>
+        <div class="empty-desc">미발송 주문 27건이 있습니다. 첫 라운드를 시작해보세요.</div>
+        <button class="btn btn-primary">새 라운드 시작 →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ALERTS -->
+  <section>
+    <div class="section-label">Alert — 정보 노출</div>
+    <p class="section-desc">상황별 alert. icon + 짧은 1-2문장 텍스트. 본문 알림은 toast로 별도 처리.</p>
+    <div class="stack">
+      <div class="alert-warn"><span>⚠</span><div>로켓그로스 30개입 재고 16개 — 32일 후 소진 예상</div></div>
+      <div style="padding: 12px 16px; background: var(--info-bg); border: 1px solid rgba(37,99,235,0.20); border-radius: 12px; color: var(--info); font-size: 12px; display: flex; gap: 8px;">
+        <span>ℹ</span><div>로켓그로스 주문은 여기 안 보입니다. 쿠팡이 풀필먼트 직접 처리하므로 발주서/송장 흐름 불필요.</div>
+      </div>
+      <div style="padding: 12px 16px; background: var(--success-bg); border: 1px solid rgba(16,185,129,0.20); border-radius: 12px; color: var(--success); font-size: 12px; display: flex; gap: 8px;">
+        <span>✓</span><div>2026-04-29 라운드 #04 dispatch 완료 — 12건 (네이버 8 + 쿠팡 4)</div>
+      </div>
+      <div style="padding: 12px 16px; background: var(--danger-bg); border: 1px solid rgba(220,38,38,0.20); border-radius: 12px; color: var(--danger); font-size: 12px; display: flex; gap: 8px;">
+        <span>✗</span><div>네이버 dispatch 8건 중 2건 실패 — 송장번호 형식 오류 가능. 자세히 보기</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ANTI-SLOP CHECKLIST -->
+  <section>
+    <div class="section-label">Anti-Slop Checklist</div>
+    <p class="section-desc">새 페이지/컴포넌트 만들 때 반드시 검증.</p>
+    <div class="card" style="font-size: 13px; line-height: 2;">
+      <div>☐ 그라데이션 배경/배너 없음</div>
+      <div>☐ 이모지 헤더 장식 없음 (📦 🏭 📧 등)</div>
+      <div>☐ 4-stat 균등 그리드 아님</div>
+      <div>☐ 한 색 → 한 의미만</div>
+      <div>☐ 모든 카드 균일 radius 아님</div>
+      <div>☐ 첫 viewport 1 hero</div>
+      <div>☐ EmptyState specify됨</div>
+      <div>☐ Loading/Error 상태 specify됨</div>
+      <div>☐ 모바일 viewport spec됨</div>
+      <div>☐ 키보드 네비게이션 spec됨</div>
+      <div>☐ 색 대비 4.5:1 (body)</div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  const toggle = document.getElementById('theme-toggle');
+  toggle.addEventListener('click', () => {
+    const isDark = document.documentElement.dataset.theme === 'dark';
+    document.documentElement.dataset.theme = isDark ? 'light' : 'dark';
+    toggle.textContent = isDark ? '🌙 Dark' : '☀ Light';
+  });
+</script>
+
+</body>
+</html>

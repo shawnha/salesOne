@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Shipping 재설계 v3 — Design System 적용</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet">
+<style>
+  /* === DESIGN.md tokens === */
+  :root {
+    --bg: #f8f9fa;
+    --surface: #ffffff;
+    --surface-2: #f1f5f9;
+    --border: rgba(0,0,0,0.06);
+    --border-strong: rgba(0,0,0,0.10);
+    --text-primary: #0f1419;
+    --text-secondary: #536471;
+    --text-tertiary: #8899a6;
+    --text-quaternary: rgba(0,0,0,0.20);
+
+    --accent: #0d9488;
+    --accent-dim: rgba(13,148,136,0.08);
+    --accent-strong: #0f766e;
+
+    --success: #10b981;     --success-bg: rgba(16,185,129,0.08);
+    --info:    #2563eb;     --info-bg:    rgba(37,99,235,0.08);
+    --warning: #d97706;     --warning-bg: rgba(217,119,6,0.08);
+    --danger:  #dc2626;     --danger-bg:  rgba(220,38,38,0.08);
+    --neutral: #64748b;     --neutral-bg: rgba(100,116,139,0.08);
+
+    --ch-naver:   #03C75A;  --ch-naver-bg:   rgba(3,199,90,0.10);
+    --ch-coupang: #ef4444;  --ch-coupang-bg: rgba(239,68,68,0.10);
+
+    --font-display: 'Geist', 'Pretendard', system-ui, sans-serif;
+    --font-body:    'Geist', 'Pretendard', system-ui, sans-serif;
+    --font-mono:    'Geist Mono', ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text-primary);
+    line-height: 1.5;
+    padding: 32px;
+  }
+  .container { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+
+  /* === Page header === */
+  .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  h1 { font-family: var(--font-display); font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-secondary); font-size: 13px; margin-top: 4px; }
+  .section-label { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-tertiary); margin-bottom: 12px; }
+
+  /* === Tabs === */
+  .tabs { display: inline-flex; gap: 4px; padding: 4px; background: var(--surface-2); border-radius: 10px; }
+  .tab { padding: 8px 14px; font-size: 12px; font-weight: 600; border-radius: 8px; cursor: pointer; color: var(--text-secondary); border: none; background: transparent; }
+  .tab.active { background: var(--surface); color: var(--text-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+  .tab .count { color: var(--text-tertiary); margin-left: 6px; }
+  .tab.active .count { color: var(--text-secondary); }
+
+  /* === Hero (1 hero rule) === */
+  .hero-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px 32px; }
+  .hero-eyebrow { font-size: 11px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; }
+  .hero-headline { font-family: var(--font-display); font-size: 36px; font-weight: 800; letter-spacing: -0.02em; margin-top: 6px; }
+  .hero-headline .accent { color: var(--accent); }
+  .hero-meta { color: var(--text-secondary); margin-top: 8px; font-size: 14px; }
+  .hero-cta { margin-top: 22px; display: flex; gap: 10px; flex-wrap: wrap; }
+
+  /* === Buttons === */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text-primary); transition: all 200ms ease-out; font-family: inherit; }
+  .btn:hover { border-color: var(--border-strong); }
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-primary:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
+  .btn-primary[disabled] { opacity: 0.4; cursor: not-allowed; }
+  .btn-ghost { background: transparent; border-color: transparent; color: var(--text-secondary); }
+  .btn-ghost:hover { background: var(--surface-2); }
+
+  /* === Alerts === */
+  .alert { padding: 12px 16px; border-radius: 12px; font-size: 12px; display: flex; gap: 8px; align-items: flex-start; }
+  .alert-warning { background: var(--warning-bg); border: 1px solid rgba(217,119,6,0.20); color: var(--warning); }
+  .alert-info { background: var(--info-bg); border: 1px solid rgba(37,99,235,0.20); color: var(--info); }
+  .alert-success { background: var(--success-bg); border: 1px solid rgba(16,185,129,0.20); color: var(--success); }
+  .alert strong { font-weight: 700; }
+  .alert-icon { flex-shrink: 0; }
+
+  /* === Badges === */
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; }
+  .badge-success { background: var(--success-bg); color: var(--success); }
+  .badge-info { background: var(--info-bg); color: var(--info); }
+  .badge-warning { background: var(--warning-bg); color: var(--warning); }
+  .badge-danger { background: var(--danger-bg); color: var(--danger); }
+  .badge-neutral { background: var(--neutral-bg); color: var(--neutral); }
+  .ch-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; }
+  .ch-naver { background: var(--ch-naver-bg); color: var(--ch-naver); }
+  .ch-coupang { background: var(--ch-coupang-bg); color: var(--ch-coupang); }
+  .ch-rg { background: var(--ch-coupang-bg); color: var(--ch-coupang); }
+  .ch-rg::before { content: '⚡'; }
+
+  /* === Step Rail === */
+  .step-rail { display: flex; gap: 6px; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+  .step { flex: 1; padding: 12px 14px; border-radius: 10px; transition: background 200ms; }
+  .step.active { background: var(--accent-dim); }
+  .step.done { background: var(--success-bg); }
+  .step-num { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 9999px; background: var(--border-strong); color: var(--surface); font-size: 10px; font-weight: 700; margin-right: 6px; }
+  .step.active .step-num { background: var(--accent); color: #fff; }
+  .step.done .step-num { background: var(--success); color: #fff; }
+  .step-label { font-size: 12px; font-weight: 600; }
+  .step.active .step-label { color: var(--accent-strong); }
+  .step-desc { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; padding-left: 26px; }
+  .step .channel-marks { padding-left: 26px; margin-top: 4px; display: flex; gap: 4px; }
+
+  /* === Card === */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; }
+  .card.tight { padding: 0; overflow: hidden; }
+  .card-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .card-title { font-family: var(--font-display); font-size: 14px; font-weight: 700; }
+  .card-meta { font-size: 11px; color: var(--text-tertiary); }
+
+  /* === Channel Section === */
+  .channel-row { display: grid; grid-template-columns: 28px 1fr 100px 80px 90px; gap: 12px; padding: 11px 18px; align-items: center; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .channel-row:last-child { border-bottom: none; }
+  .channel-row .name { font-weight: 600; }
+  .channel-row .meta { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--font-mono); font-size: 12px; }
+  .checkbox { width: 14px; height: 14px; accent-color: var(--accent); cursor: pointer; }
+
+  /* === Empty State === */
+  .empty { padding: 48px 24px; text-align: center; border: 1px dashed var(--border-strong); border-radius: 16px; background: var(--surface); }
+  .empty-icon { font-size: 22px; margin-bottom: 10px; opacity: 0.5; }
+  .empty-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .empty-desc { font-size: 12px; color: var(--text-secondary); margin-bottom: 16px; }
+
+  /* === Inbound table === */
+  table { width: 100%; font-size: 13px; border-collapse: collapse; }
+  thead { background: var(--surface-2); }
+  th { text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid var(--border); }
+  td { padding: 11px 14px; border-bottom: 1px solid var(--border); }
+  tbody tr:last-child td { border-bottom: none; }
+  th.num, td.num { text-align: right; }
+  td input[type="number"] { padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; width: 80px; }
+  td input[type="number"]:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+
+  /* === Email triggers === */
+  .toggle { width: 32px; height: 18px; background: var(--border-strong); border-radius: 999px; position: relative; cursor: pointer; flex-shrink: 0; transition: background 200ms; }
+  .toggle.on { background: var(--accent); }
+  .toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 999px; background: #fff; transition: left 200ms; }
+  .toggle.on::after { left: 16px; }
+  .email-trigger { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--border); align-items: center; }
+  .email-trigger:last-child { border-bottom: none; }
+  .email-trigger .name { font-size: 13px; font-weight: 600; }
+  .email-trigger .desc { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+  .email-trigger .recipient { font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); }
+
+  /* === Round history === */
+  .round-row { display: grid; grid-template-columns: 200px 100px 80px 1fr 90px 90px; gap: 12px; padding: 12px 18px; border-bottom: 1px solid var(--border); align-items: center; font-size: 12px; }
+  .round-row:last-child { border-bottom: none; }
+  .round-id { font-family: var(--font-mono); font-weight: 700; }
+
+  /* === Helper === */
+  .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .between { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .stack { display: flex; flex-direction: column; gap: 14px; }
+
+  /* === STATE EXAMPLES (loading/empty/error) === */
+  .state-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .skeleton-row { display: grid; grid-template-columns: 28px 1fr 90px 90px; gap: 12px; padding: 11px 18px; border-bottom: 1px solid var(--border); }
+  .skeleton { height: 12px; background: rgba(0,0,0,0.06); border-radius: 4px; animation: pulse 1.5s ease-in-out infinite; }
+  .skeleton.short { width: 60%; }
+  @keyframes pulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
+
+  .focus-area { background: var(--info-bg); border: 1px dashed rgba(37,99,235,0.30); border-radius: 12px; padding: 14px 16px; font-size: 12px; color: var(--info); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ===== PAGE HEADER ===== -->
+  <div class="page-header">
+    <div>
+      <h1>배송 관리</h1>
+      <p class="subtitle">네이버 + 쿠팡 통합 발주 → 송장 → dispatch</p>
+    </div>
+    <div class="row">
+      <button class="btn">📧 알림 설정</button>
+      <button class="btn">📋 라운드 이력</button>
+    </div>
+  </div>
+
+  <!-- ===== TABS (real tabs, not visual decoration) ===== -->
+  <div>
+    <div class="section-label">활성 컨텍스트</div>
+    <div class="tabs">
+      <button class="tab active">고객 발송 <span class="count">27</span></button>
+      <button class="tab">로켓그로스 입고 <span class="count">!</span></button>
+      <button class="tab">이메일 알림</button>
+      <button class="tab">라운드 이력</button>
+    </div>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- ===== TAB 1: OUTBOUND ===== -->
+  <!-- ============================================== -->
+
+  <!-- HERO — 1 hero rule -->
+  <div class="hero-card">
+    <div class="hero-eyebrow">2026-04-29 · 발송 라운드</div>
+    <div class="hero-headline">오늘 발송 <span class="accent">27건</span></div>
+    <div class="hero-meta">
+      <span class="ch-badge ch-naver">네이버</span> 18 · <span class="ch-badge ch-coupang">쿠팡</span> 9 · <span class="ch-badge ch-rg">로켓그로스</span> 1건은 자동 처리
+    </div>
+    <div class="hero-cta">
+      <button class="btn btn-primary">새 라운드 시작 →</button>
+      <button class="btn">지난 라운드 보기</button>
+    </div>
+    <div class="alert alert-warning" style="margin-top: 16px;">
+      <span class="alert-icon">⚠</span>
+      <div><strong>로켓그로스 30개입 재고 16개</strong> — 32일 후 소진 예상. 입고 검토 권장 → 위 "로켓그로스 입고" 탭</div>
+    </div>
+  </div>
+
+  <!-- ROUND IN PROGRESS (collapsed when no active round) -->
+  <div>
+    <div class="section-label">진행 중인 라운드 — OUT-2026-04-29-04</div>
+
+    <!-- Step rail (single source of progress truth) -->
+    <div class="step-rail">
+      <div class="step done">
+        <div><span class="step-num">✓</span><span class="step-label">주문 선택</span></div>
+        <div class="step-desc">12건 선택됨</div>
+      </div>
+      <div class="step active">
+        <div><span class="step-num">2</span><span class="step-label">3PL 발주서</span></div>
+        <div class="step-desc">CJ 양식 Excel 다운로드</div>
+      </div>
+      <div class="step">
+        <div><span class="step-num">3</span><span class="step-label">송장 회신</span></div>
+        <div class="step-desc">CJ 송장 Excel 업로드</div>
+      </div>
+      <div class="step">
+        <div><span class="step-num">4</span><span class="step-label">채널 dispatch</span></div>
+        <div class="step-desc">네이버 + 쿠팡 동시 처리</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 1: ORDERS (active step content shown inline) -->
+  <div>
+    <div class="section-label">1. 미발송 주문 — 라운드에 추가</div>
+
+    <div class="card tight">
+      <!-- NAVER section -->
+      <div class="card-header">
+        <div class="row">
+          <span class="ch-badge ch-naver">네이버</span>
+          <span class="card-title">스마트스토어 (18)</span>
+          <span class="card-meta">5개입 12 · 30개입 6 · 마지막 sync 18:25</span>
+        </div>
+        <button class="btn btn-ghost">전체 선택</button>
+      </div>
+      <div class="channel-row">
+        <input type="checkbox" class="checkbox" checked>
+        <div>
+          <div class="name">2026033147438741</div>
+          <div class="meta">한로제 · 010-7701-2732 · 5개입 ×1 · ODD-M01-5</div>
+        </div>
+        <div class="num">₩39,800</div>
+        <div class="num">1개</div>
+        <div class="num"><span class="badge badge-warning">대기</span></div>
+      </div>
+      <div class="channel-row">
+        <input type="checkbox" class="checkbox" checked>
+        <div>
+          <div class="name">2026031864402751</div>
+          <div class="meta">조지형 · 010-4477-1905 · 30개입 ×2 · ODD-M01-30</div>
+        </div>
+        <div class="num">₩134,000</div>
+        <div class="num">2개</div>
+        <div class="num"><span class="badge badge-warning">대기</span></div>
+      </div>
+      <div class="channel-row" style="opacity: 0.5;">
+        <input type="checkbox" class="checkbox">
+        <div>
+          <div class="name">2026031864402798</div>
+          <div class="meta">강수정 · 010-2554-2158 · 5개입 ×3</div>
+        </div>
+        <div class="num">₩119,400</div>
+        <div class="num">3개</div>
+        <div class="num"><span class="badge badge-warning">대기</span></div>
+      </div>
+
+      <!-- COUPANG section -->
+      <div class="card-header" style="border-top: 4px solid var(--surface-2);">
+        <div class="row">
+          <span class="ch-badge ch-coupang">쿠팡</span>
+          <span class="card-title">마켓플레이스 (9)</span>
+          <span class="card-meta">5개입 6 · 30개입 3 · 로켓그로스 1건 제외</span>
+        </div>
+        <button class="btn btn-ghost">전체 선택</button>
+      </div>
+      <div class="channel-row">
+        <input type="checkbox" class="checkbox" checked>
+        <div>
+          <div class="name">8100187302749</div>
+          <div class="meta">윤승재 · 0504-4370-4896 · 5개입 ×1 · ODD-M01-5</div>
+        </div>
+        <div class="num">₩67,000</div>
+        <div class="num">1개</div>
+        <div class="num"><span class="badge badge-warning">대기</span></div>
+      </div>
+      <div class="channel-row">
+        <input type="checkbox" class="checkbox" checked>
+        <div>
+          <div class="name">28100186504428</div>
+          <div class="meta">오병만 · 0504-1320-0186 · 30개입 ×1</div>
+        </div>
+        <div class="num">₩67,000</div>
+        <div class="num">1개</div>
+        <div class="num"><span class="badge badge-warning">대기</span></div>
+      </div>
+    </div>
+
+    <div class="alert alert-info" style="margin-top: 12px;">
+      <span class="alert-icon">ℹ</span>
+      <div><strong>로켓그로스는 여기 안 보입니다.</strong> 쿠팡 풀필먼트가 직접 처리하므로 발주서/송장 흐름 불필요. 매출 집계엔 자동 포함.</div>
+    </div>
+  </div>
+
+  <!-- STEP 2: ORDER SHEET (active) -->
+  <div>
+    <div class="section-label">2. 3PL 발주서 다운로드 — 활성 단계</div>
+    <div class="card">
+      <div class="between">
+        <div>
+          <div class="card-title">CJ 양식 통합 발주서</div>
+          <p class="card-meta" style="margin-top: 4px;">선택한 12건이 단일 Excel로 합쳐져 다운로드됩니다. 다운로드 후 라운드 상태가 PENDING으로 변경됩니다.</p>
+        </div>
+        <button class="btn btn-primary">📥 발주서 Excel 다운로드 (12건)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3 + 4 collapsed (not active) -->
+  <details>
+    <summary style="cursor: pointer; font-size: 12px; color: var(--text-tertiary); padding: 12px 0;">▸ 다음 단계 미리 보기 (3. 송장 회신 + 4. dispatch) — 활성화되면 자동 펼침</summary>
+    <div class="stack" style="margin-top: 12px;">
+      <div class="card">
+        <div class="between">
+          <div>
+            <div class="card-title">3. 송장 회신 업로드</div>
+            <p class="card-meta" style="margin-top: 4px;">CJ가 송장번호 채워서 회신한 Excel을 그대로 업로드</p>
+          </div>
+          <button class="btn" disabled style="opacity: 0.4;">📤 송장 파일 선택</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="between">
+          <div>
+            <div class="card-title">4. 채널 dispatch</div>
+            <p class="card-meta" style="margin-top: 4px;">송장 매칭 후 네이버 + 쿠팡 API로 자동 dispatch</p>
+          </div>
+          <button class="btn btn-primary" disabled>dispatch 실행</button>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <!-- ============================================== -->
+  <!-- ===== TAB 2: ROCKET GROWTH INBOUND ===== -->
+  <!-- ============================================== -->
+
+  <div style="border-top: 2px dashed var(--border-strong); padding-top: 28px;">
+    <div class="section-label">탭: 로켓그로스 입고 — 별도 화면 (미리보기)</div>
+
+    <div class="hero-card" style="background: var(--warning-bg); border-color: rgba(217,119,6,0.30);">
+      <div class="hero-eyebrow" style="color: var(--warning);">로켓그로스 입고 — 쿠팡 창고로 보충</div>
+      <div class="hero-headline">30개입 <span style="color: var(--warning);">입고 필요</span></div>
+      <div class="hero-meta">5개입 297개 · 30개입 16개 · 30일 burn rate 0.5/day → 32일 후 소진 예상</div>
+      <div class="hero-cta">
+        <button class="btn btn-primary">+ 새 입고 라운드 시작</button>
+      </div>
+    </div>
+
+    <div class="card tight" style="margin-top: 20px;">
+      <table>
+        <thead>
+          <tr>
+            <th>마스터 SKU</th>
+            <th>vendorItemId</th>
+            <th class="num">쿠팡 창고</th>
+            <th class="num">30일 판매</th>
+            <th class="num">예상 소진일</th>
+            <th class="num">권장 입고</th>
+            <th class="num">입고 수량</th>
+            <th>상태</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>ODD-M01-5</strong> · 5개입</td>
+            <td class="num" style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">95241053251</td>
+            <td class="num">297</td>
+            <td class="num">1</td>
+            <td class="num">8.1년</td>
+            <td class="num"><span style="color: var(--text-tertiary); font-size: 11px;">충분</span></td>
+            <td class="num"><input type="number" value="0"></td>
+            <td><span class="badge badge-success">충분</span></td>
+          </tr>
+          <tr>
+            <td><strong>ODD-M01-30</strong> · 30개입</td>
+            <td class="num" style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">95241053249</td>
+            <td class="num" style="color: var(--warning); font-weight: 700;">16</td>
+            <td class="num">0</td>
+            <td class="num">—</td>
+            <td class="num"><strong style="color: var(--warning);">100</strong></td>
+            <td class="num"><input type="number" value="100"></td>
+            <td><span class="badge badge-warning">입고 필요</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="alert alert-info" style="margin-top: 16px;">
+      <span class="alert-icon">ℹ</span>
+      <div>
+        <strong>입고 4단계:</strong> ① 입고 계획 확정 → ② 쿠팡 셀러센터 입고 신청 (수동, API 미지원) → ③ 3PL용 입고 Excel 생성 → ④ ExternalInventory sync로 입고 확인 자동 반영
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- ===== TAB 3: EMAIL ===== -->
+  <!-- ============================================== -->
+
+  <div style="border-top: 2px dashed var(--border-strong); padding-top: 28px;">
+    <div class="section-label">탭: 이메일 자동 발송 — 별도 화면 (미리보기)</div>
+
+    <div class="alert alert-info">
+      <span class="alert-icon">📧</span>
+      <div><strong>Resend 연동 (Phase 3 예정).</strong> 내부용 알림부터 활성화. 고객 직발송은 Phase 5 (도메인 인증 후).</div>
+    </div>
+
+    <div class="card tight" style="margin-top: 16px;">
+      <div class="card-header"><div class="card-title">발송 트리거 (6)</div></div>
+      <div style="padding: 0 18px;">
+        <div class="email-trigger">
+          <div>
+            <div class="name">발송 라운드 완료</div>
+            <div class="desc">dispatch 완료 시 자동 발송 · <span class="recipient">→ shawn@hanah1.com</span></div>
+          </div>
+          <div class="toggle on"></div>
+        </div>
+        <div class="email-trigger">
+          <div>
+            <div class="name">로켓그로스 재고 부족</div>
+            <div class="desc">쿠팡 창고 30일분 미만 시 · <span class="recipient">→ shawn@hanah1.com</span></div>
+          </div>
+          <div class="toggle on"></div>
+        </div>
+        <div class="email-trigger">
+          <div>
+            <div class="name">로켓그로스 입고 신청 완료</div>
+            <div class="desc">쿠팡 입고번호 발급 후 3PL용 안내 · <span class="recipient">→ ops@hanah1.com</span></div>
+          </div>
+          <div class="toggle on"></div>
+        </div>
+        <div class="email-trigger">
+          <div>
+            <div class="name">dispatch 실패</div>
+            <div class="desc">네이버/쿠팡 API 오류 시 · <span class="recipient">→ shawn@hanah1.com</span></div>
+          </div>
+          <div class="toggle on"></div>
+        </div>
+        <div class="email-trigger" style="opacity: 0.5;">
+          <div>
+            <div class="name">고객별 송장 안내 <span class="badge badge-neutral">Phase 5</span></div>
+            <div class="desc">DKIM/SPF 도메인 인증 후 활성화 가능 · <span class="recipient">→ 고객 email</span></div>
+          </div>
+          <div class="toggle"></div>
+        </div>
+        <div class="email-trigger" style="opacity: 0.7;">
+          <div>
+            <div class="name">일일 요약 (09:00 KST)</div>
+            <div class="desc">전일 라운드 + 매출 + 재고 요약 · <span class="recipient">→ shawn@hanah1.com</span></div>
+          </div>
+          <div class="toggle"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- ===== TAB 4: ROUND HISTORY ===== -->
+  <!-- ============================================== -->
+
+  <div style="border-top: 2px dashed var(--border-strong); padding-top: 28px;">
+    <div class="section-label">탭: 라운드 이력 — 별도 화면 (미리보기)</div>
+    <div class="card tight">
+      <div class="round-row" style="background: var(--surface-2); padding: 10px 18px;">
+        <div style="font-size: 11px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em;">라운드 ID</div>
+        <div style="font-size: 11px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em;">유형</div>
+        <div style="font-size: 11px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em;">주문</div>
+        <div style="font-size: 11px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em;">채널</div>
+        <div style="font-size: 11px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em;">상태</div>
+        <div style="font-size: 11px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em;">날짜</div>
+      </div>
+      <div class="round-row">
+        <div class="round-id">OUT-2026-04-29-04</div>
+        <div><span class="badge badge-neutral">OUT</span></div>
+        <div class="num" style="text-align: left;">12건</div>
+        <div class="row"><span class="ch-badge ch-naver">N 8</span> <span class="ch-badge ch-coupang">C 4</span></div>
+        <div><span class="badge badge-warning">작성중</span></div>
+        <div style="font-family: var(--font-mono); font-size: 11px;">2026-04-29</div>
+      </div>
+      <div class="round-row">
+        <div class="round-id">OUT-2026-04-28-03</div>
+        <div><span class="badge badge-neutral">OUT</span></div>
+        <div class="num" style="text-align: left;">15건</div>
+        <div class="row"><span class="ch-badge ch-naver">N 11</span> <span class="ch-badge ch-coupang">C 4</span></div>
+        <div><span class="badge badge-success">완료</span></div>
+        <div style="font-family: var(--font-mono); font-size: 11px;">2026-04-28</div>
+      </div>
+      <div class="round-row">
+        <div class="round-id">IN-2026-04-15-01</div>
+        <div><span class="badge badge-warning">IN</span></div>
+        <div class="num" style="text-align: left;">350개</div>
+        <div class="row"><span class="ch-badge ch-rg">로켓그로스</span></div>
+        <div><span class="badge badge-success">완료</span></div>
+        <div style="font-family: var(--font-mono); font-size: 11px;">2026-04-15</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== STATE EXAMPLES (designed states) ===== -->
+  <div style="border-top: 2px dashed var(--border-strong); padding-top: 28px;">
+    <div class="section-label">상태 디자인 — empty / loading / error</div>
+
+    <div class="state-grid">
+      <!-- Empty state -->
+      <div class="empty">
+        <div class="empty-icon">✓</div>
+        <div class="empty-title">오늘 발송할 주문 없음</div>
+        <div class="empty-desc">모든 주문이 dispatch 완료됨. 잘 했어요.</div>
+        <button class="btn">지난 라운드 보기</button>
+      </div>
+
+      <!-- Loading state -->
+      <div class="card tight">
+        <div class="card-header">
+          <div class="row">
+            <span class="ch-badge ch-naver">네이버</span>
+            <span class="card-title" style="opacity: 0.5;">동기화 중...</span>
+          </div>
+        </div>
+        <div class="skeleton-row">
+          <div class="skeleton" style="height: 14px; width: 14px;"></div>
+          <div><div class="skeleton" style="margin-bottom: 6px;"></div><div class="skeleton short"></div></div>
+          <div class="skeleton short"></div>
+          <div class="skeleton short"></div>
+        </div>
+        <div class="skeleton-row">
+          <div class="skeleton" style="height: 14px; width: 14px;"></div>
+          <div><div class="skeleton" style="margin-bottom: 6px;"></div><div class="skeleton short"></div></div>
+          <div class="skeleton short"></div>
+          <div class="skeleton short"></div>
+        </div>
+      </div>
+
+      <!-- Error state -->
+      <div class="card" style="border-color: rgba(220,38,38,0.30); background: var(--danger-bg);">
+        <div style="display: flex; gap: 8px; align-items: flex-start; color: var(--danger);">
+          <span style="font-size: 16px;">✗</span>
+          <div>
+            <div style="font-weight: 700; font-size: 13px;">동기화 실패</div>
+            <div style="font-size: 11px; margin-top: 4px;">쿠팡 API 401 — 자격 증명 갱신 필요</div>
+            <button class="btn" style="margin-top: 12px; background: var(--surface); color: var(--danger); border-color: rgba(220,38,38,0.30);">자세히 보기 →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Architecture notes (developer only — separated) ===== -->
+  <div class="focus-area">
+    <strong>📐 디자인 시스템 적용 — 운영자 화면에서 보이지 않음:</strong><br>
+    이 mockup은 DESIGN.md 토큰 100% 사용. Geist + Pretendard 폰트, single accent (#0d9488 teal), Channel/Semantic 색 분리, 단일 step rail (진행 표시기 1개), 1 hero rule (첫 viewport "오늘 발송 27건"), 진짜 탭 (4 view 분리 의도), Empty/Loading/Error 상태 디자인 명시, 슬롭 패턴 0개. 개발 시 별도 docs/markdown으로 분리.
+  </div>
+
+</div>
+</body>
+</html>
