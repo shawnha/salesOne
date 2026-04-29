@@ -18,3 +18,7 @@ npx tsx scripts/naver-sync.ts 2>&1 | tee -a /tmp/naver-sync.log
 #    skipped (failed=N in the log) — those need a separate endpoint and
 #    will be added later. Failures here don't fail the script.
 npx tsx scripts/naver-push-stock.ts 2>&1 | tee -a /tmp/naver-sync.log || true
+
+# 3) Pull Coupang orders (marketplace + rocket growth) and rocket growth inventory.
+#    Coupang's IP whitelist also requires running from the home IP.
+npx tsx scripts/coupang-sync.ts 2>&1 | tee -a /tmp/naver-sync.log || true

@@ -150,6 +150,14 @@ export type OrphanNaverItem = {
   quantity: number;
 };
 
+export type RocketGrowthInventoryItem = {
+  vendorItemId: string;
+  displayName: string;
+  quantity: number;
+  masterSku: string | null;
+  masterName: string | null;
+};
+
 export function HokInventoryClient({
   baselines,
   gongguRows: initialGongguRows,
@@ -159,6 +167,7 @@ export function HokInventoryClient({
   channelSalesBySku = {},
   variantSalesBySku = {},
   orphanNaverItems = [],
+  rocketGrowthInventory = [],
 }: {
   baselines: BaselineItem[];
   gongguRows: GongguInventoryRow[];
@@ -168,6 +177,7 @@ export function HokInventoryClient({
   channelSalesBySku?: Record<string, Partial<Record<string, number>>>;
   variantSalesBySku?: Record<string, Record<string, number>>;
   orphanNaverItems?: OrphanNaverItem[];
+  rocketGrowthInventory?: RocketGrowthInventoryItem[];
 }) {
   const router = useRouter();
   const [gongguRows, setGongguRows] = useState(initialGongguRows);
@@ -675,6 +685,53 @@ export function HokInventoryClient({
                 </div>
               ))}
             </div>
+          </Card>
+        </div>
+      )}
+
+      {/* 쿠팡 풀필먼트 재고 (로켓그로스) */}
+      {rocketGrowthInventory.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-red-600 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+              쿠팡 풀필먼트 재고 (로켓그로스)
+              <span className="text-[var(--text-quaternary)] normal-case">({rocketGrowthInventory.length})</span>
+            </h2>
+            <span className="text-[10px] text-[var(--text-tertiary)]">쿠팡 창고 보관 가용 재고</span>
+          </div>
+          <Card className="p-0 overflow-hidden">
+            <table className="w-full text-[13px]">
+              <thead className="bg-[var(--bg)]">
+                <tr className="text-left text-[11px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wide">
+                  <th className="px-4 py-2.5">채널 상품</th>
+                  <th className="px-4 py-2.5">vendorItemId</th>
+                  <th className="px-4 py-2.5">마스터 상품</th>
+                  <th className="px-4 py-2.5 text-right">쿠팡 창고 재고</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rocketGrowthInventory.map((r) => (
+                  <tr key={r.vendorItemId} className="border-t border-[var(--border)]">
+                    <td className="px-4 py-2.5 font-semibold">{r.displayName}</td>
+                    <td className="px-4 py-2.5 text-[var(--text-tertiary)] text-xs font-mono">{r.vendorItemId}</td>
+                    <td className="px-4 py-2.5">
+                      {r.masterSku ? (
+                        <div className="flex flex-col">
+                          <span className="text-[var(--text-secondary)]">{r.masterName ?? r.masterSku}</span>
+                          <span className="text-[10px] text-[var(--text-quaternary)]">{r.masterSku}</span>
+                        </div>
+                      ) : (
+                        <span className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-500/10 text-amber-600">
+                          매핑 안 됨
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-semibold">{r.quantity.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </Card>
         </div>
       )}

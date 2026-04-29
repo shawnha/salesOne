@@ -482,6 +482,47 @@ export default async function InventoryPage({
     }
   }
 
+  // HOK: rocket growth (쿠팡 풀필먼트) inventory — Coupang's own warehouse
+  // holds units we sent in. Distinct from the seller's master inventory.
+  // Mapped rows show with their master sku for reconciliation; orphans get
+  // a "매핑 안 됨" badge.
+  type RocketGrowthInventoryItem = {
+    vendorItemId: string;
+    displayName: string;
+    quantity: number;
+    masterSku: string | null;
+    masterName: string | null;
+  };
+  const hokRocketGrowthInventory: RocketGrowthInventoryItem[] = [];
+  if (isHokView) {
+    const rgRows = await prisma.externalInventory.findMany({
+      where: { companyId: hokCompany!.id, platform: "COUPANG" },
+      select: { externalSku: true, externalName: true, quantity: true },
+      orderBy: { quantity: "desc" },
+    });
+    if (rgRows.length > 0) {
+      const coupangMappings = await prisma.skuMapping.findMany({
+        where: {
+          companyId: hokCompany!.id,
+          platform: "COUPANG",
+          externalSku: { in: rgRows.map((r) => r.externalSku) },
+        },
+        select: { externalSku: true, displayName: true, product: { select: { sku: true, name: true } } },
+      });
+      const mapByExternalSku = new Map(coupangMappings.map((m) => [m.externalSku, m]));
+      for (const r of rgRows) {
+        const m = mapByExternalSku.get(r.externalSku);
+        hokRocketGrowthInventory.push({
+          vendorItemId: r.externalSku,
+          displayName: m?.displayName ?? r.externalName ?? `로켓그로스 ${r.externalSku}`,
+          quantity: r.quantity,
+          masterSku: m?.product?.sku ?? null,
+          masterName: m?.product?.name ?? null,
+        });
+      }
+    }
+  }
+
   // HOK: orphan ExternalInventory rows — Naver products synced but not yet
   // mapped to any internal Product. Surface them so a newly-registered
   // smartstore product (e.g. a fresh 공구) shows up immediately and the user
@@ -644,6 +685,7 @@ export default async function InventoryPage({
                 }),
             )}
             orphanNaverItems={hokOrphanNaverItems}
+            rocketGrowthInventory={hokRocketGrowthInventory}
           />
           {(() => {
             const hokChannels = channelRowsByCompany.get(hokCompany!.id);

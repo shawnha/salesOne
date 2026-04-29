@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import type { Connector, ExternalOrderData, ExternalOrderItemData } from "../types";
 import { Platform } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 
 export interface CoupangCredentials {
   accessKey: string;
@@ -227,6 +228,51 @@ async function fetchRocketGrowthOrders(
   return out;
 }
 
+/**
+ * Rocket Growth inventory item — quantity reflects what Coupang's fulfillment
+ * warehouse currently has on hand (orderable). Distinct from our own master
+ * inventory because the seller doesn't physically hold these units.
+ */
+type RocketGrowthInventoryItem = {
+  vendorItemId: number;
+  vendorId: string;
+  salesCountMap?: Record<string, number>;
+  inventoryDetails: {
+    totalOrderableQuantity: number;
+  };
+  externalSkuId?: number;
+};
+
+type RocketGrowthInventoryResponse = {
+  message: string;
+  code: number;
+  data: RocketGrowthInventoryItem[];
+  nextToken: string | null;
+};
+
+export async function fetchRocketGrowthInventory(
+  creds: CoupangCredentials,
+): Promise<Array<{ vendorItemId: string; quantity: number; salesLast30d: number }>> {
+  const path = `/v2/providers/rg_open_api/apis/api/v1/vendors/${encodeURIComponent(creds.vendorId)}/rg/inventory/summaries`;
+  const out: Array<{ vendorItemId: string; quantity: number; salesLast30d: number }> = [];
+  let nextToken: string | undefined;
+
+  for (let page = 0; page < 200; page++) {
+    const qs = nextToken ? `nextToken=${encodeURIComponent(nextToken)}` : "";
+    const json = await coupangFetch<RocketGrowthInventoryResponse>(creds, "GET", path, qs);
+    for (const item of json.data ?? []) {
+      out.push({
+        vendorItemId: String(item.vendorItemId),
+        quantity: item.inventoryDetails?.totalOrderableQuantity ?? 0,
+        salesLast30d: item.salesCountMap?.SALES_COUNT_LAST_THIRTY_DAYS ?? 0,
+      });
+    }
+    if (!json.nextToken) break;
+    nextToken = json.nextToken;
+  }
+  return out;
+}
+
 function mapRocketGrowthOrder(o: RocketGrowthOrder): ExternalOrderData {
   const items: ExternalOrderItemData[] = (o.orderItems || []).map((it) => ({
     externalItemId: String(it.vendorItemId),
@@ -335,8 +381,68 @@ function mapOrdersheet(sheet: CoupangOrdersheet): ExternalOrderData {
   };
 }
 
-export const coupangConnector: Connector = {
+export const coupangConnector: Connector & {
+  syncInventory: (credentials: CoupangCredentials, companyId: string) => Promise<void>;
+} = {
   platform: "COUPANG" as Platform,
+
+  /**
+   * Pull Rocket Growth (쿠팡 풀필먼트) inventory into ExternalInventory.
+   * vendorItemId stays as the externalSku — the same value that SkuMapping
+   * resolves against — so the existing /inventory orphan section + the
+   * SkuMapping lookup both Just Work.
+   *
+   * Marketplace inventory is NOT fetched here: we never persisted it to
+   * ExternalInventory before, the seller's master inventory already drives
+   * those numbers, and pulling it would duplicate marketplace SkuMapping rows.
+   */
+  syncInventory: async (credentials: CoupangCredentials, companyId: string) => {
+    const items = await fetchRocketGrowthInventory(credentials);
+    const now = new Date();
+    const liveSkus = new Set(items.map((i) => i.vendorItemId));
+
+    // Pull display names from Coupang SkuMapping when available so the orphan
+    // section shows "로켓그로스 5개입" instead of a bare numeric vendorItemId.
+    const mappings = await prisma.skuMapping.findMany({
+      where: { companyId, platform: "COUPANG", externalSku: { in: items.map((i) => i.vendorItemId) } },
+      select: { externalSku: true, displayName: true },
+    });
+    const nameByExternalSku = new Map(mappings.map((m) => [m.externalSku, m.displayName ?? null]));
+
+    for (const item of items) {
+      const externalName = nameByExternalSku.get(item.vendorItemId) ?? `로켓그로스 ${item.vendorItemId}`;
+      await prisma.externalInventory.upsert({
+        where: {
+          companyId_platform_externalSku: {
+            companyId,
+            platform: "COUPANG",
+            externalSku: item.vendorItemId,
+          },
+        },
+        update: { externalName, quantity: item.quantity, lastSyncAt: now },
+        create: {
+          companyId,
+          platform: "COUPANG",
+          externalSku: item.vendorItemId,
+          externalName,
+          quantity: item.quantity,
+          lastSyncAt: now,
+        },
+      });
+    }
+
+    // Remove rows that disappeared (vendorItem deleted or moved out of rocket growth).
+    const existing = await prisma.externalInventory.findMany({
+      where: { companyId, platform: "COUPANG" },
+      select: { externalSku: true },
+    });
+    const stale = existing.filter((e) => !liveSkus.has(e.externalSku)).map((e) => e.externalSku);
+    if (stale.length > 0) {
+      await prisma.externalInventory.deleteMany({
+        where: { companyId, platform: "COUPANG", externalSku: { in: stale } },
+      });
+    }
+  },
 
   async fetchOrders(credentials: CoupangCredentials, since: Date | null): Promise<ExternalOrderData[]> {
     if (!credentials.accessKey || !credentials.secretKey || !credentials.vendorId) {
