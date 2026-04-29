@@ -31,8 +31,7 @@ export default async function InvoicePage({ params }: { params: { id: string } }
   return (
     <div className="invoice-page">
       <style>{`
-        body { background: #fff !important; }
-        .app-shell, nav, header, footer, .nav, [data-app-chrome] { display: none !important; }
+        body { background: #fff; }
         .invoice-page { max-width: 720px; margin: 0 auto; padding: 32px; color: #111; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; font-size: 13px; line-height: 1.5; }
         .invoice-page h1 { font-size: 24px; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.01em; }
         .invoice-page h2 { font-size: 11px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 0.05em; margin: 24px 0 8px; }
