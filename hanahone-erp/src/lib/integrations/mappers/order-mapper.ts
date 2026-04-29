@@ -216,6 +216,7 @@ export async function mapExternalOrder(
         trackingNumber: extOrder.trackingNumber ?? null,
         trackingCarrier: extOrder.trackingCarrier ?? null,
         shipDate: extOrder.shipDate ?? null,
+        shipmentType: extOrder.shipmentType ?? null,
         items: validItems.length > 0 ? {
           create: validItems.map((item) => ({
             productId: item.productId!,

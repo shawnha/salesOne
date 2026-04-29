@@ -180,6 +180,7 @@ export default async function OrdersPage({
     orderDate: o.orderDate.toISOString(),
     type: o.type,
     notes: o.notes,
+    shipmentType: o.shipmentType,
     items: o.items.map((item) => {
       const cat = categorize({
         masterSku: item.product?.sku ?? null,

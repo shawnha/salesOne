@@ -165,6 +165,12 @@ export default async function OrderDetailPage({
           fulfillmentStatus={order.fulfillmentStatus}
           financialStatus={order.financialStatus}
         />
+        {order.shipmentType === "ROCKET_GROWTH" && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold rounded bg-red-500/10 text-red-600">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+            로켓그로스
+          </span>
+        )}
         <Link
           href={`/orders/${order.id}/invoice`}
           target="_blank"

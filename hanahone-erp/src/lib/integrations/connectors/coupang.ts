@@ -297,6 +297,7 @@ function mapRocketGrowthOrder(o: RocketGrowthOrder): ExternalOrderData {
     totalAmount,
     // No customer/recipient info — Coupang policy.
     channelNote: "로켓그로스",
+    shipmentType: "ROCKET_GROWTH",
     items,
   };
 }
@@ -377,6 +378,7 @@ function mapOrdersheet(sheet: CoupangOrdersheet): ExternalOrderData {
     recipientName: addr?.name,
     recipientPhone: addr?.receiverNumber || addr?.safeNumber,
     recipientZip: addr?.postCode,
+    shipmentType: "THIRD_PARTY",
     items,
   };
 }

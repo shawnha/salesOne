@@ -24,6 +24,8 @@ export interface ExternalOrderData {
   recipientPhone?: string;
   /** Recipient zip/postal code, normalized across channels */
   recipientZip?: string;
+  /** Channel fulfillment mode marker (e.g. Coupang ROCKET_GROWTH vs THIRD_PARTY). */
+  shipmentType?: string;
   items: ExternalOrderItemData[];
   /** Override the connector's platform for this order (e.g. CGETC order tagged as TIKTOK) */
   overridePlatform?: Platform;

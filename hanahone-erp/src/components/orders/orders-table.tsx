@@ -44,6 +44,7 @@ interface OrderRow {
   orderDate: string;
   type?: string | null;
   notes: string | null;
+  shipmentType?: string | null;
   items?: OrderItemRow[];
 }
 
@@ -171,7 +172,12 @@ export function OrdersTable({ orders, viewMode = "orders", exchangeRate, ratesBy
                     </Link>
                   </td>
                   <td className="py-3 px-4 text-[var(--text-secondary)]">
-                    {row.customerId ? (
+                    {row.shipmentType === "ROCKET_GROWTH" ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded bg-red-500/10 text-red-600">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                        로켓그로스
+                      </span>
+                    ) : row.customerId ? (
                       <Link
                         href={`/customers/${row.customerId}`}
                         className="hover:text-accent hover:underline"
