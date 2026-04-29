@@ -36,7 +36,7 @@ export function MonthlyRevenueChart({ data, currencyPrefix = "$" }: MonthlyReven
           width={55}
         />
         <Tooltip
-          formatter={(value) => [fmtVal(Number(value)), "Revenue"]}
+          formatter={(value) => [fmtVal(Number(value)), "매출"]}
           contentStyle={{
             background: "var(--surface)",
             border: "1px solid var(--border)",

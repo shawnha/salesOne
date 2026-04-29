@@ -3,17 +3,17 @@ import { Card } from "@/components/ui/card";
 import { MonthlyRevenueChart, HorizontalBarChart } from "@/components/reports/ReportCharts";
 import { MonthlyExportButton } from "@/components/reports/MonthlyExportButton";
 
-const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTH_NAMES = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
 
 const reportTypes = [
-  { key: "sales-by-period", label: "Sales by period", scope: "all" },
-  { key: "top-products", label: "Top products", scope: "all" },
-  { key: "order-fulfillment", label: "Order fulfillment", scope: "all" },
-  { key: "inventory-levels", label: "Inventory levels", scope: "all" },
-  { key: "customer-breakdown", label: "Customer breakdown", scope: "all" },
-  { key: "production-efficiency", label: "Production efficiency", scope: "HOK" },
-  { key: "consulting-revenue", label: "Consulting revenue", scope: "HOR" },
-  { key: "brokerage-margins", label: "Brokerage margins", scope: "HOR" },
+  { key: "sales-by-period", label: "기간별 매출", scope: "all" },
+  { key: "top-products", label: "베스트 상품", scope: "all" },
+  { key: "order-fulfillment", label: "주문 출고", scope: "all" },
+  { key: "inventory-levels", label: "재고 현황", scope: "all" },
+  { key: "customer-breakdown", label: "고객 분석", scope: "all" },
+  { key: "production-efficiency", label: "생산 효율", scope: "HOK" },
+  { key: "consulting-revenue", label: "컨설팅 매출", scope: "HOR" },
+  { key: "brokerage-margins", label: "중개 마진", scope: "HOR" },
 ];
 
 export default async function ReportsPage({ searchParams }: { searchParams: { company?: string } }) {
@@ -132,9 +132,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: { co
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">Sales Analytics</h1>
+          <h1 className="text-xl font-bold tracking-tight">매출 분석</h1>
           <p className="text-sm text-[var(--text-secondary)] mt-1">
-            {companyName ? `${companyName} — ` : "Group — "}Last 12 months
+            {companyName ? `${companyName} — ` : "그룹 — "}최근 12개월
           </p>
         </div>
         <MonthlyExportButton companyId={companyId} />
@@ -143,11 +143,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: { co
       {/* KPI Row */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {[
-          { label: "Total Revenue", value: fmtCurrency(totalRevenue) },
-          { label: "Total Orders", value: totalOrders.toLocaleString() },
-          { label: "Avg Order Value", value: fmtCurrency(avgOrderValue) },
-          { label: "Fulfillment Rate", value: `${fulfillmentRate}%`, color: Number(fulfillmentRate) >= 90 ? "text-teal-600" : "text-amber-500" },
-          { label: "Refund Rate", value: `${refundRate}%`, color: Number(refundRate) <= 5 ? "text-teal-600" : "text-rose-500" },
+          { label: "총 매출", value: fmtCurrency(totalRevenue) },
+          { label: "총 주문", value: totalOrders.toLocaleString() },
+          { label: "평균 주문가", value: fmtCurrency(avgOrderValue) },
+          { label: "출고율", value: `${fulfillmentRate}%`, color: Number(fulfillmentRate) >= 90 ? "text-teal-600" : "text-amber-500" },
+          { label: "환불율", value: `${refundRate}%`, color: Number(refundRate) <= 5 ? "text-teal-600" : "text-rose-500" },
         ].map((kpi) => (
           <Card key={kpi.label}>
             <p className="text-[11px] font-medium text-[var(--text-tertiary)] uppercase tracking-wide">{kpi.label}</p>
@@ -158,42 +158,42 @@ export default async function ReportsPage({ searchParams }: { searchParams: { co
 
       {/* Monthly Revenue Chart */}
       <Card>
-        <h3 className="text-sm font-bold tracking-tight mb-4">Monthly Revenue</h3>
+        <h3 className="text-sm font-bold tracking-tight mb-4">월별 매출</h3>
         <MonthlyRevenueChart data={monthlyRevenue} currencyPrefix={isKRW ? "₩" : "$"} />
       </Card>
 
       {/* Top Products + Top Customers */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
-          <h3 className="text-sm font-bold tracking-tight mb-4">Top Products by Revenue</h3>
+          <h3 className="text-sm font-bold tracking-tight mb-4">매출 TOP 상품</h3>
           {topProducts.length > 0 ? (
             <HorizontalBarChart data={topProducts} color="#0d9488" valuePrefix={isKRW ? "₩" : "$"} />
           ) : (
-            <p className="text-xs text-[var(--text-tertiary)]">No product data</p>
+            <p className="text-xs text-[var(--text-tertiary)]">상품 데이터 없음</p>
           )}
         </Card>
         <Card>
-          <h3 className="text-sm font-bold tracking-tight mb-4">Top Products by Volume</h3>
+          <h3 className="text-sm font-bold tracking-tight mb-4">판매량 TOP 상품</h3>
           {topByVolume.length > 0 ? (
             <HorizontalBarChart data={topByVolume} color="#6366f1" valuePrefix="" />
           ) : (
-            <p className="text-xs text-[var(--text-tertiary)]">No product data</p>
+            <p className="text-xs text-[var(--text-tertiary)]">상품 데이터 없음</p>
           )}
         </Card>
       </div>
 
       <Card>
-        <h3 className="text-sm font-bold tracking-tight mb-4">Top Customers by Revenue</h3>
+        <h3 className="text-sm font-bold tracking-tight mb-4">매출 TOP 고객</h3>
         {topCustomers.length > 0 ? (
           <HorizontalBarChart data={topCustomers} color="#d97706" valuePrefix={isKRW ? "₩" : "$"} />
         ) : (
-          <p className="text-xs text-[var(--text-tertiary)]">No customer data</p>
+          <p className="text-xs text-[var(--text-tertiary)]">고객 데이터 없음</p>
         )}
       </Card>
 
       {/* CSV Export Section */}
       <div>
-        <h2 className="text-sm font-bold tracking-tight mb-3 text-[var(--text-secondary)]">Export Reports</h2>
+        <h2 className="text-sm font-bold tracking-tight mb-3 text-[var(--text-secondary)]">보고서 내보내기</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {visibleReports.map((report) => {
             const params = new URLSearchParams();
