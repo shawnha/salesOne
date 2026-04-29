@@ -186,9 +186,17 @@ export default async function SalesPage({
     {
       key: "customer",
       header: "Customer",
-      render: (row: (typeof orders)[0]) => (
-        <span className="text-[var(--text-secondary)]">{row.customer?.name ?? "—"}</span>
-      ),
+      render: (row: (typeof orders)[0]) => {
+        if (row.shipmentType === "ROCKET_GROWTH") {
+          return (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded bg-red-500/10 text-red-600">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+              로켓그로스
+            </span>
+          );
+        }
+        return <span className="text-[var(--text-secondary)]">{row.customer?.name ?? "—"}</span>;
+      },
     },
     {
       key: "platform",

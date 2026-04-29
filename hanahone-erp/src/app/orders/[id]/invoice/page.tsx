@@ -68,7 +68,15 @@ export default async function InvoicePage({ params }: { params: { id: string } }
       <div className="row">
         <div>
           <h2>청구 / Bill To</h2>
-          <div style={{ fontWeight: 600 }}>{order.customer?.name ?? order.recipientName ?? "—"}</div>
+          <div style={{ fontWeight: 600 }}>
+            {order.shipmentType === "ROCKET_GROWTH" ? (
+              <span style={{ display: "inline-block", padding: "2px 8px", fontSize: 11, fontWeight: 700, borderRadius: 4, background: "rgba(220, 38, 38, 0.1)", color: "#dc2626" }}>
+                로켓그로스 (쿠팡 풀필먼트)
+              </span>
+            ) : (
+              order.customer?.name ?? order.recipientName ?? "—"
+            )}
+          </div>
           {order.recipientName && order.customer?.name && order.recipientName !== order.customer.name && (
             <div style={{ color: "#6b7280" }}>수령인: {order.recipientName}</div>
           )}

@@ -9,6 +9,7 @@ interface RecentOrder {
   status: string;
   totalAmount: number;
   externalSource?: string | null;
+  shipmentType?: string | null;
   isTransfer?: boolean;
   transferLabel?: string;
 }
@@ -32,7 +33,18 @@ export function RecentOrders({ orders }: { orders: RecentOrder[] }) {
       {orders.map((order) => (
         <div key={order.id} className="grid grid-cols-4 py-3 border-b border-[var(--border)] last:border-b-0 text-[13px] items-center">
           <span className="font-semibold">{order.orderNumber}</span>
-          <span className={order.isTransfer ? "text-accent" : "text-[var(--text-secondary)]"}>{order.isTransfer ? order.transferLabel : order.customerName}</span>
+          <span className={order.isTransfer ? "text-accent" : "text-[var(--text-secondary)]"}>
+            {order.isTransfer ? (
+              order.transferLabel
+            ) : order.shipmentType === "ROCKET_GROWTH" ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded bg-red-500/10 text-red-600">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                로켓그로스
+              </span>
+            ) : (
+              order.customerName
+            )}
+          </span>
           <span><Badge status={order.status} /></span>
           <span className="font-semibold text-right">{formatAmount(order.totalAmount, order.externalSource)}</span>
         </div>
