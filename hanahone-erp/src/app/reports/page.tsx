@@ -2,8 +2,12 @@ import { prisma } from "@/lib/prisma";
 import { Card } from "@/components/ui/card";
 import { MonthlyRevenueChart, HorizontalBarChart } from "@/components/reports/ReportCharts";
 import { MonthlyExportButton } from "@/components/reports/MonthlyExportButton";
+import { CurrencyDisplay } from "@/components/ui/currency-display";
+import { getUsdKrwRate, getUsdKrwRatesForDates, dateKey, convertKrwToUsd, convertUsdToKrw } from "@/lib/exchange-rate";
 
 const MONTH_NAMES = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
+
+const KRW_PLATFORMS = new Set(["NAVER", "COUPANG", "PHARMACY", "GONGGU"]);
 
 const reportTypes = [
   { key: "sales-by-period", label: "기간별 매출", scope: "all" },
@@ -15,6 +19,10 @@ const reportTypes = [
   { key: "consulting-revenue", label: "컨설팅 매출", scope: "HOR" },
   { key: "brokerage-margins", label: "중개 마진", scope: "HOR" },
 ];
+
+function toUSD(amount: number, platform: string | null, rate: number) {
+  return KRW_PLATFORMS.has(platform || "") ? convertKrwToUsd(amount, rate) : amount;
+}
 
 export default async function ReportsPage({ searchParams }: { searchParams: { company?: string } }) {
   const companyId = searchParams.company || null;
@@ -30,27 +38,33 @@ export default async function ReportsPage({ searchParams }: { searchParams: { co
   const now = new Date();
   const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
 
-  const [salesOrders, orderItems, allCustomerOrders, fulfillmentStats] = await Promise.all([
-    // Monthly revenue (12 months)
+  const [salesOrders, orderItems, allCustomerOrders, fulfillmentStats, currentRate] = await Promise.all([
+    // Monthly revenue (12 months) — externalSource needed to convert KRW channels to USD
     prisma.order.findMany({
       where: {
         ...companyFilter,
         type: { in: ["SALE", "BROKERAGE"] },
         orderDate: { gte: twelveMonthsAgo },
       },
-      select: { orderDate: true, totalAmount: true, netAmount: true },
+      select: { orderDate: true, totalAmount: true, netAmount: true, externalSource: true },
     }),
-    // Top products (all time)
+    // Top products (all time) — pull externalSource + orderDate via order relation
     prisma.orderItem.findMany({
       where: { order: { ...companyFilter, type: { in: ["SALE", "BROKERAGE"] } } },
-      include: { product: { select: { name: true, sku: true } } },
+      include: {
+        product: { select: { name: true, sku: true } },
+        order: { select: { externalSource: true, orderDate: true } },
+      },
     }),
-    // Customer breakdown
+    // Customer breakdown — include order externalSource for KRW conversion
     prisma.customer.findMany({
       where: companyFilter,
       select: {
         name: true,
-        orders: { where: { type: "SALE" }, select: { totalAmount: true } },
+        orders: {
+          where: { type: "SALE" },
+          select: { totalAmount: true, externalSource: true, orderDate: true },
+        },
       },
     }),
     // Fulfillment rates
@@ -60,9 +74,23 @@ export default async function ReportsPage({ searchParams }: { searchParams: { co
       prisma.order.count({ where: { ...companyFilter, type: "SALE", financialStatus: "PAID" } }),
       prisma.order.count({ where: { ...companyFilter, type: "SALE", financialStatus: "REFUNDED" } }),
     ]),
+    // Current rate for display layer (CurrencyDisplay needs single rate)
+    getUsdKrwRate(),
   ]);
 
-  // Monthly revenue aggregation
+  // Per-date rates so each order converts at its own orderDate rate (12 months → rates move).
+  const allDates = [
+    ...salesOrders.map((o) => o.orderDate),
+    ...orderItems.map((it) => it.order.orderDate),
+    ...allCustomerOrders.flatMap((c) => c.orders.map((o) => o.orderDate)),
+  ];
+  const ratesByDate = await getUsdKrwRatesForDates(allDates);
+  const rateFor = (d: Date) => ratesByDate.get(dateKey(d))?.rate ?? currentRate.rate;
+
+  // Currency display: HOI/Group → USD primary, HOK/HOR → KRW primary (per CLAUDE.md).
+  const primaryCurrency: "USD" | "KRW" = companyName === "HOK" || companyName === "HOR" ? "KRW" : "USD";
+
+  // Monthly revenue aggregation — sum in USD, convert per primary at display.
   const monthlyMap = new Map<string, number>();
   for (let i = 0; i < 12; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
@@ -72,39 +100,50 @@ export default async function ReportsPage({ searchParams }: { searchParams: { co
     const d = new Date(order.orderDate);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     if (monthlyMap.has(key)) {
-      monthlyMap.set(key, (monthlyMap.get(key) || 0) + Number(order.netAmount ?? order.totalAmount));
+      const usd = toUSD(Number(order.netAmount ?? order.totalAmount), order.externalSource, rateFor(d));
+      monthlyMap.set(key, (monthlyMap.get(key) || 0) + usd);
     }
   }
-  const monthlyRevenue = Array.from(monthlyMap.entries()).map(([ym, revenue]) => ({
+  const monthlyRevenue = Array.from(monthlyMap.entries()).map(([ym, usd]) => ({
     month: MONTH_NAMES[parseInt(ym.split("-")[1]) - 1],
-    revenue: Math.round(revenue),
+    revenue: Math.round(primaryCurrency === "KRW" ? convertUsdToKrw(usd, currentRate.rate) : usd),
   }));
 
-  // Top products aggregation
-  const productMap = new Map<string, { name: string; revenue: number; volume: number }>();
+  // Top products aggregation — sum in USD per item.
+  const productMap = new Map<string, { name: string; revenueUsd: number; volume: number }>();
   for (const item of orderItems) {
     const key = item.productId;
-    const existing = productMap.get(key) || { name: item.product.name, revenue: 0, volume: 0 };
-    existing.revenue += Number(item.subtotal);
+    const existing = productMap.get(key) || { name: item.product.name, revenueUsd: 0, volume: 0 };
+    const usd = toUSD(Number(item.subtotal), item.order.externalSource, rateFor(item.order.orderDate));
+    existing.revenueUsd += usd;
     existing.volume += item.quantity;
     productMap.set(key, existing);
   }
   const topProducts = Array.from(productMap.values())
-    .sort((a, b) => b.revenue - a.revenue)
+    .sort((a, b) => b.revenueUsd - a.revenueUsd)
     .slice(0, 10)
-    .map((p) => ({ name: p.name, value: Math.round(p.revenue) }));
+    .map((p) => ({
+      name: p.name,
+      value: Math.round(primaryCurrency === "KRW" ? convertUsdToKrw(p.revenueUsd, currentRate.rate) : p.revenueUsd),
+    }));
 
   const topByVolume = Array.from(productMap.values())
     .sort((a, b) => b.volume - a.volume)
     .slice(0, 10)
     .map((p) => ({ name: p.name, value: p.volume }));
 
-  // Top customers aggregation
+  // Top customers aggregation — sum in USD per order.
   const topCustomers = allCustomerOrders
-    .map((c) => ({
-      name: c.name,
-      value: Math.round(c.orders.reduce((sum, o) => sum + Number(o.totalAmount), 0)),
-    }))
+    .map((c) => {
+      const usd = c.orders.reduce(
+        (sum, o) => sum + toUSD(Number(o.totalAmount), o.externalSource, rateFor(o.orderDate)),
+        0,
+      );
+      return {
+        name: c.name,
+        value: Math.round(primaryCurrency === "KRW" ? convertUsdToKrw(usd, currentRate.rate) : usd),
+      };
+    })
     .sort((a, b) => b.value - a.value)
     .slice(0, 10);
 
@@ -113,20 +152,20 @@ export default async function ReportsPage({ searchParams }: { searchParams: { co
   const fulfillmentRate = totalOrders > 0 ? ((fulfilledOrders / totalOrders) * 100).toFixed(1) : "0";
   const refundRate = totalOrders > 0 ? ((refundedOrders / totalOrders) * 100).toFixed(1) : "0";
 
-  // Total revenue
-  const totalRevenue = salesOrders.reduce((sum, o) => sum + Number(o.netAmount ?? o.totalAmount), 0);
-  const avgOrderValue = salesOrders.length > 0 ? totalRevenue / salesOrders.length : 0;
-
-  // Currency formatting based on company
-  const isKRW = companyName === "HOK" || companyName === "HOR";
-  const fmtCurrency = (n: number) =>
-    isKRW ? `₩${Math.round(n).toLocaleString()}` : `$${Math.round(n).toLocaleString()}`;
+  // Total revenue + AOV — both in USD; CurrencyDisplay shows both currencies.
+  const totalRevenueUsd = salesOrders.reduce(
+    (sum, o) => sum + toUSD(Number(o.netAmount ?? o.totalAmount), o.externalSource, rateFor(o.orderDate)),
+    0,
+  );
+  const avgOrderValueUsd = salesOrders.length > 0 ? totalRevenueUsd / salesOrders.length : 0;
 
   const visibleReports = reportTypes.filter((r) => {
     if (r.scope === "all") return true;
     if (!companyName) return true;
     return r.scope === companyName;
   });
+
+  const currencyPrefix = primaryCurrency === "KRW" ? "₩" : "$";
 
   return (
     <div className="space-y-6">
@@ -142,24 +181,36 @@ export default async function ReportsPage({ searchParams }: { searchParams: { co
 
       {/* KPI Row */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        {[
-          { label: "총 매출", value: fmtCurrency(totalRevenue) },
-          { label: "총 주문", value: totalOrders.toLocaleString() },
-          { label: "평균 주문가", value: fmtCurrency(avgOrderValue) },
-          { label: "출고율", value: `${fulfillmentRate}%`, color: Number(fulfillmentRate) >= 90 ? "text-teal-600" : "text-amber-500" },
-          { label: "환불율", value: `${refundRate}%`, color: Number(refundRate) <= 5 ? "text-teal-600" : "text-rose-500" },
-        ].map((kpi) => (
-          <Card key={kpi.label}>
-            <p className="text-[11px] font-medium text-[var(--text-tertiary)] uppercase tracking-wide">{kpi.label}</p>
-            <p className={`text-2xl font-bold tracking-tight mt-1 ${kpi.color || ""}`}>{kpi.value}</p>
-          </Card>
-        ))}
+        <Card>
+          <p className="text-[11px] font-medium text-[var(--text-tertiary)] uppercase tracking-wide">총 매출</p>
+          <div className="mt-1">
+            <CurrencyDisplay amount={totalRevenueUsd} exchangeRate={currentRate.rate} primaryCurrency={primaryCurrency} />
+          </div>
+        </Card>
+        <Card>
+          <p className="text-[11px] font-medium text-[var(--text-tertiary)] uppercase tracking-wide">총 주문</p>
+          <p className="text-2xl font-bold tracking-tight mt-1">{totalOrders.toLocaleString()}</p>
+        </Card>
+        <Card>
+          <p className="text-[11px] font-medium text-[var(--text-tertiary)] uppercase tracking-wide">평균 주문가</p>
+          <div className="mt-1">
+            <CurrencyDisplay amount={avgOrderValueUsd} exchangeRate={currentRate.rate} primaryCurrency={primaryCurrency} />
+          </div>
+        </Card>
+        <Card>
+          <p className="text-[11px] font-medium text-[var(--text-tertiary)] uppercase tracking-wide">출고율</p>
+          <p className={`text-2xl font-bold tracking-tight mt-1 ${Number(fulfillmentRate) >= 90 ? "text-teal-600" : "text-amber-500"}`}>{fulfillmentRate}%</p>
+        </Card>
+        <Card>
+          <p className="text-[11px] font-medium text-[var(--text-tertiary)] uppercase tracking-wide">환불율</p>
+          <p className={`text-2xl font-bold tracking-tight mt-1 ${Number(refundRate) <= 5 ? "text-teal-600" : "text-rose-500"}`}>{refundRate}%</p>
+        </Card>
       </div>
 
       {/* Monthly Revenue Chart */}
       <Card>
         <h3 className="text-sm font-bold tracking-tight mb-4">월별 매출</h3>
-        <MonthlyRevenueChart data={monthlyRevenue} currencyPrefix={isKRW ? "₩" : "$"} />
+        <MonthlyRevenueChart data={monthlyRevenue} currencyPrefix={currencyPrefix} />
       </Card>
 
       {/* Top Products + Top Customers */}
@@ -167,7 +218,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: { co
         <Card>
           <h3 className="text-sm font-bold tracking-tight mb-4">매출 TOP 상품</h3>
           {topProducts.length > 0 ? (
-            <HorizontalBarChart data={topProducts} color="#0d9488" valuePrefix={isKRW ? "₩" : "$"} />
+            <HorizontalBarChart data={topProducts} color="#0d9488" valuePrefix={currencyPrefix} />
           ) : (
             <p className="text-xs text-[var(--text-tertiary)]">상품 데이터 없음</p>
           )}
@@ -185,7 +236,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: { co
       <Card>
         <h3 className="text-sm font-bold tracking-tight mb-4">매출 TOP 고객</h3>
         {topCustomers.length > 0 ? (
-          <HorizontalBarChart data={topCustomers} color="#d97706" valuePrefix={isKRW ? "₩" : "$"} />
+          <HorizontalBarChart data={topCustomers} color="#d97706" valuePrefix={currencyPrefix} />
         ) : (
           <p className="text-xs text-[var(--text-tertiary)]">고객 데이터 없음</p>
         )}
