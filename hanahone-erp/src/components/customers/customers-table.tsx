@@ -31,6 +31,8 @@ const CHANNEL_META: Record<string, { label: string; color: string }> = {
 
 const DIRECT_KEY = "DIRECT";
 const DIRECT_META = { label: "직접", color: "text-slate-500 bg-slate-500/[0.08]" };
+const MULTI_KEY = "MULTI";
+const MULTI_META = { label: "멀티채널", color: "text-purple-600 bg-purple-600/[0.08]" };
 
 export function CustomersTable({ customers, companyId, companyName }: { customers: Customer[]; companyId?: string; companyName?: string }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -152,6 +154,35 @@ export function CustomersTable({ customers, companyId, companyName }: { customer
     }
   }
 
+  // For "전체" tab: split into per-channel sub-sections (single-channel customers
+  // group by their channel, multi-channel into a "멀티채널" group, no-channel
+  // into 직접). Keeps the table readable as more channels are added.
+  type Group = { key: string; label: string; color: string; rows: Customer[] };
+  const groups: Group[] = (() => {
+    if (channelFilter !== "ALL") return [];
+    const map = new Map<string, Group>();
+    for (const c of filtered) {
+      const key = c.channels.length === 0
+        ? DIRECT_KEY
+        : c.channels.length === 1
+          ? c.channels[0]
+          : MULTI_KEY;
+      const meta = key === DIRECT_KEY
+        ? DIRECT_META
+        : key === MULTI_KEY
+          ? MULTI_META
+          : (CHANNEL_META[key] || { label: key, color: "text-slate-500 bg-slate-500/[0.08]" });
+      const g = map.get(key) || { key, label: meta.label, color: meta.color, rows: [] };
+      g.rows.push(c);
+      map.set(key, g);
+    }
+    const rank = (k: string) => k === MULTI_KEY ? 98 : k === DIRECT_KEY ? 99 : 0;
+    return Array.from(map.values()).sort((a, b) => {
+      const r = rank(a.key) - rank(b.key);
+      return r !== 0 ? r : b.rows.length - a.rows.length;
+    });
+  })();
+
   return (
     <>
       {companyId && platform && (
@@ -209,97 +240,121 @@ export function CustomersTable({ customers, companyId, companyName }: { customer
         </div>
       )}
 
-      <Card>
-        {filtered.length === 0 ? (
+      {filtered.length === 0 ? (
+        <Card>
           <EmptyState title="No customers" description="No customers found." />
-        ) : (
-          <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
-            <table className="w-full text-[13px]">
-              <thead className="sticky top-0 z-10 bg-[var(--surface)]">
-                <tr className="border-b border-[var(--border)] text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
-                  <th className="py-3 px-4 w-10">
-                    <input
-                      type="checkbox"
-                      checked={allSelected}
-                      onChange={toggleAll}
-                      className="rounded border-[var(--border)] accent-accent"
-                    />
-                  </th>
-                  <th className="text-left py-3 px-4">이름</th>
-                  <th className="text-left py-3 px-4">유형</th>
-                  <th className="text-left py-3 px-4">채널</th>
-                  <th className="text-left py-3 px-4">연락처</th>
-                  <th className="text-left py-3 px-4">회사</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((row) => (
-                  <tr
-                    key={row.id}
-                    className={`border-b border-[var(--border)] last:border-b-0 transition-colors ${
-                      selected.has(row.id)
-                        ? "bg-accent/[0.04]"
-                        : "hover:bg-[var(--hover-bg-subtle)]"
-                    }`}
-                  >
-                    <td className="py-3 px-4">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(row.id)}
-                        onChange={() => toggle(row.id)}
-                        className="rounded border-[var(--border)] accent-accent"
-                      />
-                    </td>
-                    <td className="py-3 px-4">
-                      <Link href={`/customers/${row.id}`} className="font-semibold text-accent hover:underline">
-                        {row.name}
-                      </Link>
-                      {row.recipientName && (
-                        <div className="text-[11px] text-[var(--text-tertiary)] mt-0.5">→ {row.recipientName}</div>
-                      )}
-                    </td>
-                    <td className="py-3 px-4">
-                      <Badge status={row.type} />
-                    </td>
-                    <td className="py-3 px-4">
-                      {row.channels.length === 0 ? (
-                        <span className={`inline-flex px-2 py-0.5 text-[10px] font-medium rounded ${DIRECT_META.color}`}>
-                          {DIRECT_META.label}
-                        </span>
-                      ) : (
-                        <div className="flex items-center gap-1 flex-wrap">
-                          {row.channels.map((ch) => {
-                            const meta = CHANNEL_META[ch] || { label: ch, color: "text-slate-500 bg-slate-500/[0.08]" };
-                            return (
-                              <span
-                                key={ch}
-                                className={`inline-flex px-2 py-0.5 text-[10px] font-medium rounded ${meta.color}`}
-                              >
-                                {meta.label}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-[var(--text-secondary)]">
-                      {row.email || row.phone ? (
-                        <div className="space-y-0.5">
-                          {row.email && <div>{row.email}</div>}
-                          {row.phone && <div className="font-mono text-xs">{row.phone}</div>}
-                        </div>
-                      ) : (
-                        "\u2014"
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-[var(--text-secondary)]">{row.companyName}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
+        </Card>
+      ) : channelFilter === "ALL" ? (
+        <div className="space-y-5">
+          {groups.map((g) => (
+            <div key={g.key} className="space-y-2">
+              <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+                <span className={`inline-flex px-2 py-0.5 text-[10px] font-medium rounded ${g.color}`}>{g.label}</span>
+                <span className="text-[var(--text-quaternary)] normal-case">({g.rows.length})</span>
+              </h3>
+              <Card>{renderTable(g.rows, selected, toggle, allSelected, toggleAll)}</Card>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <Card>{renderTable(filtered, selected, toggle, allSelected, toggleAll)}</Card>
+      )}
     </>
+  );
+}
+
+function renderTable(
+  rows: Customer[],
+  selected: Set<string>,
+  toggle: (id: string) => void,
+  allSelected: boolean,
+  toggleAll: () => void,
+) {
+  return (
+    <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
+      <table className="w-full text-[13px]">
+        <thead className="sticky top-0 z-10 bg-[var(--surface)]">
+          <tr className="border-b border-[var(--border)] text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+            <th className="py-3 px-4 w-10">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={toggleAll}
+                className="rounded border-[var(--border)] accent-accent"
+              />
+            </th>
+            <th className="text-left py-3 px-4">이름</th>
+            <th className="text-left py-3 px-4">유형</th>
+            <th className="text-left py-3 px-4">채널</th>
+            <th className="text-left py-3 px-4">연락처</th>
+            <th className="text-left py-3 px-4">회사</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr
+              key={row.id}
+              className={`border-b border-[var(--border)] last:border-b-0 transition-colors ${
+                selected.has(row.id)
+                  ? "bg-accent/[0.04]"
+                  : "hover:bg-[var(--hover-bg-subtle)]"
+              }`}
+            >
+              <td className="py-3 px-4">
+                <input
+                  type="checkbox"
+                  checked={selected.has(row.id)}
+                  onChange={() => toggle(row.id)}
+                  className="rounded border-[var(--border)] accent-accent"
+                />
+              </td>
+              <td className="py-3 px-4">
+                <Link href={`/customers/${row.id}`} className="font-semibold text-accent hover:underline">
+                  {row.name}
+                </Link>
+                {row.recipientName && (
+                  <div className="text-[11px] text-[var(--text-tertiary)] mt-0.5">→ {row.recipientName}</div>
+                )}
+              </td>
+              <td className="py-3 px-4">
+                <Badge status={row.type} />
+              </td>
+              <td className="py-3 px-4">
+                {row.channels.length === 0 ? (
+                  <span className={`inline-flex px-2 py-0.5 text-[10px] font-medium rounded ${DIRECT_META.color}`}>
+                    {DIRECT_META.label}
+                  </span>
+                ) : (
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {row.channels.map((ch) => {
+                      const meta = CHANNEL_META[ch] || { label: ch, color: "text-slate-500 bg-slate-500/[0.08]" };
+                      return (
+                        <span
+                          key={ch}
+                          className={`inline-flex px-2 py-0.5 text-[10px] font-medium rounded ${meta.color}`}
+                        >
+                          {meta.label}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </td>
+              <td className="py-3 px-4 text-[var(--text-secondary)]">
+                {row.email || row.phone ? (
+                  <div className="space-y-0.5">
+                    {row.email && <div>{row.email}</div>}
+                    {row.phone && <div className="font-mono text-xs">{row.phone}</div>}
+                  </div>
+                ) : (
+                  "—"
+                )}
+              </td>
+              <td className="py-3 px-4 text-[var(--text-secondary)]">{row.companyName}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
