@@ -360,21 +360,26 @@ export const coupangConnector: Connector = {
       cursor = nxt;
     }
 
-    const all: CoupangOrdersheet[] = [];
-    for (const w of windows) {
-      const sheets = await fetchOrdersheets(credentials, w.from, w.to);
-      all.push(...sheets);
+    // Pull marketplace + rocket growth independently — a 429 on one shouldn't
+    // wipe out the other. ordersheets is the noisier endpoint (one call per
+    // status × window); rg/orders is one call per window.
+    let marketplaceOrders: ExternalOrderData[] = [];
+    try {
+      const all: CoupangOrdersheet[] = [];
+      for (const w of windows) {
+        const sheets = await fetchOrdersheets(credentials, w.from, w.to);
+        all.push(...sheets);
+      }
+      const seen = new Set<number>();
+      const deduped = all.filter((s) => {
+        if (seen.has(s.shipmentBoxId)) return false;
+        seen.add(s.shipmentBoxId);
+        return true;
+      });
+      marketplaceOrders = deduped.map(mapOrdersheet);
+    } catch (err) {
+      console.warn("Coupang marketplace ordersheets sync failed:", (err as Error).message);
     }
-
-    // Dedup by shipmentBoxId (window overlap safety)
-    const seen = new Set<number>();
-    const deduped = all.filter((s) => {
-      if (seen.has(s.shipmentBoxId)) return false;
-      seen.add(s.shipmentBoxId);
-      return true;
-    });
-
-    const marketplaceOrders = deduped.map(mapOrdersheet);
 
     // Pull Rocket Growth (쿠팡 풀필먼트) orders too. They use a different
     // endpoint and a thinner shape — no customer/recipient info, no shipment
