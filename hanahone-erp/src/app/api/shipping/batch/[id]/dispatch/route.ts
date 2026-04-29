@@ -25,6 +25,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const { error } = await requireAuth();
   if (error) return error;
 
+  // optional retry: { productOrderIds: string[] } restricts dispatch to those channel-side IDs.
+  // Empty body or omitted field = dispatch all items in the batch (initial run).
+  let retryIds: Set<string> | null = null;
+  try {
+    const body = await req.json().catch(() => null);
+    if (body && Array.isArray(body.productOrderIds) && body.productOrderIds.length > 0) {
+      retryIds = new Set<string>(body.productOrderIds);
+    }
+  } catch {
+    /* no body */
+  }
+
   const batchId = params.id;
   const batch = await prisma.shippingBatch.findUnique({
     where: { id: batchId },
@@ -50,8 +62,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: "라운드를 찾을 수 없습니다" }, { status: 404 });
   }
 
-  // 송장번호 누락 확인
-  const missing = batch.items.filter((i) => !i.trackingNumber);
+  // retry mode: only consider items in the retry set
+  const itemsInScope = retryIds
+    ? batch.items.filter((i) => retryIds!.has(i.productOrderId))
+    : batch.items;
+
+  if (retryIds && itemsInScope.length === 0) {
+    return NextResponse.json(
+      { error: "재시도할 항목을 찾을 수 없습니다 (productOrderId 불일치)" },
+      { status: 400 },
+    );
+  }
+
+  // 송장번호 누락 확인 (scope 안에서만)
+  const missing = itemsInScope.filter((i) => !i.trackingNumber);
   if (missing.length > 0) {
     return NextResponse.json(
       { error: `송장번호가 비어있는 행 ${missing.length}건. 송장 회신 Excel 업로드를 먼저 완료하세요.` },
@@ -74,7 +98,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const coupangItems: CoupangDispatchItem[] = [];
   const carrierCode = carrierToNaverCode(batch.carrier);
 
-  for (const item of batch.items) {
+  for (const item of itemsInScope) {
     if (!item.trackingNumber) continue;
     const platform = item.platform || item.order?.externalSource;
     if (platform === "NAVER") {
@@ -193,9 +217,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     data: { channelDispatch, status: newStatus },
   });
 
-  // 성공한 주문은 fulfillmentStatus → FULFILLED + shipDate 세팅
+  // 성공한 주문은 fulfillmentStatus → FULFILLED + shipDate 세팅 (scope 안에서만)
   const successfulOrderIds = new Set<string>();
-  for (const item of batch.items) {
+  for (const item of itemsInScope) {
     const platform = item.platform || item.order?.externalSource;
     if (!item.trackingNumber || !item.order) continue;
     if (platform === "NAVER" && !result.naver.failed.some((f) => f.productOrderId === item.productOrderId)) {

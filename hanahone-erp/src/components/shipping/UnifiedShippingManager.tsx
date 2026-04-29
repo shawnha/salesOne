@@ -164,19 +164,35 @@ export function UnifiedShippingManager({ companyId }: { companyId: string }) {
     }
   }
 
-  async function handleDispatch(batchId: string) {
-    if (!confirm("이 라운드를 dispatch하시겠습니까?\n네이버 + 쿠팡 API에 송장번호를 자동 등록합니다.")) return;
+  async function handleDispatch(batchId: string, retryIds?: string[]) {
+    const isRetry = !!retryIds && retryIds.length > 0;
+    const confirmMsg = isRetry
+      ? `실패한 ${retryIds!.length}건만 다시 dispatch 합니다. 진행할까요?`
+      : "이 라운드를 dispatch하시겠습니까?\n네이버 + 쿠팡 API에 송장번호를 자동 등록합니다.";
+    if (!confirm(confirmMsg)) return;
     setDispatchingId(batchId);
-    setDispatchResult(null);
     setError(null);
     try {
-      const res = await fetch(`/api/shipping/batch/${batchId}/dispatch`, { method: "POST" });
+      const res = await fetch(`/api/shipping/batch/${batchId}/dispatch`, {
+        method: "POST",
+        headers: isRetry ? { "Content-Type": "application/json" } : undefined,
+        body: isRetry ? JSON.stringify({ productOrderIds: retryIds }) : undefined,
+      });
       const data = await res.json();
       if (!res.ok) {
         setError(`Dispatch 실패: ${data.error || res.status}`);
         return;
       }
-      setDispatchResult({ batchId, naver: data.naver, coupang: data.coupang });
+      if (isRetry && dispatchResult && dispatchResult.batchId === batchId) {
+        // 재시도 결과 머지: 성공한 채널은 failed에서 제거, 새 실패 추가
+        setDispatchResult({
+          batchId,
+          naver: mergeRetry(dispatchResult.naver, data.naver, "productOrderId", retryIds!),
+          coupang: mergeRetry(dispatchResult.coupang, data.coupang, "shipmentBoxId", retryIds!),
+        });
+      } else {
+        setDispatchResult({ batchId, naver: data.naver, coupang: data.coupang });
+      }
       await Promise.all([fetchPending(), fetchBatches()]);
     } catch (err: any) {
       setError(err.message || "dispatch 오류");
@@ -394,66 +410,41 @@ export function UnifiedShippingManager({ companyId }: { companyId: string }) {
       {/* STEP 4 — Dispatch 결과 (실행 후 표시) */}
       {dispatchResult && (
         <Card>
-          <h3 className="text-sm font-bold mb-3">4. Dispatch 결과 — 라운드 {dispatchResult.batchId.slice(0, 8)}</h3>
+          <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+            <h3 className="text-sm font-bold">4. Dispatch 결과 — 라운드 {dispatchResult.batchId.slice(0, 8)}</h3>
+            {(dispatchResult.naver.failed.length + dispatchResult.coupang.failed.length) > 0 && (
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={dispatchingId === dispatchResult.batchId}
+                onClick={() =>
+                  handleDispatch(dispatchResult.batchId, [
+                    ...dispatchResult.naver.failed.map((f) => f.productOrderId),
+                    ...dispatchResult.coupang.failed.map((f) => f.shipmentBoxId),
+                  ])
+                }
+              >
+                {dispatchingId === dispatchResult.batchId
+                  ? "재시도 중..."
+                  : `실패 ${dispatchResult.naver.failed.length + dispatchResult.coupang.failed.length}건만 재시도`}
+              </Button>
+            )}
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div
-              className={`p-3 rounded-lg border ${
-                dispatchResult.naver.failed.length === 0
-                  ? "bg-[var(--badge-teal-bg)] border-[var(--badge-teal)]/20"
-                  : dispatchResult.naver.ok === 0
-                    ? "bg-[var(--badge-red-bg)] border-[var(--badge-red)]/20"
-                    : "bg-[var(--badge-amber-bg)] border-[var(--badge-amber)]/20"
-              }`}
-            >
-              <div className="text-[11px] font-bold uppercase tracking-wider opacity-70 mb-1">네이버</div>
-              <div className="text-base font-bold">
-                {dispatchResult.naver.ok}건 성공
-                {dispatchResult.naver.failed.length > 0 && (
-                  <span className="ml-2 text-rose-600">{dispatchResult.naver.failed.length}건 실패</span>
-                )}
-              </div>
-              {dispatchResult.naver.failed.length > 0 && (
-                <details className="mt-2">
-                  <summary className="text-[11px] cursor-pointer">실패 상세</summary>
-                  <ul className="text-[11px] mt-1 ml-3">
-                    {dispatchResult.naver.failed.map((f, i) => (
-                      <li key={i} className="font-mono">
-                        {f.productOrderId}: {f.error}
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
-            </div>
-            <div
-              className={`p-3 rounded-lg border ${
-                dispatchResult.coupang.failed.length === 0
-                  ? "bg-[var(--badge-teal-bg)] border-[var(--badge-teal)]/20"
-                  : dispatchResult.coupang.ok === 0
-                    ? "bg-[var(--badge-red-bg)] border-[var(--badge-red)]/20"
-                    : "bg-[var(--badge-amber-bg)] border-[var(--badge-amber)]/20"
-              }`}
-            >
-              <div className="text-[11px] font-bold uppercase tracking-wider opacity-70 mb-1">쿠팡</div>
-              <div className="text-base font-bold">
-                {dispatchResult.coupang.ok}건 성공
-                {dispatchResult.coupang.failed.length > 0 && (
-                  <span className="ml-2 text-rose-600">{dispatchResult.coupang.failed.length}건 실패</span>
-                )}
-              </div>
-              {dispatchResult.coupang.failed.length > 0 && (
-                <details className="mt-2">
-                  <summary className="text-[11px] cursor-pointer">실패 상세</summary>
-                  <ul className="text-[11px] mt-1 ml-3">
-                    {dispatchResult.coupang.failed.map((f, i) => (
-                      <li key={i} className="font-mono">
-                        {f.shipmentBoxId}: {f.error}
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
-            </div>
+            <ChannelResult
+              label="네이버"
+              ok={dispatchResult.naver.ok}
+              failed={dispatchResult.naver.failed.map((f) => ({ id: f.productOrderId, error: f.error }))}
+              onRetryOne={(id) => handleDispatch(dispatchResult.batchId, [id])}
+              retryDisabled={dispatchingId === dispatchResult.batchId}
+            />
+            <ChannelResult
+              label="쿠팡"
+              ok={dispatchResult.coupang.ok}
+              failed={dispatchResult.coupang.failed.map((f) => ({ id: f.shipmentBoxId, error: f.error }))}
+              onRetryOne={(id) => handleDispatch(dispatchResult.batchId, [id])}
+              retryDisabled={dispatchingId === dispatchResult.batchId}
+            />
           </div>
         </Card>
       )}
@@ -556,6 +547,82 @@ function StepBox({
       <p className="text-[11px] text-[var(--text-tertiary)] mt-1 ml-6">{desc}</p>
     </div>
   );
+}
+
+function ChannelResult({
+  label,
+  ok,
+  failed,
+  onRetryOne,
+  retryDisabled,
+}: {
+  label: string;
+  ok: number;
+  failed: Array<{ id: string; error: string }>;
+  onRetryOne: (id: string) => void;
+  retryDisabled: boolean;
+}) {
+  const tone =
+    failed.length === 0
+      ? "bg-[var(--badge-teal-bg)] border-[var(--badge-teal)]/20"
+      : ok === 0
+        ? "bg-[var(--badge-red-bg)] border-[var(--badge-red)]/20"
+        : "bg-[var(--badge-amber-bg)] border-[var(--badge-amber)]/20";
+  return (
+    <div className={`p-3 rounded-lg border ${tone}`}>
+      <div className="text-[11px] font-bold uppercase tracking-wider opacity-70 mb-1">{label}</div>
+      <div className="text-base font-bold">
+        {ok}건 성공
+        {failed.length > 0 && <span className="ml-2 text-rose-600">{failed.length}건 실패</span>}
+      </div>
+      {failed.length > 0 && (
+        <details className="mt-2" open>
+          <summary className="text-[11px] cursor-pointer">실패 상세 ({failed.length})</summary>
+          <ul className="text-[11px] mt-1.5 space-y-1">
+            {failed.map((f, i) => (
+              <li key={i} className="flex items-start justify-between gap-2 font-mono">
+                <span className="min-w-0 flex-1">
+                  <span className="font-semibold">{f.id}</span>
+                  <span className="text-[var(--text-tertiary)]">: {f.error}</span>
+                </span>
+                <button
+                  type="button"
+                  className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded border border-[var(--border)] hover:bg-[var(--hover-bg-subtle)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={retryDisabled}
+                  onClick={() => onRetryOne(f.id)}
+                >
+                  재시도
+                </button>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
+type DispatchSummary<TKey extends string> = {
+  ok: number;
+  failed: Array<Record<TKey, string> & { error: string }>;
+};
+
+function mergeRetry<TKey extends "productOrderId" | "shipmentBoxId">(
+  prev: DispatchSummary<TKey>,
+  next: DispatchSummary<TKey>,
+  key: TKey,
+  retryIds: string[],
+): DispatchSummary<TKey> {
+  const retried = new Set(retryIds);
+  // keep prior failures that weren't retried (out of scope for this retry)
+  const keptFailures = prev.failed.filter((f) => !retried.has(f[key] as string));
+  // any retried IDs not in next.failed are now successful → carry their success forward
+  const stillFailing = new Set(next.failed.map((f) => f[key] as string));
+  const newlySucceeded = retryIds.filter((id) => !stillFailing.has(id)).length;
+  return {
+    ok: prev.ok + newlySucceeded,
+    failed: [...keptFailures, ...next.failed],
+  };
 }
 
 function ChannelSection({
