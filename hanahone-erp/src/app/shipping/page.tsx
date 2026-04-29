@@ -1,10 +1,10 @@
 import { prisma } from "@/lib/prisma";
-import { UnifiedShippingManager } from "@/components/shipping/UnifiedShippingManager";
+import { ShippingTabs } from "@/components/shipping/ShippingTabs";
 
 export default async function ShippingPage({
   searchParams,
 }: {
-  searchParams: { company?: string };
+  searchParams: { company?: string; tab?: string };
 }) {
   let companyId = searchParams.company;
 
@@ -25,13 +25,15 @@ export default async function ShippingPage({
     );
   }
 
+  const initialTab = searchParams.tab === "inbound" ? "inbound" : "outbound";
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-bold tracking-tight">배송 관리</h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">네이버 + 쿠팡 통합 발주 → 송장 → dispatch</p>
+        <p className="text-sm text-[var(--text-secondary)] mt-1">고객 발송 + 로켓그로스 입고 통합</p>
       </div>
-      <UnifiedShippingManager companyId={companyId} />
+      <ShippingTabs companyId={companyId} initialTab={initialTab} />
     </div>
   );
 }
