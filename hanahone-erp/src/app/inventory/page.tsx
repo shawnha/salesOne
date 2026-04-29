@@ -555,7 +555,7 @@ export default async function InventoryPage({
     // Pick the LAST "N개입" mention. Channel productNames sometimes list
     // a category prefix ("5개입, 30개입 ...") then specify the actual variant
     // at the end ("...정제 1.2g 5개입") — the last one wins.
-    const matches = [...name.matchAll(/(\d+)\s?개입/g)];
+    const matches = Array.from(name.matchAll(/(\d+)\s?개입/g));
     if (matches.length === 0) return null;
     const last = matches[matches.length - 1][1];
     const m30 = masters.find((p) => p.sku === "ODD-M01-30");
