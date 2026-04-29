@@ -50,7 +50,7 @@ async function main() {
 
   let updated = 0;
   let skipped = 0;
-  for (const [customerId, patch] of customerPatches) {
+  for (const [customerId, patch] of Array.from(customerPatches.entries())) {
     const customer = await prisma.customer.findUnique({
       where: { id: customerId },
       select: { id: true, name: true, email: true, contactInfo: true },
