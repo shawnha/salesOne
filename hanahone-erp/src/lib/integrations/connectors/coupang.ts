@@ -119,10 +119,11 @@ type CoupangOrdersheet = {
   orderedAt: string;
   paidAt: string | null;
   status: string;
-  orderer: { name: string; email?: string; safeNumber?: string };
+  orderer: { name: string; email?: string; safeNumber?: string; ordererNumber?: string };
   receiver: {
     name: string;
     safeNumber?: string;
+    receiverNumber?: string;
     postCode?: string;
     addr1?: string;
     addr2?: string;
@@ -211,8 +212,10 @@ function mapOrdersheet(sheet: CoupangOrdersheet): ExternalOrderData {
   const totalAmount = items.reduce((sum, it) => sum + it.unitPrice * it.quantity, 0);
 
   const addr = sheet.receiver;
+  // Address as the street portion only — zip is surfaced via recipientZip so
+  // the mapper stores it in customer.contactInfo.zip alongside Naver orders.
   const shippingAddress = addr
-    ? [addr.postCode, addr.addr1, addr.addr2].filter(Boolean).join(" ")
+    ? [addr.addr1, addr.addr2].filter(Boolean).join(" ") || undefined
     : undefined;
 
   return {
@@ -224,10 +227,13 @@ function mapOrdersheet(sheet: CoupangOrdersheet): ExternalOrderData {
     financialStatus: financial,
     totalAmount,
     customerName: sheet.orderer?.name,
-    customerPhone: sheet.orderer?.safeNumber,
+    customerEmail: sheet.orderer?.email,
+    // Prefer real number if Coupang exposed one (some sheets do, most are 0504/0502 virtual).
+    customerPhone: sheet.orderer?.ordererNumber || sheet.orderer?.safeNumber,
     shippingAddress,
     recipientName: addr?.name,
-    recipientPhone: addr?.safeNumber,
+    recipientPhone: addr?.receiverNumber || addr?.safeNumber,
+    recipientZip: addr?.postCode,
     items,
   };
 }

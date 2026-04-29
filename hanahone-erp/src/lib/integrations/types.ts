@@ -22,6 +22,8 @@ export interface ExternalOrderData {
   shippingAddress?: string;
   recipientName?: string;
   recipientPhone?: string;
+  /** Recipient zip/postal code, normalized across channels */
+  recipientZip?: string;
   items: ExternalOrderItemData[];
   /** Override the connector's platform for this order (e.g. CGETC order tagged as TIKTOK) */
   overridePlatform?: Platform;

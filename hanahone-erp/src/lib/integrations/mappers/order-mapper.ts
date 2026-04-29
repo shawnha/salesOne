@@ -126,7 +126,7 @@ export async function mapExternalOrder(
   const fulfillmentStatus = mapFulfillmentStatus(extOrder.fulfillmentStatus);
   const financialStatus = mapFinancialStatus(extOrder.financialStatus);
 
-  // Extract naverId from Naver rawData if available
+  // Naver-specific identifier; harmless on other platforms (undefined).
   const naverId = extOrder.rawData?.order?.ordererId || undefined;
 
   const customerId = await findOrCreateCustomer(
@@ -136,7 +136,9 @@ export async function mapExternalOrder(
     {
       phone: extOrder.customerPhone || extOrder.recipientPhone,
       address: extOrder.shippingAddress,
-      zipCode: extOrder.rawData?.productOrder?.shippingAddress?.zipCode,
+      zipCode: extOrder.recipientZip
+        || extOrder.rawData?.productOrder?.shippingAddress?.zipCode
+        || extOrder.rawData?.receiver?.postCode,
       naverId,
     },
   );
