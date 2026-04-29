@@ -21,8 +21,25 @@ export default async function CustomersPage({
     orderBy: { name: "asc" },
   });
 
+  // Per-customer channel set: derived from each customer's order externalSource.
+  // Customers with zero orders or only manual orders end up with [] (rendered as 직접).
+  const customerOrderRows = await prisma.order.findMany({
+    where: {
+      ...(searchParams.company ? { companyId: searchParams.company } : {}),
+      customerId: { not: null },
+    },
+    select: { customerId: true, externalSource: true },
+  });
+  const channelsByCustomer = new Map<string, Set<string>>();
+  for (const o of customerOrderRows) {
+    if (!o.customerId) continue;
+    if (!channelsByCustomer.has(o.customerId)) channelsByCustomer.set(o.customerId, new Set());
+    if (o.externalSource) channelsByCustomer.get(o.customerId)!.add(o.externalSource);
+  }
+
   const data = customers.map((c) => {
     const info = c.contactInfo as Record<string, string> | null;
+    const channels = Array.from(channelsByCustomer.get(c.id) ?? new Set<string>()).sort();
     return {
       id: c.id,
       name: c.name,
@@ -32,6 +49,7 @@ export default async function CustomersPage({
       recipientName: info?.recipientName && info.recipientName !== c.name ? info.recipientName : null,
       companyId: c.companyId,
       companyName: c.company.name,
+      channels,
     };
   });
 

@@ -15,21 +15,79 @@ interface Customer {
   phone: string | null;
   recipientName: string | null;
   companyName: string;
+  channels: string[];
 }
+
+const CHANNEL_META: Record<string, { label: string; color: string }> = {
+  SHOPIFY: { label: "Shopify", color: "text-green-600 bg-green-600/[0.08]" },
+  AMAZON: { label: "Amazon", color: "text-orange-600 bg-orange-600/[0.08]" },
+  TIKTOK: { label: "TikTok", color: "text-pink-600 bg-pink-600/[0.08]" },
+  NAVER: { label: "네이버", color: "text-emerald-600 bg-emerald-600/[0.08]" },
+  COUPANG: { label: "쿠팡", color: "text-red-600 bg-red-600/[0.08]" },
+  PHARMACY: { label: "약국", color: "text-blue-600 bg-blue-600/[0.08]" },
+  CGETC: { label: "CGETC", color: "text-indigo-600 bg-indigo-600/[0.08]" },
+  GONGGU: { label: "공구", color: "text-rose-600 bg-rose-600/[0.08]" },
+};
+
+const DIRECT_KEY = "DIRECT";
+const DIRECT_META = { label: "직접", color: "text-slate-500 bg-slate-500/[0.08]" };
 
 export function CustomersTable({ customers, companyId, companyName }: { customers: Customer[]; companyId?: string; companyName?: string }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [fetchingDetails, setFetchingDetails] = useState(false);
   const [fetchResult, setFetchResult] = useState<string | null>(null);
+  const [channelFilter, setChannelFilter] = useState<string>("ALL");
 
-  const allSelected = customers.length > 0 && selected.size === customers.length;
+  // Build available channel tabs from this customer set so HOK doesn't show
+  // empty Shopify/Amazon tabs and HOI doesn't show 네이버/쿠팡.
+  const channelCounts = new Map<string, number>();
+  let directCount = 0;
+  for (const c of customers) {
+    if (c.channels.length === 0) {
+      directCount++;
+      continue;
+    }
+    for (const ch of c.channels) {
+      channelCounts.set(ch, (channelCounts.get(ch) || 0) + 1);
+    }
+  }
+  const availableTabs: { key: string; label: string; count: number; color?: string }[] = [
+    { key: "ALL", label: "전체", count: customers.length },
+    ...Array.from(channelCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([ch, n]) => ({
+        key: ch,
+        label: CHANNEL_META[ch]?.label ?? ch,
+        count: n,
+        color: CHANNEL_META[ch]?.color,
+      })),
+  ];
+  if (directCount > 0) {
+    availableTabs.push({ key: DIRECT_KEY, label: DIRECT_META.label, count: directCount, color: DIRECT_META.color });
+  }
+
+  const filtered = customers.filter((c) => {
+    if (channelFilter === "ALL") return true;
+    if (channelFilter === DIRECT_KEY) return c.channels.length === 0;
+    return c.channels.includes(channelFilter);
+  });
+
+  const allSelected = filtered.length > 0 && filtered.every((c) => selected.has(c.id));
 
   function toggleAll() {
     if (allSelected) {
-      setSelected(new Set());
+      setSelected((prev) => {
+        const next = new Set(prev);
+        for (const c of filtered) next.delete(c.id);
+        return next;
+      });
     } else {
-      setSelected(new Set(customers.map((c) => c.id)));
+      setSelected((prev) => {
+        const next = new Set(prev);
+        for (const c of filtered) next.add(c.id);
+        return next;
+      });
     }
   }
 
@@ -129,8 +187,30 @@ export function CustomersTable({ customers, companyId, companyName }: { customer
         </div>
       )}
 
+      {availableTabs.length > 1 && (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {availableTabs.map((tab) => {
+            const active = channelFilter === tab.key;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setChannelFilter(tab.key)}
+                className={`px-3 py-1.5 text-[11px] font-medium rounded-full border transition-all ${
+                  active
+                    ? "bg-accent/10 border-accent/30 text-accent"
+                    : "bg-transparent border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
+                }`}
+              >
+                {tab.label}
+                <span className={`ml-1.5 ${active ? "text-accent/70" : "text-[var(--text-tertiary)]"}`}>{tab.count}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <Card>
-        {customers.length === 0 ? (
+        {filtered.length === 0 ? (
           <EmptyState title="No customers" description="No customers found." />
         ) : (
           <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
@@ -147,12 +227,13 @@ export function CustomersTable({ customers, companyId, companyName }: { customer
                   </th>
                   <th className="text-left py-3 px-4">이름</th>
                   <th className="text-left py-3 px-4">유형</th>
+                  <th className="text-left py-3 px-4">채널</th>
                   <th className="text-left py-3 px-4">연락처</th>
                   <th className="text-left py-3 px-4">회사</th>
                 </tr>
               </thead>
               <tbody>
-                {customers.map((row) => (
+                {filtered.map((row) => (
                   <tr
                     key={row.id}
                     className={`border-b border-[var(--border)] last:border-b-0 transition-colors ${
@@ -179,6 +260,27 @@ export function CustomersTable({ customers, companyId, companyName }: { customer
                     </td>
                     <td className="py-3 px-4">
                       <Badge status={row.type} />
+                    </td>
+                    <td className="py-3 px-4">
+                      {row.channels.length === 0 ? (
+                        <span className={`inline-flex px-2 py-0.5 text-[10px] font-medium rounded ${DIRECT_META.color}`}>
+                          {DIRECT_META.label}
+                        </span>
+                      ) : (
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {row.channels.map((ch) => {
+                            const meta = CHANNEL_META[ch] || { label: ch, color: "text-slate-500 bg-slate-500/[0.08]" };
+                            return (
+                              <span
+                                key={ch}
+                                className={`inline-flex px-2 py-0.5 text-[10px] font-medium rounded ${meta.color}`}
+                              >
+                                {meta.label}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-[var(--text-secondary)]">
                       {row.email || row.phone ? (
