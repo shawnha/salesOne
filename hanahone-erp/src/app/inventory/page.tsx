@@ -482,6 +482,33 @@ export default async function InventoryPage({
     }
   }
 
+  // HOK: orphan ExternalInventory rows — Naver products synced but not yet
+  // mapped to any internal Product. Surface them so a newly-registered
+  // smartstore product (e.g. a fresh 공구) shows up immediately and the user
+  // can register it without re-typing the product number.
+  const hokOrphanNaverItems: { externalSku: string; externalName: string; quantity: number }[] = [];
+  if (isHokView) {
+    const allNaverMappings = await prisma.skuMapping.findMany({
+      where: { companyId: hokCompany!.id, platform: "NAVER" },
+      select: { externalSku: true },
+    });
+    const mappedSet = new Set(allNaverMappings.map((m) => m.externalSku));
+    const externalRows = await prisma.externalInventory.findMany({
+      where: { companyId: hokCompany!.id, platform: "NAVER" },
+      select: { externalSku: true, externalName: true, quantity: true },
+      orderBy: { quantity: "desc" },
+    });
+    for (const e of externalRows) {
+      if (!mappedSet.has(e.externalSku)) {
+        hokOrphanNaverItems.push({
+          externalSku: e.externalSku,
+          externalName: e.externalName ?? "",
+          quantity: e.quantity,
+        });
+      }
+    }
+  }
+
   // Group view: separate sections per company
   const isGroupView = !searchParams.company;
   const companyGroups = isGroupView
@@ -616,6 +643,7 @@ export default async function InventoryPage({
                   return [r.sku, variantBreakdown.get(key) || {}];
                 }),
             )}
+            orphanNaverItems={hokOrphanNaverItems}
           />
           {(() => {
             const hokChannels = channelRowsByCompany.get(hokCompany!.id);
