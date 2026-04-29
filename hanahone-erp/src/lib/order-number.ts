@@ -20,11 +20,26 @@ export async function generateOrderNumber(companyId: string, tx: any): Promise<s
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(${companyIdToLockKey(companyId)})`;
 
   const company = await tx.company.findUniqueOrThrow({ where: { id: companyId } });
-  const lastOrder = await tx.order.findFirst({
-    where: { companyId },
-    orderBy: { createdAt: "desc" },
-    select: { orderNumber: true },
-  });
-  const lastSeq = lastOrder ? parseInt(lastOrder.orderNumber.split("-")[1]) || 0 : 0;
+
+  // Use MAX(sequence) rather than "latest by createdAt" so the next number is
+  // always strictly greater than every existing one — even if rows were
+  // inserted out of band (Excel import, admin tooling, backdated migration)
+  // with a sequence below the current max. The advisory lock above prevents
+  // concurrent generators from racing; this query keeps us correct under any
+  // historical insert path.
+  //
+  // Pattern matches "<companyName>-<digits>" exactly so a stray non-conforming
+  // orderNumber can't poison the parse.
+  const pattern = `^${company.name.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}-\\d+$`;
+  const rows = await tx.$queryRaw<Array<{ max_seq: number | null }>>`
+    SELECT COALESCE(
+      MAX(CAST(SPLIT_PART(order_number, '-', 2) AS INTEGER)),
+      0
+    )::int AS max_seq
+    FROM "salesone"."orders"
+    WHERE company_id = ${companyId}::uuid
+      AND order_number ~ ${pattern}
+  `;
+  const lastSeq = rows[0]?.max_seq ?? 0;
   return formatOrderNumber(company.name, lastSeq + 1);
 }
