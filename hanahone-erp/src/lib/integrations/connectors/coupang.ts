@@ -158,6 +158,103 @@ const ORDER_STATUSES = [
   "NONE_TRACKING",
 ] as const;
 
+/**
+ * Format date as yyyyMMdd (no separators) — required by Rocket Growth API.
+ */
+function formatYmdCompact(d: Date): string {
+  return d.getUTCFullYear() + pad(d.getUTCMonth() + 1) + pad(d.getUTCDate());
+}
+
+/**
+ * Rocket Growth (쿠팡 풀필먼트) order. The seller never touches shipping or
+ * customer info — Coupang handles both — so the response only carries paid-at,
+ * order id, and per-item productName/qty/price. No customer name/phone/address.
+ */
+type RocketGrowthOrder = {
+  vendorId: string;
+  orderId: number;
+  paidAt: number; // unix ms
+  orderItems: Array<{
+    vendorItemId: number;
+    productName: string;
+    salesQuantity: number;
+    unitSalesPrice: string;
+    currency: string;
+  }>;
+};
+
+type RocketGrowthOrdersResponse = {
+  message: string;
+  code: number;
+  data: RocketGrowthOrder[];
+  nextToken: string | null;
+};
+
+async function fetchRocketGrowthOrders(
+  creds: CoupangCredentials,
+  paidDateFrom: Date,
+  paidDateTo: Date,
+): Promise<RocketGrowthOrder[]> {
+  const path = `/v2/providers/rg_open_api/apis/api/v1/vendors/${encodeURIComponent(creds.vendorId)}/rg/orders`;
+  const out: RocketGrowthOrder[] = [];
+
+  // Walk in 31-day windows (matches marketplace constraint).
+  const WINDOW_MS = 31 * 24 * 60 * 60 * 1000;
+  const windows: Array<{ from: string; to: string }> = [];
+  let cursor = paidDateFrom.getTime();
+  const end = paidDateTo.getTime();
+  while (cursor < end) {
+    const nxt = Math.min(cursor + WINDOW_MS, end);
+    windows.push({
+      from: formatYmdCompact(new Date(cursor)),
+      to: formatYmdCompact(new Date(nxt)),
+    });
+    cursor = nxt;
+  }
+
+  for (const w of windows) {
+    let nextToken: string | undefined;
+    for (let page = 0; page < 200; page++) {
+      const qs = new URLSearchParams({ paidDateFrom: w.from, paidDateTo: w.to });
+      if (nextToken) qs.set("nextToken", nextToken);
+      const json = await coupangFetch<RocketGrowthOrdersResponse>(creds, "GET", path, qs.toString());
+      if (Array.isArray(json.data)) out.push(...json.data);
+      if (!json.nextToken) break;
+      nextToken = json.nextToken;
+    }
+  }
+
+  return out;
+}
+
+function mapRocketGrowthOrder(o: RocketGrowthOrder): ExternalOrderData {
+  const items: ExternalOrderItemData[] = (o.orderItems || []).map((it) => ({
+    externalItemId: String(it.vendorItemId),
+    productName: it.productName,
+    sku: String(it.vendorItemId),
+    quantity: Number(it.salesQuantity || 0),
+    unitPrice: Number(it.unitSalesPrice || 0),
+  }));
+
+  const totalAmount = items.reduce((sum, it) => sum + it.unitPrice * it.quantity, 0);
+  const orderDate = new Date(o.paidAt);
+
+  return {
+    externalOrderId: `RG-${o.orderId}`,
+    externalOrderNumber: String(o.orderId),
+    rawData: { ...o, shipmentType: "ROCKET_GROWTH" },
+    orderDate,
+    // Rocket Growth is fulfilled by Coupang — once paid, treat it as paid +
+    // delivered from our POV (we don't get real shipment lifecycle hooks).
+    fulfillmentStatus: "DELIVERED",
+    financialStatus: "PAID",
+    totalAmount,
+    // No customer/recipient info — Coupang policy.
+    channelNote: "로켓그로스",
+    items,
+  };
+}
+
 async function fetchOrdersheets(
   creds: CoupangCredentials,
   createdAtFrom: string,
@@ -277,6 +374,28 @@ export const coupangConnector: Connector = {
       return true;
     });
 
-    return deduped.map(mapOrdersheet);
+    const marketplaceOrders = deduped.map(mapOrdersheet);
+
+    // Pull Rocket Growth (쿠팡 풀필먼트) orders too. They use a different
+    // endpoint and a thinner shape — no customer/recipient info, no shipment
+    // lifecycle. We tag them with channelNote=로켓그로스 so they're easy to
+    // distinguish in reporting.
+    let rgOrders: ExternalOrderData[] = [];
+    try {
+      const raw = await fetchRocketGrowthOrders(credentials, from, now);
+      const rgSeen = new Set<number>();
+      const rgDeduped = raw.filter((o) => {
+        if (rgSeen.has(o.orderId)) return false;
+        rgSeen.add(o.orderId);
+        return true;
+      });
+      rgOrders = rgDeduped.map(mapRocketGrowthOrder);
+    } catch (err) {
+      // Don't block marketplace sync if rocket growth API fails (permission
+      // not enabled, transient, etc.).
+      console.warn("Coupang Rocket Growth sync failed:", (err as Error).message);
+    }
+
+    return [...marketplaceOrders, ...rgOrders];
   },
 };
