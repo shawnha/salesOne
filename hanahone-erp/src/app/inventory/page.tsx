@@ -527,24 +527,77 @@ export default async function InventoryPage({
   // mapped to any internal Product. Surface them so a newly-registered
   // smartstore product (e.g. a fresh 공구) shows up immediately and the user
   // can register it without re-typing the product number.
-  const hokOrphanNaverItems: { externalSku: string; externalName: string; quantity: number }[] = [];
+  //
+  // For each orphan we pre-compute a master suggestion based on productName
+  // keywords (공구/N개입), so the UI can offer one-click "이 마스터로 매핑"
+  // without forcing the user to think.
+  type OrphanItem = {
+    externalSku: string;
+    externalName: string;
+    quantity: number;
+    suggestedMasterId: string | null;
+    suggestedMasterSku: string | null;
+    suggestedMasterName: string | null;
+    suggestedIsGonggu: boolean;
+  };
+  function isGongguName(name: string): boolean {
+    // "공구" 명시 또는 "X일분" 옵션 표기 (예: "5일분 1개(5개입)"). 공구 통합상품의
+    // 옵션은 BOM이 다 다르므로 자동 매핑하면 매출 잘못 잡힘.
+    return /공구|gonggu/i.test(name) || /\d+\s?일분/.test(name);
+  }
+
+  function suggestMaster(
+    externalName: string,
+    masters: { id: string; sku: string; name: string }[],
+  ): { id: string; sku: string; name: string } | null {
+    const name = externalName ?? "";
+    if (isGongguName(name)) return null;
+    // Pick the LAST "N개입" mention. Channel productNames sometimes list
+    // a category prefix ("5개입, 30개입 ...") then specify the actual variant
+    // at the end ("...정제 1.2g 5개입") — the last one wins.
+    const matches = [...name.matchAll(/(\d+)\s?개입/g)];
+    if (matches.length === 0) return null;
+    const last = matches[matches.length - 1][1];
+    const m30 = masters.find((p) => p.sku === "ODD-M01-30");
+    const m5 = masters.find((p) => p.sku === "ODD-M01-5");
+    if (last === "30" && m30) return m30;
+    if (last === "5" && m5) return m5;
+    return null;
+  }
+
+  const hokOrphanNaverItems: OrphanItem[] = [];
+  const hokOrphanCoupangItems: OrphanItem[] = [];
   if (isHokView) {
-    const allNaverMappings = await prisma.skuMapping.findMany({
-      where: { companyId: hokCompany!.id, platform: "NAVER" },
-      select: { externalSku: true },
+    const masters = await prisma.product.findMany({
+      where: { companyId: hokCompany!.id },
+      select: { id: true, sku: true, name: true },
     });
-    const mappedSet = new Set(allNaverMappings.map((m) => m.externalSku));
-    const externalRows = await prisma.externalInventory.findMany({
-      where: { companyId: hokCompany!.id, platform: "NAVER" },
-      select: { externalSku: true, externalName: true, quantity: true },
-      orderBy: { quantity: "desc" },
-    });
-    for (const e of externalRows) {
-      if (!mappedSet.has(e.externalSku)) {
-        hokOrphanNaverItems.push({
+
+    for (const platform of ["NAVER", "COUPANG"] as const) {
+      const platformMappings = await prisma.skuMapping.findMany({
+        where: { companyId: hokCompany!.id, platform },
+        select: { externalSku: true },
+      });
+      const mappedSet = new Set(platformMappings.map((m) => m.externalSku));
+      const externalRows = await prisma.externalInventory.findMany({
+        where: { companyId: hokCompany!.id, platform },
+        select: { externalSku: true, externalName: true, quantity: true },
+        orderBy: { quantity: "desc" },
+      });
+      const target = platform === "NAVER" ? hokOrphanNaverItems : hokOrphanCoupangItems;
+      for (const e of externalRows) {
+        if (mappedSet.has(e.externalSku)) continue;
+        const name = e.externalName ?? "";
+        const isGonggu = isGongguName(name);
+        const suggestion = suggestMaster(name, masters);
+        target.push({
           externalSku: e.externalSku,
-          externalName: e.externalName ?? "",
+          externalName: name,
           quantity: e.quantity,
+          suggestedMasterId: suggestion?.id ?? null,
+          suggestedMasterSku: suggestion?.sku ?? null,
+          suggestedMasterName: suggestion?.name ?? null,
+          suggestedIsGonggu: isGonggu,
         });
       }
     }
@@ -685,6 +738,7 @@ export default async function InventoryPage({
                 }),
             )}
             orphanNaverItems={hokOrphanNaverItems}
+            orphanCoupangItems={hokOrphanCoupangItems}
             rocketGrowthInventory={hokRocketGrowthInventory}
           />
           {(() => {

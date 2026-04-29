@@ -148,6 +148,10 @@ export type OrphanNaverItem = {
   externalSku: string;
   externalName: string;
   quantity: number;
+  suggestedMasterId?: string | null;
+  suggestedMasterSku?: string | null;
+  suggestedMasterName?: string | null;
+  suggestedIsGonggu?: boolean;
 };
 
 export type RocketGrowthInventoryItem = {
@@ -167,6 +171,7 @@ export function HokInventoryClient({
   channelSalesBySku = {},
   variantSalesBySku = {},
   orphanNaverItems = [],
+  orphanCoupangItems = [],
   rocketGrowthInventory = [],
 }: {
   baselines: BaselineItem[];
@@ -177,6 +182,7 @@ export function HokInventoryClient({
   channelSalesBySku?: Record<string, Partial<Record<string, number>>>;
   variantSalesBySku?: Record<string, Record<string, number>>;
   orphanNaverItems?: OrphanNaverItem[];
+  orphanCoupangItems?: OrphanNaverItem[];
   rocketGrowthInventory?: RocketGrowthInventoryItem[];
 }) {
   const router = useRouter();
@@ -648,46 +654,32 @@ export function HokInventoryClient({
       {/* 구분선 */}
       <div className="border-t border-[var(--border)]" />
 
-      {/* 미매핑 네이버 상품 — 신규 등록 자동 감지 */}
-      {orphanNaverItems.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-amber-600">
-              미매핑 네이버 상품 <span className="text-[var(--text-quaternary)]">({orphanNaverItems.length})</span>
-            </h2>
-            <span className="text-[10px] text-[var(--text-tertiary)]">셀러센터에 등록됐지만 ERP 매핑이 없는 상품</span>
-          </div>
-          <Card>
-            <div className="divide-y divide-[var(--border)]">
-              {orphanNaverItems.map((item) => (
-                <div key={item.externalSku} className="flex items-center justify-between py-2.5 px-1 gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex px-1.5 py-0.5 text-[10px] font-mono font-medium rounded bg-[#03C75A]/10 text-[#03C75A]">
-                        N {item.externalSku}
-                      </span>
-                      <span className="text-[12px] font-medium truncate">{item.externalName || "(이름 없음)"}</span>
-                    </div>
-                    <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5">현 재고 {item.quantity.toLocaleString()}</p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setAddNaver(item.externalSku);
-                      setAddStarter(0);
-                      setAddRefill(0);
-                      setAddOnHand(0);
-                      setShowAddGonggu(true);
-                    }}
-                    className="text-[11px] font-medium px-3 py-1.5 rounded-full bg-teal-500/10 text-teal-500 hover:bg-teal-500/20 transition-colors flex-shrink-0"
-                  >
-                    공구로 등록
-                  </button>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
-      )}
+      {/* 미매핑 채널 상품 (네이버 + 쿠팡) — 신규 등록 자동 감지 */}
+      <OrphanSection
+        title="미매핑 네이버 상품"
+        platform="NAVER"
+        items={orphanNaverItems}
+        companyId={companyId}
+        badgeColor="bg-[#03C75A]/10 text-[#03C75A]"
+        badgePrefix="N"
+        showGongguOption
+        onOpenGonggu={(externalSku) => {
+          setAddNaver(externalSku);
+          setAddStarter(0);
+          setAddRefill(0);
+          setAddOnHand(0);
+          setShowAddGonggu(true);
+        }}
+      />
+      <OrphanSection
+        title="미매핑 쿠팡 상품"
+        platform="COUPANG"
+        items={orphanCoupangItems}
+        companyId={companyId}
+        badgeColor="bg-red-500/10 text-red-600"
+        badgePrefix="C"
+      />
+
 
       {/* 쿠팡 풀필먼트 재고 (로켓그로스) */}
       {rocketGrowthInventory.length > 0 && (
@@ -932,6 +924,127 @@ function DataTableInline<T>({
           ))}
         </div>
       ))}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  OrphanSection — generic per-platform unmapped channel item list    */
+/* ------------------------------------------------------------------ */
+
+function OrphanSection({
+  title,
+  platform,
+  items,
+  companyId,
+  badgeColor,
+  badgePrefix,
+  showGongguOption = false,
+  onOpenGonggu,
+}: {
+  title: string;
+  platform: "NAVER" | "COUPANG";
+  items: OrphanNaverItem[];
+  companyId: string;
+  badgeColor: string;
+  badgePrefix: string;
+  showGongguOption?: boolean;
+  onOpenGonggu?: (externalSku: string) => void;
+}) {
+  const router = useRouter();
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  if (items.length === 0) return null;
+
+  async function autoMap(item: OrphanNaverItem) {
+    if (!item.suggestedMasterId) return;
+    setPendingId(item.externalSku);
+    setError(null);
+    try {
+      const res = await fetch("/api/inventory/sku-mapping", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId,
+          platform,
+          externalSku: item.externalSku,
+          productId: item.suggestedMasterId,
+          displayName: item.externalName?.slice(0, 60) || null,
+          isGonggu: false,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.text();
+        setError(`매핑 실패: ${body}`);
+        return;
+      }
+      router.refresh();
+    } catch (err: any) {
+      setError(err.message || "매핑 실패");
+    } finally {
+      setPendingId(null);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-amber-600">
+          {title} <span className="text-[var(--text-quaternary)]">({items.length})</span>
+        </h2>
+        <span className="text-[10px] text-[var(--text-tertiary)]">셀러센터에 등록됐지만 ERP 매핑이 없는 상품</span>
+      </div>
+      {error && (
+        <div className="px-3 py-2 rounded-xl bg-red-500/[0.06] border border-red-500/[0.12] text-[11px] text-red-600">{error}</div>
+      )}
+      <Card>
+        <div className="divide-y divide-[var(--border)]">
+          {items.map((item) => {
+            const canAutoMap = !!item.suggestedMasterId && !item.suggestedIsGonggu;
+            return (
+              <div key={item.externalSku} className="flex items-center justify-between py-2.5 px-1 gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex px-1.5 py-0.5 text-[10px] font-mono font-medium rounded ${badgeColor}`}>
+                      {badgePrefix} {item.externalSku}
+                    </span>
+                    <span className="text-[12px] font-medium truncate">{item.externalName || "(이름 없음)"}</span>
+                  </div>
+                  <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5">
+                    현 재고 {item.quantity.toLocaleString()}
+                    {canAutoMap && (
+                      <span className="ml-2 text-teal-600">→ 추정: {item.suggestedMasterSku}</span>
+                    )}
+                    {item.suggestedIsGonggu && (
+                      <span className="ml-2 text-rose-600">→ 공구 추정 (BOM 입력 필요)</span>
+                    )}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {canAutoMap && (
+                    <button
+                      onClick={() => autoMap(item)}
+                      disabled={pendingId === item.externalSku}
+                      className="text-[11px] font-medium px-3 py-1.5 rounded-full bg-teal-500/10 text-teal-600 hover:bg-teal-500/20 transition-colors disabled:opacity-50"
+                    >
+                      {pendingId === item.externalSku ? "..." : `${item.suggestedMasterSku}로 매핑`}
+                    </button>
+                  )}
+                  {showGongguOption && onOpenGonggu && (
+                    <button
+                      onClick={() => onOpenGonggu(item.externalSku)}
+                      className="text-[11px] font-medium px-3 py-1.5 rounded-full bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 transition-colors"
+                    >
+                      공구로 등록
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
     </div>
   );
 }
