@@ -13,7 +13,18 @@
 import { prisma } from "../src/lib/prisma";
 import { Platform } from "@prisma/client";
 
-const PLATFORMS: Platform[] = [Platform.SHOPIFY, Platform.NAVER, Platform.CGETC];
+const PLATFORMS: Platform[] = [
+  Platform.SHOPIFY,
+  Platform.NAVER,
+  Platform.CGETC,
+  Platform.COUPANG,
+  Platform.AMAZON,
+];
+// AMAZON note: legacy syncs only persisted the order envelope in rawData. The
+// connector now folds OrderItems into rawData (see amazon.ts), so syncs from
+// 2026-04-30 forward are backfillable. Older orders fall through with no
+// extracted lines and are reported as unmatched — re-sync those windows if
+// you need their variant data.
 
 interface RawLine {
   title: string;
@@ -44,6 +55,29 @@ function extractLines(platform: Platform, raw: any): RawLine[] {
       title: String(li.productName ?? ""),
       sku: String(li.sku ?? ""),
     }));
+  }
+  if (platform === Platform.AMAZON) {
+    return (raw.OrderItems || []).map((it: any) => ({
+      title: String(it.Title ?? ""),
+      sku: String(it.SellerSKU ?? ""),
+    }));
+  }
+  if (platform === Platform.COUPANG) {
+    // Both marketplace ordersheets and Rocket Growth orders nest their items
+    // under `orderItems`, but the field shape diverges:
+    //   - marketplace:  { vendorItemName, externalVendorSku, sellerProductItemName, vendorItemPackageName, vendorItemId }
+    //   - rocket growth: { productName, vendorItemId }  (no SKU at all)
+    // Keep vendorItemId as the SKU for RG so dispatch lookups still resolve.
+    return (raw.orderItems || []).map((it: any) => {
+      const isRocketGrowth = raw.shipmentType === "ROCKET_GROWTH";
+      const title = isRocketGrowth
+        ? String(it.productName ?? "")
+        : String(it.vendorItemName ?? it.sellerProductItemName ?? it.vendorItemPackageName ?? "");
+      const sku = isRocketGrowth
+        ? String(it.vendorItemId ?? "")
+        : String(it.externalVendorSku ?? it.vendorItemId ?? "");
+      return { title: title.trim(), sku };
+    });
   }
   return [];
 }

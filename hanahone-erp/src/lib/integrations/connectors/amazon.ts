@@ -65,7 +65,11 @@ export const amazonConnector: Connector = {
       orders.push({
         externalOrderId: order.AmazonOrderId,
         externalOrderNumber: order.AmazonOrderId,
-        rawData: order,
+        // Items live on a separate SP-API endpoint and aren't part of the
+        // order envelope; fold them in so variant backfill (and any future
+        // raw-data introspection) can recover the line-level fields without
+        // re-hitting the API.
+        rawData: { ...order, OrderItems: itemsData.payload?.OrderItems ?? [] },
         orderDate: new Date(order.PurchaseDate),
         fulfillmentStatus: mapFulfillmentStatus(rawStatus),
         financialStatus: isCancelled ? "VOIDED" : "PAID",
