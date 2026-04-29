@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -61,6 +61,15 @@ export function UnifiedShippingManager({ companyId }: { companyId: string }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadResult, setUploadResult] = useState<string | null>(null);
+  const [dispatchingId, setDispatchingId] = useState<string | null>(null);
+  const [dispatchResult, setDispatchResult] = useState<{
+    batchId: string;
+    naver: { ok: number; failed: Array<{ productOrderId: string; error: string }> };
+    coupang: { ok: number; failed: Array<{ shipmentBoxId: string; error: string }> };
+  } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchPending = useCallback(async () => {
     setLoadingPending(true);
@@ -124,6 +133,56 @@ export function UnifiedShippingManager({ companyId }: { companyId: string }) {
       else next.add(id);
       return next;
     });
+  }
+
+  async function handleUploadTracking(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadResult(null);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("companyId", companyId);
+      const res = await fetch("/api/shipping/upload", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(`송장 업로드 실패: ${data.error || res.status}`);
+        return;
+      }
+      const errCount = data.errors?.length ?? 0;
+      setUploadResult(
+        `${data.updatedCount}/${data.totalItems}건 매칭${errCount > 0 ? ` (${errCount}건 미매칭)` : ""}`,
+      );
+      await fetchBatches();
+    } catch (err: any) {
+      setError(err.message || "업로드 오류");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function handleDispatch(batchId: string) {
+    if (!confirm("이 라운드를 dispatch하시겠습니까?\n네이버 + 쿠팡 API에 송장번호를 자동 등록합니다.")) return;
+    setDispatchingId(batchId);
+    setDispatchResult(null);
+    setError(null);
+    try {
+      const res = await fetch(`/api/shipping/batch/${batchId}/dispatch`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(`Dispatch 실패: ${data.error || res.status}`);
+        return;
+      }
+      setDispatchResult({ batchId, naver: data.naver, coupang: data.coupang });
+      await Promise.all([fetchPending(), fetchBatches()]);
+    } catch (err: any) {
+      setError(err.message || "dispatch 오류");
+    } finally {
+      setDispatchingId(null);
+    }
   }
 
   async function handleStartRound() {
@@ -301,6 +360,104 @@ export function UnifiedShippingManager({ companyId }: { companyId: string }) {
         </Card>
       )}
 
+      {/* STEP 3 — 송장 회신 업로드 (PENDING 라운드 있을 때만) */}
+      {batches.some((b) => b.status === "PENDING") && (
+        <Card>
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h3 className="text-sm font-bold mb-1">3. 송장 회신 업로드</h3>
+              <p className="text-xs text-[var(--text-secondary)]">
+                CJ가 송장번호 채워서 회신한 Excel을 그대로 업로드. 라운드 ID로 자동 매칭.
+              </p>
+              {uploadResult && (
+                <p className="text-xs text-teal-600 mt-2">✓ {uploadResult}</p>
+              )}
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={handleUploadTracking}
+            />
+            <Button
+              variant="secondary"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading ? "업로드 중..." : "📤 송장 파일 선택"}
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* STEP 4 — Dispatch 결과 (실행 후 표시) */}
+      {dispatchResult && (
+        <Card>
+          <h3 className="text-sm font-bold mb-3">4. Dispatch 결과 — 라운드 {dispatchResult.batchId.slice(0, 8)}</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div
+              className={`p-3 rounded-lg border ${
+                dispatchResult.naver.failed.length === 0
+                  ? "bg-[var(--badge-teal-bg)] border-[var(--badge-teal)]/20"
+                  : dispatchResult.naver.ok === 0
+                    ? "bg-[var(--badge-red-bg)] border-[var(--badge-red)]/20"
+                    : "bg-[var(--badge-amber-bg)] border-[var(--badge-amber)]/20"
+              }`}
+            >
+              <div className="text-[11px] font-bold uppercase tracking-wider opacity-70 mb-1">네이버</div>
+              <div className="text-base font-bold">
+                {dispatchResult.naver.ok}건 성공
+                {dispatchResult.naver.failed.length > 0 && (
+                  <span className="ml-2 text-rose-600">{dispatchResult.naver.failed.length}건 실패</span>
+                )}
+              </div>
+              {dispatchResult.naver.failed.length > 0 && (
+                <details className="mt-2">
+                  <summary className="text-[11px] cursor-pointer">실패 상세</summary>
+                  <ul className="text-[11px] mt-1 ml-3">
+                    {dispatchResult.naver.failed.map((f, i) => (
+                      <li key={i} className="font-mono">
+                        {f.productOrderId}: {f.error}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
+            <div
+              className={`p-3 rounded-lg border ${
+                dispatchResult.coupang.failed.length === 0
+                  ? "bg-[var(--badge-teal-bg)] border-[var(--badge-teal)]/20"
+                  : dispatchResult.coupang.ok === 0
+                    ? "bg-[var(--badge-red-bg)] border-[var(--badge-red)]/20"
+                    : "bg-[var(--badge-amber-bg)] border-[var(--badge-amber)]/20"
+              }`}
+            >
+              <div className="text-[11px] font-bold uppercase tracking-wider opacity-70 mb-1">쿠팡</div>
+              <div className="text-base font-bold">
+                {dispatchResult.coupang.ok}건 성공
+                {dispatchResult.coupang.failed.length > 0 && (
+                  <span className="ml-2 text-rose-600">{dispatchResult.coupang.failed.length}건 실패</span>
+                )}
+              </div>
+              {dispatchResult.coupang.failed.length > 0 && (
+                <details className="mt-2">
+                  <summary className="text-[11px] cursor-pointer">실패 상세</summary>
+                  <ul className="text-[11px] mt-1 ml-3">
+                    {dispatchResult.coupang.failed.map((f, i) => (
+                      <li key={i} className="font-mono">
+                        {f.shipmentBoxId}: {f.error}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* ROUND HISTORY */}
       <div className="space-y-3">
         <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--text-tertiary)]">라운드 이력</h2>
@@ -336,8 +493,25 @@ export function UnifiedShippingManager({ companyId }: { companyId: string }) {
                       {batch._count?.items ?? batch.totalOrders}건
                       {batch.carrier && ` · ${batch.carrier}`}
                     </p>
+                    {batch.channelDispatch && (
+                      <p className="text-[10px] text-[var(--text-tertiary)] mt-0.5 font-mono">
+                        {Object.entries(batch.channelDispatch)
+                          .map(([ch, st]) => `${ch}=${st}`)
+                          .join(" · ")}
+                      </p>
+                    )}
                   </div>
                 </div>
+                {batch.status === "SHIPPED" && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => handleDispatch(batch.id)}
+                    disabled={dispatchingId === batch.id}
+                  >
+                    {dispatchingId === batch.id ? "..." : "Dispatch 실행"}
+                  </Button>
+                )}
               </div>
             ))}
           </Card>
