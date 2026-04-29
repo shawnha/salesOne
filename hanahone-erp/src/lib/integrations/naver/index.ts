@@ -10,6 +10,7 @@ async function syncNaverInventory(
 ): Promise<void> {
   const inventoryData = await fetchNaverInventory(credentials);
   const now = new Date();
+  const liveSkus = new Set(inventoryData.map((i) => i.sku));
 
   for (const item of inventoryData) {
     await prisma.externalInventory.upsert({
@@ -32,6 +33,24 @@ async function syncNaverInventory(
         externalName: item.productName,
         quantity: item.quantity,
         lastSyncAt: now,
+      },
+    });
+  }
+
+  // Drop rows for products that disappeared from Naver (e.g. seller deleted
+  // them in 스마트스토어센터). Without this, stale rows linger as fake
+  // inventory forever — the upsert above never touches them.
+  const existing = await prisma.externalInventory.findMany({
+    where: { companyId, platform: "NAVER" },
+    select: { externalSku: true },
+  });
+  const stale = existing.filter((e) => !liveSkus.has(e.externalSku)).map((e) => e.externalSku);
+  if (stale.length > 0) {
+    await prisma.externalInventory.deleteMany({
+      where: {
+        companyId,
+        platform: "NAVER",
+        externalSku: { in: stale },
       },
     });
   }
