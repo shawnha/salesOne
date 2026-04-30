@@ -2,11 +2,24 @@
  * Seed BOM data for HOK manufacturing.
  * HOK manufactures ODD M-01 products in different pack sizes.
  * BOM: Each pack uses N units of base material (ODD M-01 단위).
- * Also creates sample production orders.
+ *
+ * Incremental: only adds BOM rows for pack products that have NO BOM
+ * entries today. Existing rows are left alone — including hand-curated
+ * mappings via /api/inventory/bom that this script doesn't know about.
+ *
+ * Pass --force to wipe HOK BOMs before re-seeding (the original
+ * destructive behavior). Use only when you intend to discard manual
+ * edits.
+ *
+ * Pass --apply to commit. Default is dry run.
+ *
+ * Also seeds sample production orders the first time it's run for HOK.
  */
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
+const APPLY = process.argv.includes("--apply");
+const FORCE = process.argv.includes("--force");
 
 // Pack sizes extracted from product names
 const PACK_SIZES: Record<string, number> = {
@@ -35,16 +48,39 @@ async function main() {
   const baseProduct = products.find(p => p.sku === "ODD-M01-5");
   if (!baseProduct) throw new Error("Base product ODD-M01-5 not found");
 
-  // Clear existing BOMs
-  await prisma.billOfMaterials.deleteMany({ where: { companyId: hok.id } });
+  if (FORCE) {
+    if (APPLY) {
+      const deleted = await prisma.billOfMaterials.deleteMany({ where: { companyId: hok.id } });
+      console.log(`[force] cleared ${deleted.count} existing HOK BOM rows`);
+    } else {
+      const count = await prisma.billOfMaterials.count({ where: { companyId: hok.id } });
+      console.log(`[dry·force] would clear ${count} existing HOK BOM rows`);
+    }
+  }
+
+  // Determine which products already have BOM entries; skip them in
+  // incremental mode so hand-curated rows survive reruns.
+  const existingFinishedIds = new Set(
+    (
+      await prisma.billOfMaterials.findMany({
+        where: { companyId: hok.id },
+        select: { finishedProductId: true },
+      })
+    ).map((b) => b.finishedProductId),
+  );
 
   // Create BOMs: each pack size consumes (packSize / 5) units of base product
   // e.g. 30개입 = 6x base (5개입), 110개입 = 22x base
   const bomData: any[] = [];
+  let skipped = 0;
   for (const product of products) {
     if (product.sku === baseProduct.sku) continue; // Skip self
     const packSize = PACK_SIZES[product.sku];
     if (!packSize) continue;
+    if (!FORCE && existingFinishedIds.has(product.id)) {
+      skipped++;
+      continue;
+    }
     const baseUnitsNeeded = packSize / 5;
     bomData.push({
       companyId: hok.id,
@@ -55,12 +91,18 @@ async function main() {
   }
 
   if (bomData.length > 0) {
-    await prisma.billOfMaterials.createMany({ data: bomData });
-    console.log(`Created ${bomData.length} BOM records`);
+    if (APPLY) {
+      await prisma.billOfMaterials.createMany({ data: bomData });
+      console.log(`Created ${bomData.length} BOM records (skipped ${skipped} already-present)`);
+    } else {
+      console.log(`[dry] would create ${bomData.length} BOM records (skipped ${skipped} already-present)`);
+    }
     for (const bom of bomData) {
       const prod = products.find(p => p.id === bom.finishedProductId);
       console.log(`  ${prod?.name} → ${bom.quantityRequired}x ${baseProduct.name}`);
     }
+  } else {
+    console.log(`No new BOMs to seed (skipped ${skipped} already-present)`);
   }
 
   // Create sample production orders
@@ -90,11 +132,19 @@ async function main() {
     });
 
     if (orders.length > 0) {
-      await prisma.productionOrder.createMany({ data: orders });
-      console.log(`Created ${orders.length} production orders`);
+      if (APPLY) {
+        await prisma.productionOrder.createMany({ data: orders });
+        console.log(`Created ${orders.length} production orders`);
+      } else {
+        console.log(`[dry] would create ${orders.length} production orders`);
+      }
     }
   } else {
     console.log(`Skipped production orders (${existingOrders} already exist)`);
+  }
+
+  if (!APPLY) {
+    console.log("\nDry run. Pass --apply to commit. Pass --force to wipe existing BOMs first.");
   }
 }
 
