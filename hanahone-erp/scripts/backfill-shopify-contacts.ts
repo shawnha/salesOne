@@ -1,6 +1,10 @@
 /**
- * One-time backfill: populate Customer.contactInfo.phone from existing Shopify order rawData.
- * Extracts phone from customer, billing_address, or shipping_address.
+ * SUPERSEDED by scripts/backfill-customer-contacts.ts (channel-agnostic,
+ * also covers zip / address / Naver naverId). This file is kept for
+ * archival reference and is no longer invoked.
+ *
+ * Original purpose: populate Customer.contactInfo.phone from Shopify
+ * order rawData (customer / billing_address / shipping_address).
  */
 import { PrismaClient } from "@prisma/client";
 

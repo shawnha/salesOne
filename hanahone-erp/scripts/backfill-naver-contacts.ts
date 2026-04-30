@@ -1,6 +1,11 @@
 /**
- * One-time backfill: populate Customer.contactInfo from existing Naver order rawData.
- * Extracts phone, address, zipCode, naverId from stored API responses.
+ * SUPERSEDED by scripts/backfill-customer-contacts.ts (channel-agnostic,
+ * pulls Naver zipCode + naverId from rawData when Order columns are
+ * empty). This file is kept for archival reference and is no longer
+ * invoked.
+ *
+ * Original purpose: populate Customer.contactInfo.phone/address/zip/naverId
+ * from Naver order rawData (order.ordererTel, productOrder.shippingAddress).
  */
 import { PrismaClient } from "@prisma/client";
 
