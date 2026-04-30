@@ -40,7 +40,7 @@ export default async function OrdersPage({
     where.type = searchParams.type;
   } else {
     // Exclude seeding and gifts from default view
-    where.type = { notIn: ["SEEDING", "GIFT", "INTER_COMPANY"] };
+    where.type = { notIn: ["SEEDING", "GIFT", "REVIEW", "INTER_COMPANY"] };
   }
   applyChannelFilter(where, searchParams.channel);
   if (searchParams.q) {
@@ -114,10 +114,13 @@ export default async function OrdersPage({
   if (searchParams.company) baseFilter.companyId = searchParams.company;
   const showSeedingGiftCards = !searchParams.type;
 
-  const [seedingCount, giftCount, normalOrderCount] = await Promise.all([
+  const [seedingCount, giftCount, reviewCount, normalOrderCount] = await Promise.all([
     prisma.order.count({ where: { ...baseFilter, type: "SEEDING" } }),
     prisma.order.count({ where: { ...baseFilter, type: "GIFT" } }),
-    prisma.order.count({ where: { ...baseFilter, type: { notIn: ["SEEDING", "GIFT", "INTER_COMPANY"] } } }),
+    prisma.order.count({ where: { ...baseFilter, type: "REVIEW" } }),
+    prisma.order.count({
+      where: { ...baseFilter, type: { notIn: ["SEEDING", "GIFT", "REVIEW", "INTER_COMPANY"] } },
+    }),
   ]);
 
   const [recentSeeding, recentGifts] = showSeedingGiftCards
@@ -266,7 +269,12 @@ export default async function OrdersPage({
           )}
         </div>
       </div>
-      <TypeTabs orderCount={normalOrderCount} seedingCount={seedingCount} giftCount={giftCount} />
+      <TypeTabs
+        orderCount={normalOrderCount}
+        seedingCount={seedingCount}
+        giftCount={giftCount}
+        reviewCount={reviewCount}
+      />
       {/* Orders Line Chart + Top Customers */}
       <div className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-4">
         <Card className="p-5">

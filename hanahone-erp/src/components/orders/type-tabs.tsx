@@ -5,9 +5,10 @@ interface TypeTabsProps {
   orderCount: number;
   seedingCount: number;
   giftCount: number;
+  reviewCount: number;
 }
 
-export function TypeTabs({ orderCount, seedingCount, giftCount }: TypeTabsProps) {
+export function TypeTabs({ orderCount, seedingCount, giftCount, reviewCount }: TypeTabsProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -28,6 +29,7 @@ export function TypeTabs({ orderCount, seedingCount, giftCount }: TypeTabsProps)
     { type: "", label: "Orders", count: orderCount, activeClass: "bg-[var(--accent)] text-white" },
     { type: "SEEDING", label: "Seeding", count: seedingCount, activeClass: "bg-violet-500 text-white" },
     { type: "GIFT", label: "Gifted", count: giftCount, activeClass: "bg-rose-400 text-white" },
+    { type: "REVIEW", label: "지인 리뷰", count: reviewCount, activeClass: "bg-cyan-600 text-white" },
   ];
 
   return (
