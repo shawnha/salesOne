@@ -355,27 +355,6 @@ function mapOrdersheet(sheet: CoupangOrdersheet): ExternalOrderData {
 
   const totalAmount = items.reduce((sum, it) => sum + it.unitPrice * it.quantity, 0);
 
-  // Refund amount derivation. Coupang's marketplace API doesn't expose a
-  // single "refunded amount" field — instead it signals refunds via:
-  //   1. Order status = CANCEL or RETURNS → entire order refunded.
-  //   2. Per-item `cancelCount` > 0 with order still active → partial refund
-  //      (some units of a multi-qty line cancelled).
-  // Without this, an order's financialStatus flips to REFUNDED on full
-  // cancel but refundAmount stays null, so netAmount keeps showing the
-  // full total and Sales/Dashboard double-count revenue.
-  let refundAmount: number | undefined;
-  if (financial === "REFUNDED") {
-    refundAmount = totalAmount;
-  } else {
-    const partial = (sheet.orderItems || []).reduce((sum, it) => {
-      const cancelled = Number(it.cancelCount || 0);
-      if (cancelled <= 0) return sum;
-      const unit = Number(it.salesPrice || it.orderPrice || 0);
-      return sum + unit * cancelled;
-    }, 0);
-    if (partial > 0) refundAmount = partial;
-  }
-
   const addr = sheet.receiver;
   // Address as the street portion only — zip is surfaced via recipientZip so
   // the mapper stores it in customer.contactInfo.zip alongside Naver orders.
@@ -391,7 +370,6 @@ function mapOrdersheet(sheet: CoupangOrdersheet): ExternalOrderData {
     fulfillmentStatus: fulfillment,
     financialStatus: financial,
     totalAmount,
-    refundAmount,
     customerName: sheet.orderer?.name,
     customerEmail: sheet.orderer?.email,
     // Prefer real number if Coupang exposed one (some sheets do, most are 0504/0502 virtual).

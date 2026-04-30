@@ -2,17 +2,16 @@
  * Order detail edit endpoint.
  *
  * PATCH /api/orders/{id}
- *   body: {
- *     type?: OrderType                      // SALE | SEEDING | GIFT | REVIEW
- *     financialAction?: "REVERT_REFUND"     // undo a refund (REFUNDED → PAID)
- *   }
+ *   body: { type?: OrderType }
  *
- * Refunds and fulfillment edits otherwise live in the sync layer; this
- * endpoint only handles the operator-driven actions exposed in the UI.
+ * Currently only handles classification changes (e.g. tagging a Coupang
+ * order as REVIEW for 지인 리뷰 작업, or reverting to SALE). Refunds and
+ * fulfillment edits live elsewhere — this endpoint stays narrow on
+ * purpose so it's safe to call from the detail page action menu.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { OrderType, Prisma } from "@prisma/client";
+import { OrderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireCompanyAccess } from "@/lib/api-guard";
 
@@ -24,20 +23,12 @@ const ALLOWED_TYPES = ["SALE", "SEEDING", "GIFT", "REVIEW"] as const satisfies r
 
 const PatchSchema = z.object({
   type: z.enum(ALLOWED_TYPES).optional(),
-  financialAction: z.enum(["REVERT_REFUND"]).optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const order = await prisma.order.findUnique({
     where: { id: params.id },
-    select: {
-      id: true,
-      companyId: true,
-      type: true,
-      totalAmount: true,
-      refundAmount: true,
-      financialStatus: true,
-    },
+    select: { id: true, companyId: true, type: true },
   });
   if (!order) {
     return NextResponse.json({ error: "주문을 찾을 수 없습니다" }, { status: 404 });
@@ -54,52 +45,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     );
   }
 
-  const { type, financialAction } = parsed.data;
-  if (!type && !financialAction) {
+  const { type } = parsed.data;
+  if (!type) {
     return NextResponse.json({ error: "변경할 필드가 없습니다" }, { status: 400 });
-  }
-
-  const data: Prisma.OrderUpdateInput = {};
-  if (type) data.type = type;
-
-  if (financialAction === "REVERT_REFUND") {
-    if (order.financialStatus !== "REFUNDED") {
-      return NextResponse.json(
-        { error: "환불 상태가 아닌 주문은 번복할 수 없습니다" },
-        { status: 409 },
-      );
-    }
-
-    // Undo any inventory restore that was issued when the order flipped to
-    // REFUNDED. inventory-deduction.ts records "restore:{orderId}:item:*"
-    // adjustments that added stock back; reverse them so the post-revert
-    // inventory matches PAID state. The original "order:{orderId}:item:*"
-    // SALE adjustment is left in place — its quantityChange is still
-    // accurate because the SKU was sold once and never un-sold.
-    const restoreAdjs = await prisma.inventoryAdjustment.findMany({
-      where: { referenceId: { startsWith: `restore:${params.id}:` } },
-      select: { id: true, inventoryId: true, quantityChange: true },
-    });
-    for (const adj of restoreAdjs) {
-      const inv = await prisma.inventory.findUnique({ where: { id: adj.inventoryId } });
-      if (inv) {
-        await prisma.inventory.update({
-          where: { id: inv.id },
-          data: { quantity: inv.quantity - adj.quantityChange },
-        });
-      }
-      await prisma.inventoryAdjustment.delete({ where: { id: adj.id } });
-    }
-
-    data.financialStatus = "PAID";
-    data.refundAmount = null;
-    data.netAmount = order.totalAmount;
   }
 
   const updated = await prisma.order.update({
     where: { id: params.id },
-    data,
-    select: { id: true, type: true, financialStatus: true, refundAmount: true, netAmount: true },
+    data: { type },
+    select: { id: true, type: true },
   });
 
   return NextResponse.json({ success: true, order: updated });
