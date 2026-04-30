@@ -9,6 +9,7 @@ Each company has a primary currency and a secondary currency shown below it.
 | **HOI** | USD ($) | KRW (₩) |
 | **HOK** | KRW (₩) | USD ($) |
 | **HOR** | KRW (₩) | USD ($) |
+| **HOW** | KRW (₩) | USD ($) |
 | **Group** | USD ($) | KRW (₩) |
 
 This applies to every page that shows monetary values: Dashboard, Sales, Orders, Products, Inventory, Reconciliation, Shipping, Reports, etc.
@@ -40,6 +41,7 @@ main();
 | HOI | `69b44456-1369-4892-8a41-6760a8b13412` | USD (KRW 보조) |
 | HOK | `5f8b00b1-c358-4ccd-9c1c-7ca37ce99c87` | KRW (USD 보조) |
 | HOR | `4623876c-9537-445d-a896-c26783c43ce4` | KRW (USD 보조) |
+| HOW | `1e9dae9b-5bcb-40ed-b551-cf541a4b2a99` | KRW (USD 보조) — HOK 100% 자회사, 도매 |
 
 ### 주요 모델
 
