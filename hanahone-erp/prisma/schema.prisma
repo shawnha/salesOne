@@ -324,6 +324,12 @@ model Order {
   trackingCarrier       String?   @map("tracking_carrier")
   // Channel fulfillment mode (e.g. Coupang THIRD_PARTY vs ROCKET_GROWTH).
   shipmentType          String?   @map("shipment_type")
+  // For type=REVIEW orders: when we sent the friend their refund (out-of-band,
+  // typically via bank transfer or Coupang Wing). NULL = pending refund. The
+  // refund itself doesn't change financialStatus / refundAmount — REVIEW orders
+  // remain real revenue (real money received from the channel) and are counted
+  // as such in /sales /dashboard /reports.
+  reviewRefundedAt      DateTime? @map("review_refunded_at")
 
   items     OrderItem[]
   transfer  InterCompanyTransfer?

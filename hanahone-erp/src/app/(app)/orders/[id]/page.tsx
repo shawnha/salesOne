@@ -8,6 +8,7 @@ import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 import { OrderStatusChanger } from "@/components/orders/OrderStatusChanger";
 import { OrderTypeChanger } from "@/components/orders/OrderTypeChanger";
 import { RefundRevertButton } from "@/components/orders/RefundRevertButton";
+import { ReviewRefundToggle } from "@/components/orders/ReviewRefundToggle";
 import { categorize, CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/product-category";
 import { getTrackingUrl } from "@/lib/tracking-url";
 
@@ -292,6 +293,16 @@ export default async function OrderDetailPage({
                 <RefundRevertButton orderId={order.id} financialStatus={order.financialStatus} />
               </div>
             </div>
+            {order.type === "REVIEW" && (
+              <div className="flex justify-between items-center gap-2">
+                <span className="text-[var(--text-secondary)]">지인 환급</span>
+                <ReviewRefundToggle
+                  orderId={order.id}
+                  type={order.type}
+                  reviewRefundedAt={order.reviewRefundedAt?.toISOString() ?? null}
+                />
+              </div>
+            )}
             <div className="border-t border-[var(--border)] my-2" />
             <OrderStatusChanger
               orderId={order.id}
