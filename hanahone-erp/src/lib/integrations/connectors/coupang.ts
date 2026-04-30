@@ -79,7 +79,22 @@ async function coupangFetch<T>(
 
 /**
  * Map Coupang ordersheet status → (fulfillment, financial).
+ *
  * Coupang lifecycle: ACCEPT → INSTRUCT → DEPARTURE → DELIVERING → FINAL_DELIVERY
+ *
+ * Status semantics:
+ *   - ACCEPT / INSTRUCT  : 결제 완료, 출고 전 → UNFULFILLED
+ *   - DEPARTURE          : 송장 등록 + 택배사 인계 완료 → FULFILLED ("발송됨")
+ *   - DELIVERING         : 배송 중 → FULFILLED
+ *   - NONE_TRACKING      : 택배사 추적 불가 (운송장 등록은 완료) → FULFILLED
+ *   - FINAL_DELIVERY     : 수령 완료 → DELIVERED
+ *   - CANCEL / RETURNS   : 취소/반품 → CANCELLED + REFUNDED
+ *
+ * Previously DEPARTURE/DELIVERING/NONE_TRACKING were mapped to
+ * PARTIALLY_FULFILLED, which is wrong at the order level (it implies "some
+ * line items shipped, others not" — Coupang's order-level statuses don't
+ * mean that). The miscoded status kept already-shipped orders in the
+ * /shipping pending list (which filters UNFULFILLED + PARTIALLY_FULFILLED).
  */
 function mapCoupangStatus(status: string): { fulfillment: string; financial: string } {
   switch ((status || "").toUpperCase()) {
@@ -89,7 +104,7 @@ function mapCoupangStatus(status: string): { fulfillment: string; financial: str
     case "DEPARTURE":
     case "DELIVERING":
     case "NONE_TRACKING":
-      return { fulfillment: "PARTIALLY_FULFILLED", financial: "PAID" };
+      return { fulfillment: "FULFILLED", financial: "PAID" };
     case "FINAL_DELIVERY":
       return { fulfillment: "DELIVERED", financial: "PAID" };
     case "CANCEL":

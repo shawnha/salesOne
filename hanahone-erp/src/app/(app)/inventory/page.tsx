@@ -116,7 +116,7 @@ export default async function InventoryPage({
   for (const item of recentSales) {
     const orderType = item.order.type;
     // Count towards burn rate only for revenue-bearing orders.
-    const isRevenue = orderType === "SALE" || orderType === "BROKERAGE";
+    const isRevenue = orderType === "SALE" || orderType === "BROKERAGE" || orderType === "REVIEW";
     if (isRevenue) {
       if (item.productId) {
         salesByProduct.set(item.productId, (salesByProduct.get(item.productId) || 0) + item.quantity);

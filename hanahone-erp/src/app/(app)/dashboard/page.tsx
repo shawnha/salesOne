@@ -83,7 +83,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
     where: {
       order: {
         ...companyFilter,
-        type: { in: ["SALE", "BROKERAGE"] },
+        type: { in: ["SALE", "BROKERAGE", "REVIEW"] },
         orderDate: { gte: thirtyDaysAgo },
       },
     },
@@ -109,8 +109,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
   const inventoryValue = filteredInventory.reduce((sum, inv) => sum + inv.quantity * Number(inv.product.costPrice), 0)
     + cgetcProducts.reduce((sum, p) => sum + p.quantity * 0, 0); // CGETC products have no costPrice yet
 
-  const revenueTypes = { in: ["SALE", "BROKERAGE"] as any };
-  const nonRevenueTypes = { notIn: ["SEEDING", "GIFT", "REVIEW", "INTER_COMPANY"] as any };
+  // REVIEW intentionally counted as revenue — friend-review orders received
+  // real money from the channel; the post-sale refund to the buyer happens
+  // out of band (bank transfer) and is tracked separately via Order.reviewRefundedAt.
+  const revenueTypes = { in: ["SALE", "BROKERAGE", "REVIEW"] as any };
+  const nonRevenueTypes = { notIn: ["SEEDING", "GIFT", "INTER_COMPANY"] as any };
   const orderFilter = { ...companyFilter, ...dateFilter, type: nonRevenueTypes };
   const [salesOrders, totalOrderCount, fulfilledCount, pendingCount, seedingCount, giftCount, latestSyncs, exchangeRate] = await Promise.all([
     prisma.order.findMany({
@@ -147,7 +150,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
   const companyOrdersForBreakdown = await Promise.all(
     companies.map((c) =>
       prisma.order.findMany({
-        where: { companyId: c.id, ...dateFilter, type: { in: ["SALE", "BROKERAGE"] } },
+        where: { companyId: c.id, ...dateFilter, type: { in: ["SALE", "BROKERAGE", "REVIEW"] } },
         select: { totalAmount: true, externalSource: true, orderDate: true },
       }),
     ),
