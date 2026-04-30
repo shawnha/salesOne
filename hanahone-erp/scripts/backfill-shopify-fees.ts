@@ -1,10 +1,20 @@
 /**
- * One-time backfill for Shopify order fees.
+ * Backfill for Shopify order fees.
  *
- * Calls the Shopify Admin GraphQL API for every Shopify-sourced order that
- * doesn't have commissionAmount yet, and writes the fee (plus derived
- * settlementAmount) back to the Order row so Sales > Fees KPI + Recon can
- * surface HOI Shopify margin alongside Naver.
+ * Two modes:
+ *   default       — orders missing commissionAmount (initial backfill).
+ *   --refunded    — orders WITH refundAmount > 0, regardless of whether
+ *                   commissionAmount is already set. Use when refunds were
+ *                   recorded before sync-runner's refund-driven re-fetch was
+ *                   in place; the original commission is stale because
+ *                   Shopify Payments returns part of the processing fee on
+ *                   refund. Live syncs (post-fe5bb7d) handle this going
+ *                   forward via refundChanged in sync-runner.
+ *   --all         — every mapped Shopify order (forces full recomputation;
+ *                   only use after a connector change to fee parsing).
+ *
+ * Calls the Shopify Admin GraphQL API and writes fee + derived
+ * settlementAmount back to the Order row.
  *
  * Dry run by default. Pass --apply to commit.
  *
@@ -18,6 +28,8 @@ import { fetchShopifyOrderFees } from "../src/lib/integrations/connectors/shopif
 import { decrypt } from "../src/lib/integrations/encryption";
 
 const APPLY = process.argv.includes("--apply");
+const MODE_REFUNDED = process.argv.includes("--refunded");
+const MODE_ALL = process.argv.includes("--all");
 
 async function main() {
   // One HOI-side Shopify integration assumed; widen if there are multiple.
@@ -31,12 +43,18 @@ async function main() {
 
   const credentials = JSON.parse(decrypt(config.credentials as string));
 
-  // Only backfill orders that were mapped from Shopify and lack a commission.
+  const mappedOrderFilter = MODE_ALL
+    ? {} // every mapped order
+    : MODE_REFUNDED
+      ? { refundAmount: { not: null, gt: 0 } }
+      : { commissionAmount: null };
+
+  const mode = MODE_ALL ? "all" : MODE_REFUNDED ? "refunded" : "missing-commission";
   const exts = await prisma.externalOrder.findMany({
     where: {
       platform: "SHOPIFY",
       mappedOrderId: { not: null },
-      mappedOrder: { commissionAmount: null },
+      mappedOrder: mappedOrderFilter,
     },
     select: {
       externalOrderId: true,
@@ -47,12 +65,14 @@ async function main() {
           totalAmount: true,
           refundAmount: true,
           netAmount: true,
+          commissionAmount: true,
+          settlementAmount: true,
         },
       },
     },
   });
 
-  console.log(`[shopify-fees] candidates: ${exts.length}`);
+  console.log(`[shopify-fees] mode=${mode} candidates: ${exts.length}`);
 
   let ok = 0;
   let noFees = 0;
@@ -82,6 +102,23 @@ async function main() {
       const refundAmount = Number(order.refundAmount ?? 0);
       // If GraphQL returns a derived net, use it; otherwise compute.
       const settlement = net ?? totalAmount - refundAmount - fee;
+      const oldCommission = order.commissionAmount === null ? null : Number(order.commissionAmount);
+      const oldSettlement = order.settlementAmount === null ? null : Number(order.settlementAmount);
+      const unchanged =
+        oldCommission !== null &&
+        oldSettlement !== null &&
+        Math.abs(oldCommission - fee) < 0.005 &&
+        Math.abs(oldSettlement - settlement) < 0.005;
+
+      if (unchanged) {
+        if (!APPLY) {
+          console.log(
+            `  [dry·noop] ${order.orderNumber} fee=${fee} settlement=${settlement.toFixed(2)} (matches DB)`,
+          );
+        }
+        await sleep(250);
+        continue;
+      }
 
       if (APPLY) {
         await prisma.order.update({
@@ -92,8 +129,12 @@ async function main() {
           },
         });
       } else {
+        const delta =
+          oldCommission !== null
+            ? ` (was fee=${oldCommission.toFixed(2)} settlement=${(oldSettlement ?? 0).toFixed(2)})`
+            : "";
         console.log(
-          `  [dry] ${order.orderNumber} total=${totalAmount} refund=${refundAmount} fee=${fee} → settlement=${settlement.toFixed(2)}`,
+          `  [dry] ${order.orderNumber} total=${totalAmount} refund=${refundAmount} fee=${fee} → settlement=${settlement.toFixed(2)}${delta}`,
         );
       }
       ok++;
