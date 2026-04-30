@@ -108,6 +108,8 @@ enum OrderType {
   INTER_COMPANY
   SEEDING
   GIFT
+  /// 지인 리뷰 작업용 주문 — 풀 결제 후 우리가 사후에 환급. 정상 매출에서 제외.
+  REVIEW
 
   @@schema("salesone")
 }

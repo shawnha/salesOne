@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 
 export type ChannelSales = Partial<Record<
-  "SHOPIFY" | "AMAZON" | "TIKTOK" | "NAVER" | "COUPANG" | "PHARMACY" | "CGETC" | "GONGGU" | "SEEDING" | "GIFT" | "MANUAL",
+  "SHOPIFY" | "AMAZON" | "TIKTOK" | "NAVER" | "COUPANG" | "PHARMACY" | "CGETC" | "GONGGU" | "SEEDING" | "GIFT" | "REVIEW" | "MANUAL",
   number
 >>;
 
@@ -30,6 +30,7 @@ const CHANNEL_LABELS: Record<string, string> = {
   GONGGU: "공구",
   SEEDING: "Seeding",
   GIFT: "Gift",
+  REVIEW: "지인 리뷰",
   MANUAL: "Manual",
 };
 
@@ -44,6 +45,7 @@ const CHANNEL_COLORS: Record<string, string> = {
   GONGGU: "text-rose-600 bg-rose-600/[0.08]",
   SEEDING: "text-violet-600 bg-violet-600/[0.08]",
   GIFT: "text-amber-600 bg-amber-600/[0.08]",
+  REVIEW: "text-cyan-600 bg-cyan-600/[0.08]",
   MANUAL: "text-slate-500 bg-slate-500/[0.08]",
 };
 
