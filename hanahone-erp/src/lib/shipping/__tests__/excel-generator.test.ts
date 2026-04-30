@@ -187,17 +187,18 @@ describe("generatePurchaseOrderExcel", () => {
     // styles on write, leaving a colorless purchase order. exceljs
     // preserves the yellow header fill from the template.
     const buf = await generatePurchaseOrderExcel([sampleOrder]);
-    const ExcelJS = (await import("exceljs")).default;
-    const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(buf);
+    const ExcelJSMod = (await import("exceljs")).default;
+    const wb = new ExcelJSMod.Workbook();
+    await wb.xlsx.load(
+      buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer,
+    );
     const ws = wb.getWorksheet("1차")!;
     // Column D = 4 (번호); should have yellow fill
     const headerCell = ws.getCell(1, 4);
-    const fill = headerCell.fill as ExcelJS.FillPattern | undefined;
+    const fill = headerCell.fill as { type?: string; pattern?: string; fgColor?: { argb?: string } } | undefined;
     expect(fill?.type).toBe("pattern");
     expect(fill?.pattern).toBe("solid");
-    const fg = fill?.fgColor as { argb?: string } | undefined;
-    expect(fg?.argb?.toUpperCase()).toMatch(/F{0,2}FFFF00/);
+    expect(fill?.fgColor?.argb?.toUpperCase()).toMatch(/F{0,2}FFFF00/);
   });
 });
 

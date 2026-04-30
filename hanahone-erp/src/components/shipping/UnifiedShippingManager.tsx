@@ -172,6 +172,27 @@ export function UnifiedShippingManager({ companyId }: { companyId: string }) {
     }
   }
 
+  async function handleDeleteBatch(batchId: string) {
+    if (
+      !confirm(
+        "이 라운드를 삭제하시겠습니까?\n주문들이 미발송 목록으로 돌아갑니다. (작성 중 라운드만 삭제 가능)",
+      )
+    )
+      return;
+    setError(null);
+    try {
+      const res = await fetch(`/api/shipping/batch/${batchId}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(`라운드 삭제 실패: ${data.error || res.status}`);
+        return;
+      }
+      await Promise.all([fetchPending(), fetchBatches()]);
+    } catch (err: any) {
+      setError(err.message || "삭제 오류");
+    }
+  }
+
   async function handleResync() {
     if (syncing) return;
     setSyncing(true);
@@ -578,16 +599,27 @@ export function UnifiedShippingManager({ companyId }: { companyId: string }) {
                     )}
                   </div>
                 </div>
-                {batch.status === "SHIPPED" && (
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => handleDispatch(batch.id)}
-                    disabled={dispatchingId === batch.id}
-                  >
-                    {dispatchingId === batch.id ? "..." : "Dispatch 실행"}
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {batch.status === "SHIPPED" && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => handleDispatch(batch.id)}
+                      disabled={dispatchingId === batch.id}
+                    >
+                      {dispatchingId === batch.id ? "..." : "Dispatch 실행"}
+                    </Button>
+                  )}
+                  {batch.status === "PENDING" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteBatch(batch.id)}
+                    >
+                      삭제
+                    </Button>
+                  )}
+                </div>
               </div>
             ))}
           </Card>
