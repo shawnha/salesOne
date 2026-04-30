@@ -30,6 +30,7 @@ interface PendingResponse {
   byChannel: { NAVER: PendingOrder[]; COUPANG: PendingOrder[] };
   excludedRocketGrowth: number;
   inFlightCount: number;
+  range: { from: string | null; to: string | null };
 }
 
 interface ShippingBatch {
@@ -69,13 +70,18 @@ export function UnifiedShippingManager({ companyId }: { companyId: string }) {
     naver: { ok: number; failed: Array<{ productOrderId: string; error: string }> };
     coupang: { ok: number; failed: Array<{ shipmentBoxId: string; error: string }> };
   } | null>(null);
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchPending = useCallback(async () => {
     setLoadingPending(true);
     setError(null);
     try {
-      const res = await fetch(`/api/shipping/pending-orders?companyId=${companyId}`);
+      const params = new URLSearchParams({ companyId });
+      if (dateFrom) params.set("from", dateFrom);
+      if (dateTo) params.set("to", dateTo);
+      const res = await fetch(`/api/shipping/pending-orders?${params.toString()}`);
       if (!res.ok) {
         setError("미발송 주문 조회 실패");
         return;
@@ -87,7 +93,7 @@ export function UnifiedShippingManager({ companyId }: { companyId: string }) {
     } finally {
       setLoadingPending(false);
     }
-  }, [companyId]);
+  }, [companyId, dateFrom, dateTo]);
 
   const fetchBatches = useCallback(async () => {
     setLoadingBatches(true);
@@ -244,14 +250,16 @@ export function UnifiedShippingManager({ companyId }: { companyId: string }) {
       {/* HERO — 1 hero rule */}
       <Card className="!p-7">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
-          {new Date().toLocaleDateString("ko-KR")} · 발송 라운드
+          {dateFrom || dateTo
+            ? `주문일 ${dateFrom || "처음"} ~ ${dateTo || "오늘"} · 발송 라운드`
+            : `전체 미발송 · 발송 라운드`}
         </p>
         <h1 className="text-3xl font-extrabold tracking-tight mt-1.5">
           {loadingPending ? (
             <span className="text-[var(--text-tertiary)]">불러오는 중...</span>
           ) : pending ? (
             <>
-              오늘 발송 <span className="text-accent">{pending.total}건</span>
+              발송 대기 <span className="text-accent">{pending.total}건</span>
             </>
           ) : (
             "—"
@@ -283,7 +291,7 @@ export function UnifiedShippingManager({ companyId }: { companyId: string }) {
             )}
           </p>
         )}
-        <div className="flex gap-3 mt-5 flex-wrap">
+        <div className="flex items-end gap-3 mt-5 flex-wrap">
           <Button
             variant="primary"
             onClick={handleStartRound}
@@ -294,6 +302,39 @@ export function UnifiedShippingManager({ companyId }: { companyId: string }) {
           <Button variant="secondary" onClick={() => fetchPending()}>
             새로고침
           </Button>
+
+          <div className="ml-auto flex items-end gap-2 flex-wrap">
+            <label className="flex flex-col text-[10px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+              주문일 시작
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="mt-1 px-3 py-1.5 rounded-lg bg-[var(--surface)] border border-[var(--border)] text-sm font-normal normal-case tracking-normal text-[var(--text)] focus:outline-none focus:border-accent"
+              />
+            </label>
+            <label className="flex flex-col text-[10px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+              주문일 끝
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="mt-1 px-3 py-1.5 rounded-lg bg-[var(--surface)] border border-[var(--border)] text-sm font-normal normal-case tracking-normal text-[var(--text)] focus:outline-none focus:border-accent"
+              />
+            </label>
+            {(dateFrom || dateTo) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setDateFrom("");
+                  setDateTo("");
+                }}
+              >
+                초기화
+              </Button>
+            )}
+          </div>
         </div>
       </Card>
 
