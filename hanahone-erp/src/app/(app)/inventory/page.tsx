@@ -130,7 +130,6 @@ export default async function InventoryPage({
     let channel: string = item.order.externalSource || "MANUAL";
     if (orderType === "SEEDING") channel = "SEEDING";
     else if (orderType === "GIFT") channel = "GIFT";
-    else if (orderType === "REVIEW") channel = "REVIEW";
     else if (channel === "NAVER" && item.order.notes === "공구") channel = "GONGGU";
     else if (channel === "CGETC" && item.order.notes?.toLowerCase().startsWith("free gifting")) channel = "SEEDING";
 
@@ -150,7 +149,7 @@ export default async function InventoryPage({
     // Skip non-channel sources (internal/manual) and aux order types (SEEDING/GIFT/TRANSFER)
     // since those surface elsewhere.
     const src = item.order.externalSource;
-    if (src && orderType !== "SEEDING" && orderType !== "GIFT" && orderType !== "REVIEW" && orderType !== "INTER_COMPANY") {
+    if (src && orderType !== "SEEDING" && orderType !== "GIFT" && orderType !== "INTER_COMPANY") {
       const variantName = (item.externalVariantName || item.product?.name || "").trim();
       if (variantName) {
         const variantSku = item.externalVariantSku?.trim() || null;

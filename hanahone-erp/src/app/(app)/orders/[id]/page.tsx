@@ -6,7 +6,6 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 import { OrderStatusChanger } from "@/components/orders/OrderStatusChanger";
-import { OrderTypeChanger } from "@/components/orders/OrderTypeChanger";
 import { categorize, CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/product-category";
 import { getTrackingUrl } from "@/lib/tracking-url";
 
@@ -189,9 +188,9 @@ export default async function OrderDetailPage({
               <span className="text-[var(--text-secondary)]">Company</span>
               <span className="font-semibold">{order.company.name}</span>
             </div>
-            <div className="flex justify-between items-center gap-2">
+            <div className="flex justify-between">
               <span className="text-[var(--text-secondary)]">Type</span>
-              <OrderTypeChanger orderId={order.id} currentType={order.type} />
+              <Badge status={order.type} />
             </div>
             {order.externalSource && (
               <div className="flex justify-between">

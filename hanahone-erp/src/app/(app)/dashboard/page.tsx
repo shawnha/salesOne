@@ -110,7 +110,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
     + cgetcProducts.reduce((sum, p) => sum + p.quantity * 0, 0); // CGETC products have no costPrice yet
 
   const revenueTypes = { in: ["SALE", "BROKERAGE"] as any };
-  const nonRevenueTypes = { notIn: ["SEEDING", "GIFT", "REVIEW", "INTER_COMPANY"] as any };
+  const nonRevenueTypes = { notIn: ["SEEDING", "GIFT", "INTER_COMPANY"] as any };
   const orderFilter = { ...companyFilter, ...dateFilter, type: nonRevenueTypes };
   const [salesOrders, totalOrderCount, fulfilledCount, pendingCount, seedingCount, giftCount, latestSyncs, exchangeRate] = await Promise.all([
     prisma.order.findMany({
