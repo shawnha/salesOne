@@ -65,25 +65,25 @@ describe("generatePurchaseOrderExcel", () => {
     "택배사",
   ];
 
-  it("returns a Buffer", () => {
-    const result = generatePurchaseOrderExcel([sampleOrder]);
+  it("returns a Buffer", async () => {
+    const result = await generatePurchaseOrderExcel([sampleOrder]);
     expect(Buffer.isBuffer(result)).toBe(true);
   });
 
-  it("creates sheet named '1차'", () => {
-    const buf = generatePurchaseOrderExcel([sampleOrder]);
+  it("creates sheet named '1차'", async () => {
+    const buf = await generatePurchaseOrderExcel([sampleOrder]);
     const wb = XLSX.read(buf, { type: "buffer" });
     expect(wb.SheetNames).toContain("1차");
   });
 
-  it("has correct headers in row 1 (A-P from template)", () => {
-    const buf = generatePurchaseOrderExcel([sampleOrder]);
+  it("has correct headers in row 1 (A-P from template)", async () => {
+    const buf = await generatePurchaseOrderExcel([sampleOrder]);
     const rows = readSheet(buf, "1차");
     expect(rows[0].slice(0, 16)).toEqual(EXPECTED_HEADERS_A_TO_P);
   });
 
-  it("fills fixed sender info in columns A-C", () => {
-    const buf = generatePurchaseOrderExcel([sampleOrder]);
+  it("fills fixed sender info in columns A-C", async () => {
+    const buf = await generatePurchaseOrderExcel([sampleOrder]);
     const rows = readSheet(buf, "1차");
     const dataRow = rows[1];
     expect(dataRow[0]).toBe("한아원");
@@ -91,15 +91,15 @@ describe("generatePurchaseOrderExcel", () => {
     expect(dataRow[2]).toBe("서초구 서초대로60길 18, 한아원 9층");
   });
 
-  it("fills sequential number starting at 1", () => {
-    const buf = generatePurchaseOrderExcel([sampleOrder, minimalOrder]);
+  it("fills sequential number starting at 1", async () => {
+    const buf = await generatePurchaseOrderExcel([sampleOrder, minimalOrder]);
     const rows = readSheet(buf, "1차");
     expect(rows[1][3]).toBe(1);
     expect(rows[2][3]).toBe(2);
   });
 
-  it("maps order fields to correct columns", () => {
-    const buf = generatePurchaseOrderExcel([sampleOrder]);
+  it("maps order fields to correct columns", async () => {
+    const buf = await generatePurchaseOrderExcel([sampleOrder]);
     const rows = readSheet(buf, "1차");
     const row = rows[1];
     expect(row[4]).toBe("홍길동");         // 수취인명
@@ -113,60 +113,60 @@ describe("generatePurchaseOrderExcel", () => {
     expect(row[17]).toBe("BATCH-2026-01"); // batchId
   });
 
-  it("puts ordererPhone in 기타연락처 column (index 8) when present", () => {
-    const buf = generatePurchaseOrderExcel([sampleOrder]);
+  it("puts ordererPhone in 기타연락처 column (index 8) when present", async () => {
+    const buf = await generatePurchaseOrderExcel([sampleOrder]);
     const rows = readSheet(buf, "1차");
     expect(rows[1][8]).toBe("010-9999-0000");
   });
 
-  it("leaves 기타연락처 empty when ordererPhone is absent", () => {
-    const buf = generatePurchaseOrderExcel([minimalOrder]);
+  it("leaves 기타연락처 empty when ordererPhone is absent", async () => {
+    const buf = await generatePurchaseOrderExcel([minimalOrder]);
     const rows = readSheet(buf, "1차");
     // cell may be undefined or empty string
     expect(rows[1][8] ?? "").toBe("");
   });
 
-  it("leaves deliveryMessage empty when not provided", () => {
-    const buf = generatePurchaseOrderExcel([minimalOrder]);
+  it("leaves deliveryMessage empty when not provided", async () => {
+    const buf = await generatePurchaseOrderExcel([minimalOrder]);
     const rows = readSheet(buf, "1차");
     expect(rows[1][10] ?? "").toBe("");
   });
 
-  it("leaves tplCode empty when not provided", () => {
-    const buf = generatePurchaseOrderExcel([minimalOrder]);
+  it("leaves tplCode empty when not provided", async () => {
+    const buf = await generatePurchaseOrderExcel([minimalOrder]);
     const rows = readSheet(buf, "1차");
     expect(rows[1][12] ?? "").toBe("");
   });
 
-  it("column 11 (공란) is empty for every data row", () => {
-    const buf = generatePurchaseOrderExcel([sampleOrder, minimalOrder]);
+  it("column 11 (공란) is empty for every data row", async () => {
+    const buf = await generatePurchaseOrderExcel([sampleOrder, minimalOrder]);
     const rows = readSheet(buf, "1차");
     expect(rows[1][11] ?? "").toBe("");
     expect(rows[2][11] ?? "").toBe("");
   });
 
-  it("배송방식, 운송장번호, 택배사 columns (13-15) are empty in data rows", () => {
-    const buf = generatePurchaseOrderExcel([sampleOrder]);
+  it("배송방식, 운송장번호, 택배사 columns (13-15) are empty in data rows", async () => {
+    const buf = await generatePurchaseOrderExcel([sampleOrder]);
     const rows = readSheet(buf, "1차");
     expect(rows[1][13] ?? "").toBe(""); // 배송방식
     expect(rows[1][14] ?? "").toBe(""); // 운송장번호
     expect(rows[1][15] ?? "").toBe(""); // 택배사
   });
 
-  it("preserves template header when order list is empty", () => {
-    const buf = generatePurchaseOrderExcel([]);
+  it("preserves template header when order list is empty", async () => {
+    const buf = await generatePurchaseOrderExcel([]);
     const rows = readSheet(buf, "1차");
     expect(rows[0].slice(0, 16)).toEqual(EXPECTED_HEADERS_A_TO_P);
   });
 
-  it("creates '참조' sheet", () => {
-    const buf = generatePurchaseOrderExcel([sampleOrder]);
+  it("creates '참조' sheet", async () => {
+    const buf = await generatePurchaseOrderExcel([sampleOrder]);
     const wb = XLSX.read(buf, { type: "buffer" });
     expect(wb.SheetNames).toContain("참조");
   });
 
-  it("'참조' sheet preserves template product mappings", () => {
-    const buf = generatePurchaseOrderExcel([sampleOrder]);
+  it("'참조' sheet preserves template product mappings", async () => {
+    const buf = await generatePurchaseOrderExcel([sampleOrder]);
     const rows = readSheet(buf, "참조");
     // Template has existing product mappings (e.g., ODD products)
     expect(rows.length).toBeGreaterThan(0);
@@ -174,11 +174,30 @@ describe("generatePurchaseOrderExcel", () => {
     expect(rows[0][0]).toBeDefined();
   });
 
-  it("handles multiple orders with correct row count", () => {
+  it("handles multiple orders with correct row count", async () => {
     const orders = [sampleOrder, minimalOrder, { ...sampleOrder, productOrderId: "ORDER-005" }];
-    const buf = generatePurchaseOrderExcel(orders);
+    const buf = await generatePurchaseOrderExcel(orders);
     const rows = readSheet(buf, "1차");
     expect(rows.length).toBe(4); // 1 header + 3 data rows
+  });
+
+  it("preserves header fill color from template (yellow on D1-P1)", async () => {
+    // This is the regression we're guarding against. Originally the
+    // generator round-tripped through SheetJS Community which strips
+    // styles on write, leaving a colorless purchase order. exceljs
+    // preserves the yellow header fill from the template.
+    const buf = await generatePurchaseOrderExcel([sampleOrder]);
+    const ExcelJS = (await import("exceljs")).default;
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf);
+    const ws = wb.getWorksheet("1차")!;
+    // Column D = 4 (번호); should have yellow fill
+    const headerCell = ws.getCell(1, 4);
+    const fill = headerCell.fill as ExcelJS.FillPattern | undefined;
+    expect(fill?.type).toBe("pattern");
+    expect(fill?.pattern).toBe("solid");
+    const fg = fill?.fgColor as { argb?: string } | undefined;
+    expect(fg?.argb?.toUpperCase()).toMatch(/F{0,2}FFFF00/);
   });
 });
 

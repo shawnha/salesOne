@@ -1,6 +1,18 @@
+// 3PL purchase-order Excel generation. Uses exceljs because:
+//   - The CJ template (templates/3pl-template.xlsx) carries header colors,
+//     column widths, autofilter, and cell formatting that buyers expect to
+//     see in the generated file.
+//   - SheetJS Community Edition (`xlsx`) drops cell-level styles on write.
+//   - `xlsx-js-style` only writes styles authored in its own schema; it
+//     can't round-trip the styles produced when reading a template.
+//   - exceljs reads and writes OOXML styles natively, so loading the
+//     template + filling in rows preserves every visual property.
+//
+// The Naver upload Excel still uses the lightweight `xlsx` package because
+// it's a fresh sheet with no styling and Naver only accepts .xls (BIFF8).
+import ExcelJS from "exceljs";
 import * as XLSX from "xlsx";
 import path from "path";
-import fs from "fs";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,83 +48,112 @@ const NAVER_UPLOAD_HEADERS = ["상품주문번호", "배송방법", "택배사",
 const NAVER_DELIVERY_METHOD = "택배발송 : 택배,등기,소포";
 const DEFAULT_CARRIER = "CJ대한통운";
 
+// Column layout in the CJ template (1-indexed for exceljs):
+//   A=1 보내는분, B=2 보내는분 연락처, C=3 주소,
+//   D=4 번호, E=5 수취인명, F=6 상품명, G=7 수량,
+//   H=8 핸드폰, I=9 기타연락처, J=10 주소, K=11 배송메세지,
+//   L=12 (공란), M=13 상품고유코드, N=14 배송방식, O=15 운송장번호, P=16 택배사,
+//   Q=17 productOrderId (hidden), R=18 batchId (hidden)
+const COL = {
+  SENDER_NAME: 1,
+  SENDER_PHONE: 2,
+  SENDER_ADDR: 3,
+  ROW_NUM: 4,
+  RECIPIENT_NAME: 5,
+  PRODUCT_NAME: 6,
+  QUANTITY: 7,
+  RECIPIENT_PHONE: 8,
+  ORDERER_PHONE: 9,
+  ADDRESS: 10,
+  DELIVERY_MSG: 11,
+  TPL_CODE: 13,
+  PRODUCT_ORDER_ID: 17,
+  BATCH_ID: 18,
+} as const;
+
 // ---------------------------------------------------------------------------
 // generatePurchaseOrderExcel
 // ---------------------------------------------------------------------------
 
 /**
- * Generates a 3PL purchase order Excel by loading the original template file
- * and filling in order data. Preserves all formatting, filters, colors, etc.
- * Adds hidden Q/R columns for productOrderId and batchId.
+ * Generates a 3PL purchase order Excel by loading the original template
+ * and filling in order data. Preserves header colors, fonts, autofilter,
+ * and any other formatting the template carries.
+ *
+ * Adds hidden columns Q/R for productOrderId and batchId so the tracking
+ * upload step (excel-parser.ts) can match returned rows back to the batch.
  */
-export function generatePurchaseOrderExcel(orders: PurchaseOrderInput[]): Buffer {
-  // Load template
-  const templatePath = path.join(process.cwd(), "src/lib/shipping/templates/3pl-template.xlsx");
-  const templateBuf = fs.readFileSync(templatePath);
-  const wb = XLSX.read(templateBuf, { type: "buffer", cellStyles: true });
-  const ws = wb.Sheets["1차"];
+export async function generatePurchaseOrderExcel(
+  orders: PurchaseOrderInput[],
+): Promise<Buffer> {
+  const templatePath = path.join(
+    process.cwd(),
+    "src/lib/shipping/templates/3pl-template.xlsx",
+  );
 
-  // Row 1 = headers (preserved from template)
-  // Row 2 onward = data rows
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.readFile(templatePath);
 
-  // Write order data starting from row 2 (0-indexed: row index 1)
+  const ws = wb.getWorksheet("1차");
+  if (!ws) throw new Error("Template sheet '1차' missing");
+
+  // The shipped CJ template carries ~1354 placeholder data rows (some with
+  // example values, the rest empty-but-styled). spliceRows() doesn't
+  // actually drop them from the internal `_rows` array on this exceljs
+  // version, so the worksheet dimension stays at A1:Q1355 on write and
+  // the buyer sees thousands of phantom rows. Truncate _rows directly to
+  // keep just the header, then re-populate.
+  const wsInternal = ws as unknown as { _rows: unknown[] };
+  if (Array.isArray(wsInternal._rows) && wsInternal._rows.length > 1) {
+    wsInternal._rows.length = 1;
+  }
+
+  // Header is row 1; data rows start at row 2.
   orders.forEach((order, index) => {
-    const r = index + 1; // 1-indexed row in sheet (row 2 = index 1 in 0-based)
-    // A: 보내는분
-    ws[XLSX.utils.encode_cell({ r, c: 0 })] = { t: "s", v: SENDER_NAME };
-    // B: 보내는분 연락처
-    ws[XLSX.utils.encode_cell({ r, c: 1 })] = { t: "s", v: SENDER_PHONE };
-    // C: 주소
-    ws[XLSX.utils.encode_cell({ r, c: 2 })] = { t: "s", v: SENDER_ADDRESS };
-    // D: 번호
-    ws[XLSX.utils.encode_cell({ r, c: 3 })] = { t: "n", v: index + 1 };
-    // E: 수취인명
-    ws[XLSX.utils.encode_cell({ r, c: 4 })] = { t: "s", v: order.recipientName };
-    // F: 상품명
-    ws[XLSX.utils.encode_cell({ r, c: 5 })] = { t: "s", v: order.productName };
-    // G: 수량
-    ws[XLSX.utils.encode_cell({ r, c: 6 })] = { t: "n", v: order.quantity };
-    // H: 핸드폰
-    ws[XLSX.utils.encode_cell({ r, c: 7 })] = { t: "s", v: order.recipientPhone };
-    // I: 기타연락처
+    const r = index + 2;
+    const row = ws.getRow(r);
+
+    row.getCell(COL.SENDER_NAME).value = SENDER_NAME;
+    row.getCell(COL.SENDER_PHONE).value = SENDER_PHONE;
+    row.getCell(COL.SENDER_ADDR).value = SENDER_ADDRESS;
+    row.getCell(COL.ROW_NUM).value = index + 1;
+    row.getCell(COL.RECIPIENT_NAME).value = order.recipientName;
+    row.getCell(COL.PRODUCT_NAME).value = order.productName;
+    row.getCell(COL.QUANTITY).value = order.quantity;
+    row.getCell(COL.RECIPIENT_PHONE).value = order.recipientPhone;
     if (order.ordererPhone) {
-      ws[XLSX.utils.encode_cell({ r, c: 8 })] = { t: "s", v: order.ordererPhone };
+      row.getCell(COL.ORDERER_PHONE).value = order.ordererPhone;
     }
-    // J: 주소
-    ws[XLSX.utils.encode_cell({ r, c: 9 })] = { t: "s", v: order.shippingAddress };
-    // K: 배송메세지
+    row.getCell(COL.ADDRESS).value = order.shippingAddress;
     if (order.deliveryMessage) {
-      ws[XLSX.utils.encode_cell({ r, c: 10 })] = { t: "s", v: order.deliveryMessage };
+      row.getCell(COL.DELIVERY_MSG).value = order.deliveryMessage;
     }
-    // L: (공란) — skip
-    // M: 상품고유코드
     if (order.tplCode) {
-      ws[XLSX.utils.encode_cell({ r, c: 12 })] = { t: "s", v: order.tplCode };
+      row.getCell(COL.TPL_CODE).value = order.tplCode;
     }
-    // N~P: 배송방식, 운송장번호, 택배사 — blank (3PL fills)
-    // Q: productOrderId (숨김)
-    ws[XLSX.utils.encode_cell({ r, c: 16 })] = { t: "s", v: order.productOrderId };
-    // R: batchId (숨김)
-    ws[XLSX.utils.encode_cell({ r, c: 17 })] = { t: "s", v: order.batchId };
+    row.getCell(COL.PRODUCT_ORDER_ID).value = order.productOrderId;
+    row.getCell(COL.BATCH_ID).value = order.batchId;
+
+    row.commit();
   });
 
-  // Update sheet range to include all data rows + Q/R columns
-  const lastRow = orders.length + 1; // +1 for header
-  ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: lastRow - 1, c: 17 } });
+  // Hide the productOrderId / batchId columns — they're only there for the
+  // tracking-upload round trip, not for human eyes.
+  ws.getColumn(COL.PRODUCT_ORDER_ID).hidden = true;
+  ws.getColumn(COL.BATCH_ID).hidden = true;
 
-  // Hide Q, R columns
-  if (!ws["!cols"]) ws["!cols"] = [];
-  for (let i = ws["!cols"].length; i <= 17; i++) {
-    ws["!cols"][i] = ws["!cols"][i] || {};
-  }
-  ws["!cols"][16] = { hidden: true };
-  ws["!cols"][17] = { hidden: true };
+  const lastRow = orders.length + 1; // +1 header
 
-  // Update autofilter range
-  ws["!autofilter"] = { ref: `A1:P${lastRow}` };
+  // Update the autofilter to span only the visible columns. The template
+  // ships with autofilter on header row 1 across A:P; reapply so it covers
+  // the new data range.
+  ws.autoFilter = {
+    from: { row: 1, column: 1 },
+    to: { row: lastRow, column: 16 },
+  };
 
-  const xlsxBuf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-  return Buffer.from(xlsxBuf);
+  const arrayBuffer = await wb.xlsx.writeBuffer();
+  return Buffer.from(arrayBuffer as ArrayBuffer);
 }
 
 // ---------------------------------------------------------------------------
@@ -121,11 +162,12 @@ export function generatePurchaseOrderExcel(orders: PurchaseOrderInput[]): Buffer
 
 /**
  * Generates a Naver upload Excel in .xls format (required by Naver).
- * Sheet name must be exactly "발송처리".
+ * Sheet name must be exactly "발송처리". No styling, fresh sheet — using
+ * the lightweight `xlsx` package is fine here.
  */
 export function generateNaverUploadExcel(
   items: NaverUploadInput[],
-  carrier: string = DEFAULT_CARRIER
+  carrier: string = DEFAULT_CARRIER,
 ): Buffer {
   const wb = XLSX.utils.book_new();
 

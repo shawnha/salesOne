@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
     };
   });
 
-  const buffer = generatePurchaseOrderExcel(inputs);
+  const buffer = await generatePurchaseOrderExcel(inputs);
 
   return new NextResponse(new Uint8Array(buffer), {
     status: 200,
