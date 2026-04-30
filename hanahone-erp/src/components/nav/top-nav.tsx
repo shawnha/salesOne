@@ -17,7 +17,6 @@ const navLinks = [
   { href: "/customers", label: "Customers" },
   { href: "/transfers", label: "Transfers" },
   { href: "/manufacturing", label: "Mfg" },
-  { href: "/consulting", label: "Consulting" },
   { href: "/reports", label: "Reports" },
 ];
 
