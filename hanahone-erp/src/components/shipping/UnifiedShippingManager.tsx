@@ -64,6 +64,8 @@ export function UnifiedShippingManager({ companyId }: { companyId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
   const [dispatchingId, setDispatchingId] = useState<string | null>(null);
   const [dispatchResult, setDispatchResult] = useState<{
     batchId: string;
@@ -167,6 +169,40 @@ export function UnifiedShippingManager({ companyId }: { companyId: string }) {
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function handleResync() {
+    if (syncing) return;
+    setSyncing(true);
+    setSyncResult(null);
+    setError(null);
+    try {
+      // NAVER + COUPANG in parallel — pulls latest fulfillment status from each channel.
+      const [naverRes, coupangRes] = await Promise.all([
+        fetch("/api/sync/NAVER", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ companyId }),
+        }).then((r) => r.json().catch(() => ({}))).catch((e) => ({ error: e?.message ?? "오류" })),
+        fetch("/api/sync/COUPANG", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ companyId }),
+        }).then((r) => r.json().catch(() => ({}))).catch((e) => ({ error: e?.message ?? "오류" })),
+      ]);
+      const naverOk = !naverRes.error;
+      const coupangOk = !coupangRes.error;
+      const naverNum = naverRes?.recordsProcessed ?? 0;
+      const coupangNum = coupangRes?.recordsProcessed ?? 0;
+      setSyncResult(
+        `네이버 ${naverOk ? `${naverNum}건` : "실패"} · 쿠팡 ${coupangOk ? `${coupangNum}건` : "실패"}`,
+      );
+      await fetchPending();
+    } catch (err: any) {
+      setError(err?.message ?? "동기화 오류");
+    } finally {
+      setSyncing(false);
     }
   }
 
@@ -302,6 +338,14 @@ export function UnifiedShippingManager({ companyId }: { companyId: string }) {
           <Button variant="secondary" onClick={() => fetchPending()}>
             새로고침
           </Button>
+          <Button variant="secondary" onClick={handleResync} disabled={syncing}>
+            {syncing ? "동기화 중..." : "🔄 채널 동기화"}
+          </Button>
+          {syncResult && (
+            <span className="text-xs text-[var(--text-secondary)] self-center">
+              ✓ {syncResult}
+            </span>
+          )}
 
           <div className="ml-auto flex items-end gap-2 flex-wrap">
             <label className="flex flex-col text-[10px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
