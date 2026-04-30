@@ -7,6 +7,7 @@ import Link from "next/link";
 import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 import { OrderStatusChanger } from "@/components/orders/OrderStatusChanger";
 import { OrderTypeChanger } from "@/components/orders/OrderTypeChanger";
+import { RefundRevertButton } from "@/components/orders/RefundRevertButton";
 import { categorize, CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/product-category";
 import { getTrackingUrl } from "@/lib/tracking-url";
 
@@ -284,9 +285,12 @@ export default async function OrderDetailPage({
               <span className="text-[var(--text-secondary)]">Fulfillment</span>
               <Badge status={order.fulfillmentStatus} />
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center gap-2">
               <span className="text-[var(--text-secondary)]">Financial</span>
-              <Badge status={order.financialStatus} />
+              <div className="flex items-center gap-2">
+                <Badge status={order.financialStatus} />
+                <RefundRevertButton orderId={order.id} financialStatus={order.financialStatus} />
+              </div>
             </div>
             <div className="border-t border-[var(--border)] my-2" />
             <OrderStatusChanger
