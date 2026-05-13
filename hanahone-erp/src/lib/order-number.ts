@@ -28,16 +28,19 @@ export async function generateOrderNumber(companyId: string, tx: any): Promise<s
   // concurrent generators from racing; this query keeps us correct under any
   // historical insert path.
   //
-  // Pattern matches "<companyName>-<digits>" exactly so a stray non-conforming
-  // orderNumber can't poison the parse.
-  const pattern = `^${company.name.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}-\\d+$`;
+  // Pattern matches "<companyName>-<1..9 digits>" so a stray non-conforming
+  // orderNumber can't poison the parse. The 1..9 digit cap also keeps the
+  // CAST AS INTEGER below the int4 ceiling (max 2,147,483,647) — needed
+  // because the table contains imported rows like "HOI-2603509777" from a
+  // legacy system that would otherwise blow out the cast.
+  const pattern = `^${company.name.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}-\\d{1,9}$`;
   const rows = await tx.$queryRaw<Array<{ max_seq: number | null }>>`
     SELECT COALESCE(
       MAX(CAST(SPLIT_PART(order_number, '-', 2) AS INTEGER)),
       0
     )::int AS max_seq
     FROM "salesone"."orders"
-    WHERE company_id = ${companyId}::uuid
+    WHERE company_id = ${companyId}
       AND order_number ~ ${pattern}
   `;
   const lastSeq = rows[0]?.max_seq ?? 0;
