@@ -22,3 +22,8 @@ npx tsx scripts/naver-push-stock.ts 2>&1 | tee -a /tmp/naver-sync.log || true
 # 3) Pull Coupang orders (marketplace + rocket growth) and rocket growth inventory.
 #    Coupang's IP whitelist also requires running from the home IP.
 npx tsx scripts/coupang-sync.ts 2>&1 | tee -a /tmp/naver-sync.log || true
+
+# 4) Pull Shopify orders + payouts (지급내역). OAuth client-credentials — IP 무관.
+#    2026-06-11 추가: 이전엔 수동 트리거만 있어서 5/13~6/1 16일 공백 같은 사고가
+#    났음. 야간 잡에 합류시켜 자동화. Failures here don't fail the script.
+npx tsx scripts/shopify-sync.ts 2>&1 | tee -a /tmp/naver-sync.log || true
