@@ -5,7 +5,8 @@
  */
 import { prisma } from "@/lib/prisma";
 import { runSync } from "@/lib/integrations/sync-runner";
-import { coupangConnector } from "@/lib/integrations/connectors/coupang";
+import { coupangConnector, fetchCoupangSettlements } from "@/lib/integrations/connectors/coupang";
+import { getPayoutSince, syncChannelPayouts } from "@/lib/integrations/payout-sync";
 import { decrypt } from "@/lib/integrations/encryption";
 
 async function main() {
@@ -30,6 +31,17 @@ async function main() {
     console.log("Coupang Rocket Growth inventory synced");
   } catch (err) {
     console.error("Coupang inventory sync failed:", (err as Error).message);
+  }
+
+  // Settlement (지급내역) — best-effort: 실패해도 주문/재고 sync에 영향 없음
+  try {
+    const credentials = JSON.parse(decrypt(config.credentials));
+    const since = await getPayoutSince("COUPANG");
+    const payouts = await fetchCoupangSettlements(credentials, since);
+    const { upserted, failed } = await syncChannelPayouts(config.companyId, "COUPANG", payouts);
+    console.log(`Coupang payouts: ${upserted} upserted, ${failed} failed (since ${since.toISOString().slice(0, 10)})`);
+  } catch (err) {
+    console.error("Coupang payout sync failed:", (err as Error).message);
   }
 
   console.log(`[${new Date().toISOString()}] Coupang sync completed`);

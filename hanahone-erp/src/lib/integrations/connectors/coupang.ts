@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import type { Connector, ExternalOrderData, ExternalOrderItemData } from "../types";
+import type { Connector, ExternalOrderData, ExternalOrderItemData, ChannelPayoutData } from "../types";
 import { Platform } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
@@ -48,7 +48,7 @@ export function buildAuthHeader(
   return `CEA algorithm=HmacSHA256, access-key=${creds.accessKey}, signed-date=${datetime}, signature=${signature}`;
 }
 
-async function coupangFetch<T>(
+export async function coupangFetch<T>(
   creds: CoupangCredentials,
   method: "GET" | "POST" | "PUT",
   path: string,
@@ -549,3 +549,89 @@ export const coupangConnector: Connector & {
     return [...marketplaceOrders, ...rgOrders];
   },
 };
+
+// ---------------------------------------------------------------------------
+// Settlement (지급내역) — what Coupang actually deposited.
+//
+//   GET /v2/providers/marketplace_openapi/apis/api/v1/settlement-histories
+//       ?revenueRecognitionYearMonth=YYYY-MM      (month granularity only)
+//
+// Returns an array of payout batches. A WEEKLY batch pays ~70% up front
+// (settlementAmount); the retained ~30% (lastAmount) arrives later as its own
+// batch. finalAmount = the actual deposit for THIS batch — that's what we
+// store, so rows reconcile 1:1 against bank deposits (financeone).
+// Batches have NO unique id → externalId is derived (see ChannelPayoutData).
+// ---------------------------------------------------------------------------
+
+export type CoupangSettlementBatch = {
+  settlementType: string; // WEEKLY / MONTHLY / ...
+  settlementDate: string; // 지급일 YYYY-MM-DD
+  revenueRecognitionYearMonth: string;
+  revenueRecognitionDateFrom: string;
+  revenueRecognitionDateTo: string;
+  totalSale: number;
+  serviceFee: number;
+  settlementTargetAmount: number;
+  settlementAmount: number;
+  lastAmount: number;
+  finalAmount: number;
+  status: string; // DONE 등 원문
+  [key: string]: unknown;
+};
+
+/** List YYYY-MM strings from `since`'s month through `now`'s month (inclusive, capped). */
+export function settlementMonthsBetween(since: Date, now: Date, maxMonths = 24): string[] {
+  const months: string[] = [];
+  let y = since.getUTCFullYear();
+  let m = since.getUTCMonth();
+  const endY = now.getUTCFullYear();
+  const endM = now.getUTCMonth();
+  while (y < endY || (y === endY && m <= endM)) {
+    months.push(`${y}-${pad(m + 1)}`);
+    if (months.length >= maxMonths) break;
+    m++;
+    if (m > 11) { m = 0; y++; }
+  }
+  return months;
+}
+
+export function mapCoupangSettlement(batch: CoupangSettlementBatch): ChannelPayoutData {
+  return {
+    externalId: `${batch.settlementType}:${batch.settlementDate}:${batch.revenueRecognitionDateFrom}`,
+    payoutDate: new Date(batch.settlementDate),
+    amount: Number(batch.finalAmount || 0),
+    currency: "KRW",
+    periodStart: batch.revenueRecognitionDateFrom ? new Date(batch.revenueRecognitionDateFrom) : undefined,
+    periodEnd: batch.revenueRecognitionDateTo ? new Date(batch.revenueRecognitionDateTo) : undefined,
+    feeAmount: Math.abs(Number(batch.serviceFee || 0)),
+    status: batch.status || undefined,
+    rawData: batch,
+  };
+}
+
+export async function fetchCoupangSettlements(
+  creds: CoupangCredentials,
+  since: Date,
+): Promise<ChannelPayoutData[]> {
+  const path = "/v2/providers/marketplace_openapi/apis/api/v1/settlement-histories";
+  const out: ChannelPayoutData[] = [];
+  for (const month of settlementMonthsBetween(since, new Date())) {
+    const query = `revenueRecognitionYearMonth=${month}`;
+    let batches: CoupangSettlementBatch[];
+    try {
+      batches = await coupangFetch<CoupangSettlementBatch[]>(creds, "GET", path, query);
+    } catch (err) {
+      // coupangFetch에는 429 재시도가 없음(주문 경로 공유라 건드리지 않음) —
+      // 정산 호출만 15초 백오프 후 1회 재시도.
+      if (!/HTTP 429/.test((err as Error).message)) throw err;
+      await new Promise((r) => setTimeout(r, 15000));
+      batches = await coupangFetch<CoupangSettlementBatch[]>(creds, "GET", path, query);
+    }
+    if (!Array.isArray(batches)) continue; // empty month → non-array/empty 응답 방어
+    for (const batch of batches) {
+      if (!batch?.settlementDate) continue;
+      out.push(mapCoupangSettlement(batch));
+    }
+  }
+  return out;
+}

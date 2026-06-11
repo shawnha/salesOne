@@ -7,6 +7,8 @@ import { prisma } from "@/lib/prisma";
 import { runSync } from "@/lib/integrations/sync-runner";
 import { recalculateHokInventory } from "@/lib/integrations/inventory-calculator";
 import { naverConnector } from "@/lib/integrations/naver";
+import { fetchNaverSettlements } from "@/lib/integrations/naver/settlement";
+import { getPayoutSince, syncChannelPayouts } from "@/lib/integrations/payout-sync";
 import { decrypt } from "@/lib/integrations/encryption";
 import * as notify from "@/lib/notifications";
 
@@ -81,6 +83,17 @@ async function main() {
   // Recalculate HOK inventory
   await recalculateHokInventory(config.companyId);
   console.log("HOK inventory recalculated");
+
+  // Settlement (지급내역) — best-effort: 실패해도 주문/재고 sync에 영향 없음
+  try {
+    const credentials = JSON.parse(decrypt(config.credentials));
+    const since = await getPayoutSince("NAVER");
+    const payouts = await fetchNaverSettlements(credentials, since);
+    const { upserted, failed } = await syncChannelPayouts(config.companyId, "NAVER", payouts);
+    console.log(`Naver payouts: ${upserted} upserted, ${failed} failed (since ${since.toISOString().slice(0, 10)})`);
+  } catch (err) {
+    console.error("Naver payout sync failed:", (err as Error).message);
+  }
 
   console.log(`[${new Date().toISOString()}] Naver sync completed`);
 }

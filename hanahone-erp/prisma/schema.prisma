@@ -51,6 +51,7 @@ model Company {
   settlementReconciliations   SettlementReconciliation[]
   notifications               Notification[]
   rgInbounds                  RocketGrowthInbound[]
+  channelPayouts              ChannelPayout[]
 
   @@map("companies")
   @@schema("public")
@@ -793,4 +794,39 @@ model Notification {
   @@index([createdAt(sort: Desc)])
   @@index([readAt])
   @@schema("public")
+}
+
+/// Channel payout batches — what the platform actually deposited into our bank,
+/// as reported by the platform's settlement API. Distinct from
+/// SettlementReconciliation (manual monthly expected-vs-actual check) — do not merge.
+///
+/// externalId is DERIVED (platforms expose no payout id):
+///   COUPANG: `{settlementType}:{settlementDate}:{revenueRecognitionDateFrom}`
+///   NAVER:   `DAILY:{settleBasisStartDate}:{settleExpectDate}`
+/// amount = actual deposit for the batch (Coupang finalAmount — WEEKLY pays 70%,
+/// the retained 30% arrives later as its own MONTHLY batch row).
+model ChannelPayout {
+  id          String    @id @default(uuid())
+  companyId   String    @map("company_id")
+  company     Company   @relation(fields: [companyId], references: [id])
+  platform    Platform
+  externalId  String    @map("external_id")
+  /// Date the money was (or will be) deposited
+  payoutDate  DateTime  @map("payout_date")
+  amount      Decimal   @db.Decimal(14, 2)
+  currency    String    @default("KRW")
+  /// Sales period covered by this payout, when the platform reports it
+  periodStart DateTime? @map("period_start")
+  periodEnd   DateTime? @map("period_end")
+  /// Total fees deducted in this payout, when reported (normalized positive)
+  feeAmount   Decimal?  @map("fee_amount") @db.Decimal(14, 2)
+  status      String?   // platform-reported status (DONE / SCHEDULED 등)
+  rawData     Json?     @map("raw_data")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([platform, externalId])
+  @@index([companyId, platform, payoutDate])
+  @@map("channel_payouts")
+  @@schema("salesone")
 }

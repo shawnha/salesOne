@@ -82,3 +82,27 @@ export interface SyncResult {
   recordsFailed: number;
   errorMessage?: string;
 }
+
+/**
+ * One platform-reported payout batch, normalized across channels.
+ * Persisted to ChannelPayout by syncChannelPayouts() (payout-sync.ts).
+ *
+ * externalId is DERIVED — platforms expose no payout id:
+ *   COUPANG: `{settlementType}:{settlementDate}:{revenueRecognitionDateFrom}`
+ *   NAVER:   `DAILY:{settleBasisStartDate}:{settleExpectDate}`
+ */
+export interface ChannelPayoutData {
+  externalId: string;
+  /** Date the money was (or will be) deposited */
+  payoutDate: Date;
+  /** Actual deposit amount for this batch (e.g. Coupang finalAmount, not the 100% target) */
+  amount: number;
+  currency: string;
+  periodStart?: Date;
+  periodEnd?: Date;
+  /** Fees deducted in this payout, normalized positive */
+  feeAmount?: number;
+  /** Platform-reported status (DONE / SCHEDULED 등 원문) */
+  status?: string;
+  rawData: any;
+}
