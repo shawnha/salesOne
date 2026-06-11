@@ -1,0 +1,6 @@
+{
+  "name": "hanahone-erp-shopify-app-config",
+  "version": "1.0.0",
+  "private": true,
+  "description": "hanahOne_erp Shopify app configuration (config-only, no code) — deploy with `shopify app deploy`"
+}

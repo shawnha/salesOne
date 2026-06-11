@@ -1,4 +1,4 @@
-import type { Connector, ExternalOrderData } from "../types";
+import type { Connector, ExternalOrderData, ChannelPayoutData } from "../types";
 
 interface ShopifyCredentials {
   clientId: string;
@@ -274,6 +274,76 @@ export interface ShopifyProduct {
     price: string;
     compareAtPrice: string | null;
   }[];
+}
+
+// ---------------------------------------------------------------------------
+// Payouts (지급내역) — what Shopify Payments actually deposited.
+//
+//   GET /admin/api/2024-01/shopify_payments/payouts.json
+//       ?limit=250&date_min=YYYY-MM-DD            (Link-header pagination)
+//
+// Requires the read_shopify_payments_payouts scope (granted 2026-06-11,
+// app version hanahone_erp-4). Unlike Coupang/Naver, Shopify payouts DO have
+// a unique id → externalId = String(id). amount = actual USD deposit.
+// summary carries per-category fees; we sum every `*_fee_amount` field.
+// ---------------------------------------------------------------------------
+
+export type ShopifyPayout = {
+  id: number;
+  status: string; // paid / scheduled / in_transit / failed / canceled (원문)
+  date: string;
+  currency: string;
+  amount: string;
+  summary?: Record<string, string>;
+};
+
+export function mapShopifyPayout(p: ShopifyPayout): ChannelPayoutData {
+  const fee = Object.entries(p.summary || {})
+    .filter(([k]) => k.endsWith("_fee_amount"))
+    .reduce((sum, [, v]) => sum + (parseFloat(v) || 0), 0);
+  return {
+    externalId: String(p.id),
+    payoutDate: new Date(p.date),
+    amount: parseFloat(p.amount) || 0,
+    currency: p.currency || "USD",
+    feeAmount: +fee.toFixed(2),
+    status: p.status || undefined,
+    rawData: p,
+  };
+}
+
+export async function fetchShopifyPayouts(
+  credentials: ShopifyCredentials,
+  since: Date,
+): Promise<ChannelPayoutData[]> {
+  const shop = credentials.shop || credentials.storeUrl;
+  if (!shop) throw new Error("Missing shop URL");
+
+  const token = await getAccessToken({ ...credentials, shop });
+  const headers = { "X-Shopify-Access-Token": token, "Content-Type": "application/json" };
+
+  let url = `https://${shop}/admin/api/2024-01/shopify_payments/payouts.json?limit=250&date_min=${since.toISOString().slice(0, 10)}`;
+  const out: ChannelPayoutData[] = [];
+  let hasNext = true;
+
+  while (hasNext) {
+    const res = await fetch(url, { headers });
+    if (!res.ok) throw new Error(`Shopify payouts error: ${res.status} ${res.statusText}`);
+    const data = await res.json();
+    for (const p of data.payouts || []) {
+      if (!p?.id || !p?.date) continue;
+      out.push(mapShopifyPayout(p));
+    }
+    const linkHeader = res.headers.get("Link");
+    const nextMatch = linkHeader?.match(/<([^>]+)>;\s*rel="next"/);
+    if (nextMatch) {
+      url = nextMatch[1];
+    } else {
+      hasNext = false;
+    }
+  }
+
+  return out;
 }
 
 export async function fetchShopifyProducts(

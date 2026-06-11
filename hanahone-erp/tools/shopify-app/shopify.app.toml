@@ -1,0 +1,27 @@
+# hanahOne_erp — Shopify app configuration (Dev Dashboard app, client credentials grant)
+#
+# 이 파일이 앱 구성의 원천(IaC)이다. scope 변경 시:
+#   1. 아래 scopes 수정
+#   2. cd tools/shopify-app && shopify app deploy   (새 버전 생성+릴리스)
+#   3. 스토어 admin에서 권한 업데이트 승인 (필요 시)
+#
+# 2026-06-11: 활성 버전 hanahone_erp-3 (2026-03-24 릴리스)의 구성을 그대로 복제하고
+# read_shopify_payments_payouts 1개를 추가함 (정산/지급 수집용 — ChannelPayout).
+
+client_id = "8a584058d5570e1239fc5ebefe73d465"
+name = "hanahOne_erp"
+application_url = "http://localhost:4000/api/shopify/callback"
+embedded = false
+
+[access_scopes]
+# 기존 17개 (hanahone_erp-3과 동일) + read_shopify_payments_payouts
+scopes = "read_all_orders,read_analytics,read_customer_events,read_all_cart_transforms,read_cash_tracking,read_checkout_branding_settings,write_checkouts,read_custom_fulfillment_services,read_customers,read_customer_payment_methods,read_discounts,read_inventory,read_locations,read_orders,read_products,read_reports,read_shipping,read_shopify_payments_payouts"
+use_legacy_install_flow = false
+
+[webhooks]
+api_version = "2026-01"
+
+[auth]
+# client_credentials 방식이라 실제 OAuth 리다이렉트는 안 쓰지만 CLI 검증상 필수.
+# app_url과 동일하게 유지.
+redirect_urls = ["http://localhost:4000/api/shopify/callback"]
