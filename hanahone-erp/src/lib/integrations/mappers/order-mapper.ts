@@ -213,6 +213,8 @@ export async function mapExternalOrder(
         recipientPhone: extOrder.recipientPhone || null,
         settlementAmount: extOrder.settlementAmount ?? null,
         commissionAmount: extOrder.commissionAmount ?? null,
+        taxAmount: extOrder.taxAmount ?? null,
+        shippingAmount: extOrder.shippingAmount ?? null,
         trackingNumber: extOrder.trackingNumber ?? null,
         trackingCarrier: extOrder.trackingCarrier ?? null,
         shipDate: extOrder.shipDate ?? null,

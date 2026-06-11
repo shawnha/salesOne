@@ -77,11 +77,18 @@ export async function runSync(connector: Connector, companyId: string): Promise<
           const newFinancial = mapFinancialStatus(extOrder.financialStatus);
           const refund = extOrder.refundAmount || 0;
           const net = extOrder.totalAmount - refund;
+          const newTax = extOrder.taxAmount ?? null;
+          const newShipping = extOrder.shippingAmount ?? null;
+
+          const taxOrShippingChanged =
+            Number(existing.mappedOrder.taxAmount ?? 0) !== Number(newTax ?? 0) ||
+            Number(existing.mappedOrder.shippingAmount ?? 0) !== Number(newShipping ?? 0);
 
           const needsUpdate =
             existing.mappedOrder.fulfillmentStatus !== newFulfillment ||
             existing.mappedOrder.financialStatus !== newFinancial ||
-            Number(existing.mappedOrder.totalAmount) !== extOrder.totalAmount;
+            Number(existing.mappedOrder.totalAmount) !== extOrder.totalAmount ||
+            taxOrShippingChanged;
 
           const oldRefund = Number(existing.mappedOrder.refundAmount ?? 0);
           const refundChanged = refund !== oldRefund;
@@ -113,6 +120,8 @@ export async function runSync(connector: Connector, companyId: string): Promise<
                 trackingNumber: newTracking,
                 trackingCarrier: newCarrier,
                 shipDate: newShipDate,
+                taxAmount: newTax,
+                shippingAmount: newShipping,
               },
             });
             // Update raw data

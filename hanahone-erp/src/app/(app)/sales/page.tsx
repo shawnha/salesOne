@@ -115,7 +115,7 @@ export default async function SalesPage({
   const totalPages = Math.ceil(totalSalesCount / PAGE_SIZE);
   const allSalesForKpi = await prisma.order.findMany({
     where,
-    select: { netAmount: true, totalAmount: true, externalSource: true, commissionAmount: true, settlementAmount: true, orderDate: true },
+    select: { netAmount: true, totalAmount: true, externalSource: true, commissionAmount: true, settlementAmount: true, taxAmount: true, shippingAmount: true, orderDate: true },
   });
 
   // Per-date exchange rates so each order is converted at its own orderDate rate.
@@ -136,6 +136,20 @@ export default async function SalesPage({
     if (!o.commissionAmount) return sum;
     return sum + sumInUsd(Number(o.commissionAmount), o.externalSource, o.orderDate);
   }, 0);
+  // Tax & shipping are stored separately so we can recognize "real" revenue
+  // excluding pass-through items (sales tax in US, carrier fees). For US
+  // entities like HOI, sales tax is a liability owed to state government —
+  // not revenue under US GAAP / ASC 606.
+  const totalTax = allSalesForKpi.reduce((sum, o) => {
+    if (!o.taxAmount) return sum;
+    return sum + sumInUsd(Number(o.taxAmount), o.externalSource, o.orderDate);
+  }, 0);
+  const totalShipping = allSalesForKpi.reduce((sum, o) => {
+    if (!o.shippingAmount) return sum;
+    return sum + sumInUsd(Number(o.shippingAmount), o.externalSource, o.orderDate);
+  }, 0);
+  const recognizedRevenue = totalRevenue - totalTax - totalShipping;
+  const hasTaxOrShipping = totalTax + totalShipping > 0.01;
   const orderCount = totalSalesCount;
 
   // Per-category 30-day-window USD revenue (within the active month filter).
@@ -275,13 +289,29 @@ export default async function SalesPage({
             <p className="text-lg font-semibold">{orderCount}</p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-[var(--text-secondary)]">Net Revenue</p>
+            <p className="text-xs text-[var(--text-secondary)]">
+              {hasTaxOrShipping ? "Gross Revenue" : "Net Revenue"}
+            </p>
             <CurrencyDisplay
               amount={totalRevenue}
               exchangeRate={exchangeRate.rate}
               primaryCurrency={primaryCurrency}
             />
           </div>
+          {hasTaxOrShipping && (
+            <div
+              className="text-right"
+              title={`Excludes: tax $${totalTax.toFixed(2)} + shipping $${totalShipping.toFixed(2)}`}
+            >
+              <p className="text-xs text-emerald-500">Net Revenue</p>
+              <CurrencyDisplay
+                amount={recognizedRevenue}
+                exchangeRate={exchangeRate.rate}
+                primaryCurrency={primaryCurrency}
+              />
+              <p className="text-[10px] text-[var(--text-tertiary)]">excl. tax & shipping</p>
+            </div>
+          )}
           {totalCommission > 0 && (
             <div className="text-right">
               <p className="text-xs text-red-400">Fees</p>

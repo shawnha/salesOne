@@ -37,6 +37,10 @@ export interface ExternalOrderData {
   settlementAmount?: number;
   /** Platform commission/fees */
   commissionAmount?: number;
+  /** Sales tax / VAT collected from customer. Pass-through, not revenue for US entities. */
+  taxAmount?: number;
+  /** Shipping fee charged to customer. Stored separately for revenue recognition. */
+  shippingAmount?: number;
   /** Carrier tracking number (e.g. CJ대한통운 송장 번호, FedEx tracking #) */
   trackingNumber?: string;
   /** Carrier name (e.g. "CJ대한통운", "FedEx", "WILL CALL") */

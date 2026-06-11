@@ -111,6 +111,10 @@ export const shopifyConnector: Connector = {
       for (const order of data.orders || []) {
         const refundAmount = calculateRefundAmount(order);
         const totalAmount = parseFloat(order.total_price);
+        const taxAmount = parseFloat(order.total_tax || "0");
+        const shippingAmount = parseFloat(
+          order.total_shipping_price_set?.shop_money?.amount || "0",
+        );
 
         orders.push({
           externalOrderId: String(order.id),
@@ -121,6 +125,8 @@ export const shopifyConnector: Connector = {
           financialStatus: mapFinancialStatus(order.financial_status),
           totalAmount,
           refundAmount: refundAmount > 0 ? refundAmount : undefined,
+          taxAmount: taxAmount > 0 ? taxAmount : undefined,
+          shippingAmount: shippingAmount > 0 ? shippingAmount : undefined,
           customerName: order.customer
             ? `${order.customer.first_name || ""} ${order.customer.last_name || ""}`.trim()
             : undefined,

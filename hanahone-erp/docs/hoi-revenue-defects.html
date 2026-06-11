@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>HOI 매출 인식 결함 분석 — 2026-05-06</title>
+<style>
+  :root {
+    --bg: #0b0d10;
+    --surface: #14171c;
+    --surface-2: #1a1e25;
+    --border: #2a2f37;
+    --text: #e8eaed;
+    --text-2: #a8adb6;
+    --text-3: #6b7280;
+    --accent: #14b8a6;
+    --warn: #f59e0b;
+    --rose: #ef4444;
+    --teal: #14b8a6;
+    --indigo: #818cf8;
+    --amber: #fbbf24;
+    --violet: #a78bfa;
+    --green: #34d399;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Pretendard", "Apple SD Gothic Neo", sans-serif;
+    font-size: 14px;
+    line-height: 1.65;
+  }
+  .container { max-width: 1180px; margin: 0 auto; padding: 48px 24px 96px; }
+  header { margin-bottom: 28px; }
+  h1 {
+    font-size: 28px; font-weight: 700; margin: 0 0 6px;
+    letter-spacing: -0.02em;
+  }
+  .subtitle { color: var(--text-2); font-size: 13px; }
+  .meta { color: var(--text-3); font-size: 12px; margin-top: 6px; }
+  h2 {
+    font-size: 18px; font-weight: 600; margin: 36px 0 12px;
+    border-left: 3px solid var(--accent); padding-left: 12px;
+  }
+  h2.tldr { border-left-color: var(--amber); }
+  h2.findings { border-left-color: var(--rose); }
+  h2.data { border-left-color: var(--indigo); }
+  h2.codes { border-left-color: var(--warn); }
+  h2.matrix { border-left-color: var(--violet); }
+  h2.actions { border-left-color: var(--green); }
+  h2.flow { border-left-color: var(--teal); }
+  h3 { font-size: 14px; font-weight: 600; margin: 16px 0 8px; color: var(--text-2); }
+  p { margin: 0 0 12px; color: var(--text-2); }
+  strong { color: var(--text); font-weight: 600; }
+  code {
+    background: var(--surface-2); color: var(--accent);
+    padding: 2px 6px; border-radius: 4px; font-size: 12.5px;
+    font-family: "SF Mono", Menlo, monospace;
+  }
+  .mono { font-family: "SF Mono", Menlo, monospace; }
+
+  /* TL;DR box */
+  .tldr-box {
+    background: linear-gradient(135deg, rgba(245,158,11,0.06), rgba(245,158,11,0.02));
+    border: 1px solid rgba(245,158,11,0.25);
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin: 8px 0 16px;
+  }
+  .tldr-box ol { margin: 0; padding-left: 22px; color: var(--text); }
+  .tldr-box ol li { margin-bottom: 8px; }
+  .tldr-box ol li:last-child { margin-bottom: 0; }
+
+  /* Stats grid */
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px; margin: 8px 0 16px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .stat-card.bad { border-left: 3px solid var(--rose); }
+  .stat-card.warn { border-left: 3px solid var(--amber); }
+  .stat-card.ok { border-left: 3px solid var(--green); }
+  .stat-card.info { border-left: 3px solid var(--indigo); }
+  .stat-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--text-3);
+    margin-bottom: 6px;
+  }
+  .stat-value {
+    font-size: 22px; font-weight: 700; color: var(--text);
+    font-family: "SF Mono", Menlo, monospace;
+    margin-bottom: 2px;
+  }
+  .stat-value.rose { color: var(--rose); }
+  .stat-value.amber { color: var(--amber); }
+  .stat-value.green { color: var(--green); }
+  .stat-value.indigo { color: var(--indigo); }
+  .stat-sub { font-size: 11px; color: var(--text-3); }
+
+  /* Finding card */
+  .finding {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin: 12px 0;
+    border-left: 3px solid var(--rose);
+  }
+  .finding.warn { border-left-color: var(--amber); }
+  .finding-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px; flex-wrap: wrap; gap: 8px;
+  }
+  .finding-title {
+    font-size: 15px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .finding-num {
+    background: rgba(239, 68, 68, 0.14); color: var(--rose);
+    padding: 2px 9px; border-radius: 4px; font-size: 11px;
+    font-weight: 700; font-family: "SF Mono", Menlo, monospace;
+  }
+  .finding.warn .finding-num { background: rgba(245, 158, 11, 0.14); color: var(--amber); }
+  .finding-body { color: var(--text-2); font-size: 13.5px; }
+  .finding-body p { margin: 4px 0 8px; }
+  .finding-body ul { margin: 4px 0 8px; padding-left: 20px; }
+  .finding-body ul li { margin-bottom: 3px; }
+  .finding-section {
+    margin-top: 10px; padding-top: 10px;
+    border-top: 1px dashed var(--border);
+  }
+  .finding-section-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--text-3);
+    margin-bottom: 4px;
+  }
+  .label-bad { color: var(--rose); }
+  .label-ok { color: var(--green); }
+  .label-warn { color: var(--amber); }
+
+  /* Pills */
+  .pill {
+    display: inline-block; padding: 2px 8px;
+    border-radius: 999px; font-size: 11px; font-weight: 600;
+    white-space: nowrap;
+  }
+  .pill-p0 { background: rgba(239, 68, 68, 0.14); color: var(--rose); }
+  .pill-p1 { background: rgba(245, 158, 11, 0.14); color: var(--amber); }
+  .pill-p2 { background: rgba(129, 140, 248, 0.14); color: var(--indigo); }
+  .pill-p3 { background: rgba(167, 139, 250, 0.14); color: var(--violet); }
+  .pill-area { background: var(--surface-2); color: var(--text-2); }
+  .pill-channel-shopify { background: rgba(52, 211, 153, 0.14); color: var(--green); }
+  .pill-channel-amazon { background: rgba(251, 191, 36, 0.14); color: var(--amber); }
+  .pill-channel-tiktok { background: rgba(167, 139, 250, 0.14); color: var(--violet); }
+
+  /* Tables */
+  table {
+    width: 100%; border-collapse: collapse;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden; margin: 8px 0 16px;
+    font-size: 13px;
+  }
+  thead { background: var(--surface-2); }
+  th, td {
+    text-align: left; padding: 10px 14px;
+    border-bottom: 1px solid var(--border); vertical-align: top;
+  }
+  th { font-weight: 600; color: var(--text-2); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num { font-family: "SF Mono", Menlo, monospace; text-align: right; }
+  td.bad { color: var(--rose); font-weight: 600; }
+  td.warn { color: var(--amber); font-weight: 600; }
+  td.ok { color: var(--green); }
+  td.dim { color: var(--text-3); }
+
+  /* Math breakdown */
+  .breakdown {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 22px; margin: 8px 0 16px;
+    font-family: "SF Mono", Menlo, monospace; font-size: 13px;
+    line-height: 2;
+  }
+  .breakdown .label { color: var(--text-2); display: inline-block; min-width: 360px; }
+  .breakdown .val { color: var(--text); font-weight: 600; }
+  .breakdown .val.bad { color: var(--rose); }
+  .breakdown .val.warn { color: var(--amber); }
+  .breakdown .val.green { color: var(--green); }
+  .breakdown .val.dim { color: var(--text-3); }
+  .breakdown hr { border: none; border-top: 1px dashed var(--border); margin: 6px 0; }
+  .breakdown .total-line { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 8px; }
+
+  /* ASCII diagram */
+  .ascii-diagram {
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 12.5px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px; color: var(--text-2);
+    white-space: pre; overflow-x: auto;
+    line-height: 1.5;
+  }
+  .ascii-diagram .red { color: var(--rose); }
+  .ascii-diagram .amber { color: var(--amber); }
+  .ascii-diagram .green { color: var(--green); }
+  .ascii-diagram .accent { color: var(--accent); }
+  .ascii-diagram .dim { color: var(--text-3); }
+
+  /* Action card */
+  .action-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin: 10px 0;
+  }
+  .action-card.p0 { border-left: 3px solid var(--rose); }
+  .action-card.p1 { border-left: 3px solid var(--amber); }
+  .action-card.p2 { border-left: 3px solid var(--indigo); }
+  .action-card.p3 { border-left: 3px solid var(--violet); }
+  .action-header {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 6px;
+  }
+  .action-title { font-size: 14px; font-weight: 600; color: var(--text); }
+  .action-effort { font-size: 11px; color: var(--text-3); margin-left: auto; }
+  .action-card ul { margin: 6px 0 0; padding-left: 18px; color: var(--text-2); font-size: 13.5px; }
+
+  /* Status badges */
+  .badge-ok { color: var(--green); font-weight: 700; }
+  .badge-warn { color: var(--amber); font-weight: 700; }
+  .badge-bad { color: var(--rose); font-weight: 700; }
+
+  /* Footnote */
+  .footnote {
+    margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--text-3);
+  }
+  .footnote ul { padding-left: 18px; }
+
+  @media (max-width: 720px) {
+    .container { padding: 24px 16px 64px; }
+    h1 { font-size: 22px; }
+    .breakdown .label { min-width: 220px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>HOI 매출 인식 결함 분석</h1>
+    <div class="subtitle">사장님이 의문 제기한 "올려둔 가격과 다르게 들어오는 주문"의 근본 원인 — 데이터 + 코드 분석</div>
+    <div class="meta">2026-05-06 작성 · HOI Shopify/TikTok/Amazon 222+62+29 = 313건 분석 기준</div>
+  </header>
+
+  <!-- TL;DR -->
+  <h2 class="tldr">📌 TL;DR</h2>
+  <div class="tldr-box">
+    <ol>
+      <li><strong>"가격이 더 높게 들어옴" (43건/Shopify)</strong> = 미국 <strong>Sales Tax (~9%) + 배송비</strong>가 매출에 포함됨. 회계상 매출이 <strong>$345 (1.7%) 부풀려져</strong> 있음.</li>
+      <li><strong>"가격이 더 낮게 들어옴" (6건/Shopify)</strong> = <strong>누군가 발급한 할인 코드</strong> (`INSIDER10` 4회, `berfodd`, `Seller discount`). 사장님이 인지 못 하셨던 것일 수 있음 — Shopify 어드민에서 즉시 확인 필요.</li>
+      <li><strong>TikTok / Amazon 은 분석 자체가 불가능</strong> — `ExternalOrder.rawData`가 0건 저장됨. 같은 문제가 더 클 가능성이 높지만 추적 불가 상태.</li>
+    </ol>
+  </div>
+
+  <!-- 핵심 수치 -->
+  <h2 class="data">📊 핵심 수치 (HOI Shopify 222건 전체)</h2>
+  <div class="stats-grid">
+    <div class="stat-card bad">
+      <div class="stat-label">현재 매출 (total_price)</div>
+      <div class="stat-value rose">$19,975.63</div>
+      <div class="stat-sub">tax + shipping 포함된 부풀린 값</div>
+    </div>
+    <div class="stat-card ok">
+      <div class="stat-label">정확한 매출 (subtotal_price)</div>
+      <div class="stat-value green">$19,630.10</div>
+      <div class="stat-sub">tax/배송 제외, 할인 차감 후</div>
+    </div>
+    <div class="stat-card warn">
+      <div class="stat-label">매출 부풀림</div>
+      <div class="stat-value amber">+$345.53</div>
+      <div class="stat-sub">현재 매출 대비 +1.7%</div>
+    </div>
+    <div class="stat-card info">
+      <div class="stat-label">미인지 할인 적용</div>
+      <div class="stat-value indigo">$57.90</div>
+      <div class="stat-sub">총 6건 (4 + 1 + 1)</div>
+    </div>
+  </div>
+
+  <!-- 매출 구성 분석 (수치 분해) -->
+  <h2 class="data">🧮 매출 구성 분해</h2>
+  <p>현재 우리 시스템이 매출로 잡고 있는 <code>$19,975.63</code> 안에 무엇이 들어 있는가:</p>
+  <div class="breakdown">
+    <div><span class="label">정가 합계 (total_line_items_price)</span><span class="val">$19,688.00</span></div>
+    <div><span class="label">− 발급된 할인 (total_discounts)</span><span class="val warn">−   $57.90</span></div>
+    <hr>
+    <div><span class="label">= subtotal_price <span class="dim">(올바른 매출 기준 ✓)</span></span><span class="val green">$19,630.10</span></div>
+    <div><span class="label">+ 미국 Sales Tax (total_tax)</span><span class="val bad">+  $335.53</span></div>
+    <div><span class="label">+ 배송비 (total_shipping)</span><span class="val bad">+   $10.00</span></div>
+    <div class="total-line"><span class="label">= total_price <span class="dim">(현재 우리 매출 ✗)</span></span><span class="val bad">$19,975.63</span></div>
+  </div>
+
+  <!-- 채널별 분포 -->
+  <h2 class="data">📈 채널별 불일치 분포 (지난 6개월)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>채널</th>
+        <th class="num">주문 수</th>
+        <th class="num">정가합계 &gt; 결제액 (낮음)</th>
+        <th class="num">정가합계 &lt; 결제액 (높음)</th>
+        <th class="num">일치</th>
+        <th>정가 정보 누락</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="pill pill-channel-shopify">SHOPIFY</span></td>
+        <td class="num">98</td>
+        <td class="num warn">1</td>
+        <td class="num warn">34</td>
+        <td class="num ok">63</td>
+        <td><span class="badge-ok">전부 OK ✓</span></td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-channel-tiktok">TIKTOK</span></td>
+        <td class="num">52</td>
+        <td class="num dim">0</td>
+        <td class="num dim">0</td>
+        <td class="num">41</td>
+        <td><span class="badge-bad">41건 전부 누락 ✗</span></td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-channel-amazon">AMAZON</span></td>
+        <td class="num">29</td>
+        <td class="num dim">0</td>
+        <td class="num dim">0</td>
+        <td class="num">29</td>
+        <td><span class="badge-bad">29건 전부 누락 ✗</span></td>
+      </tr>
+    </tbody>
+  </table>
+  <p style="font-size: 12.5px; color: var(--text-3);">
+    ⚠️ TikTok/Amazon은 <code>originalUnitPrice</code>가 NULL이라 비교 자체가 무의미함 — "일치"가 아니라 "비교 불가". 실제 할인/세금/배송비 영향은 알 수 없음.
+  </p>
+
+  <!-- 미인지 할인 코드 -->
+  <h2 class="codes">✅ Shopify 발급 할인 코드 — 사장님 발급 확인됨 (2026-05-06)</h2>
+  <p>당초 미스터리였으나 <strong>사장님이 직접 발급하신 코드로 확인됨</strong>. 즉 "낮게 들어온" 6건은 의도된 할인으로 정상 동작. 남은 진짜 문제는 <strong>"높게 들어온" 43건 (= 세금/배송비 매출 포함)</strong>과 <strong>TikTok/Amazon raw 미저장</strong>.</p>
+  <table>
+    <thead>
+      <tr>
+        <th>코드</th>
+        <th>타입</th>
+        <th class="num">사용 횟수</th>
+        <th class="num">누적 할인액</th>
+        <th>비고 / 추정</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>INSIDER10</code></td>
+        <td>$10 fixed</td>
+        <td class="num">4회</td>
+        <td class="num">$40.00</td>
+        <td><span class="badge-ok">사장님 발급 확인 ✓</span></td>
+      </tr>
+      <tr>
+        <td><code>berfodd</code></td>
+        <td>10% 할인</td>
+        <td class="num">1회</td>
+        <td class="num">$13.00</td>
+        <td><span class="badge-ok">사장님 발급 확인 ✓</span></td>
+      </tr>
+      <tr>
+        <td><code>Seller discount</code></td>
+        <td>$4.90 manual</td>
+        <td class="num">1회</td>
+        <td class="num">$4.90</td>
+        <td><span class="badge-ok">사장님 발급 확인 ✓</span></td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    이 6건은 회계상으로 정확히 매출 차감되어야 함 (셀러 부담 할인 → Net Revenue 차감 ✓).
+    현재 시스템은 <code>total_price</code>를 쓰기 때문에 이 부분은 이미 차감 반영되어 있음.
+    <strong>TikTok Shop / Amazon Seller Central</strong>에서도 동일한 방식으로 의도된 할인이 있는지 확인 필요 (raw 미저장으로 ERP에서는 추적 불가).
+  </p>
+
+  <!-- 5가지 결함 -->
+  <h2 class="findings">🔧 발견된 5가지 코드 레벨 결함</h2>
+
+  <div class="finding">
+    <div class="finding-header">
+      <div class="finding-title"><span class="finding-num">#1</span> Shopify 매출 매핑 결함 (가장 큰 임팩트)</div>
+      <div><span class="pill pill-p1">P1</span> <span class="pill pill-channel-shopify">SHOPIFY</span></div>
+    </div>
+    <div class="finding-body">
+      <p>현재 <code>shopify.ts:113</code>에서 <code>totalAmount = order.total_price</code> 사용. 이 값은 <strong>상품가 + 세금 + 배송비 − 할인</strong>이라 회계상 매출이 부풀려짐.</p>
+      <div class="finding-section">
+        <div class="finding-section-label label-bad">현재 (잘못됨)</div>
+        <div class="mono" style="font-size: 12.5px;">totalAmount: parseFloat(order.<span style="color: var(--rose);">total_price</span>)  // tax + shipping 포함</div>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label label-ok">올바른 매핑</div>
+        <div class="mono" style="font-size: 12.5px;">totalAmount: parseFloat(order.<span style="color: var(--green);">subtotal_price</span>)  // = line_items − discounts</div>
+        <p style="margin-top: 6px;">또는 <code>total_line_items_price - total_discounts</code>로 동등 계산. <code>tax</code>, <code>shipping</code>, <code>tip</code>은 별도 컬럼에 저장.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <div class="finding-title"><span class="finding-num">#2</span> TikTok / Amazon raw 데이터 미저장</div>
+      <div><span class="pill pill-p2">P2</span> <span class="pill pill-channel-tiktok">TIKTOK</span> <span class="pill pill-channel-amazon">AMAZON</span></div>
+    </div>
+    <div class="finding-body">
+      <p>HOI 전체 데이터 분포:</p>
+      <div class="ascii-diagram">ExternalOrder.rawData 보존 현황 (HOI all-time):
+  SHOPIFY  : <span class="green">222건 ✓</span>
+  CGETC    : <span class="green">735건 ✓</span>
+  AMAZON   : <span class="red">  0건 ✗</span>  ← Order는 29건 있는데 raw 0건
+  TIKTOK   : <span class="red">  0건 ✗</span>  ← Order는 62건 있는데 raw 0건</div>
+      <p>Order 매핑은 되어 있는데 채널이 보낸 원본이 보존 안 됨. 사후 검증, 매출 재계산, 회계 감사가 모두 불가능. <strong>사장님이 체감하는 "왜 적게 들어왔지?"를 추적할 방법 자체가 없는 상태.</strong></p>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <div class="finding-title"><span class="finding-num">#3</span> TikTok CSV 파서 결함</div>
+      <div><span class="pill pill-p1">P1</span> <span class="pill pill-channel-tiktok">TIKTOK</span></div>
+    </div>
+    <div class="finding-body">
+      <p>파일: <code>tiktok-csv.ts:56</code></p>
+      <ul>
+        <li><code>Order Total</code>을 그대로 totalAmount로 사용 — TikTok Shop의 grand total은 일반적으로 tax + shipping 포함</li>
+        <li><code>originalUnitPrice</code>, <code>discountAmount</code> 안 채움 → 할인 추적 불가</li>
+        <li>TikTok voucher / platform discount 정보 미파싱</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <div class="finding-title"><span class="finding-num">#4</span> Amazon 커넥터 결함</div>
+      <div><span class="pill pill-p1">P1</span> <span class="pill pill-channel-amazon">AMAZON</span></div>
+    </div>
+    <div class="finding-body">
+      <p>파일: <code>amazon.ts:76</code></p>
+      <ul>
+        <li><code>OrderTotal.Amount</code> (grand total) 사용 → 세금/배송비 포함</li>
+        <li><code>PromotionDiscount</code> 미사용 → Amazon Vine, Lightning Deal, Prime 멤버 할인 추적 불가</li>
+        <li>제대로 하려면 <code>ItemPrice</code> 합계 + <code>PromotionDiscount</code> 별도 처리</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="finding warn">
+    <div class="finding-header">
+      <div class="finding-title"><span class="finding-num">#5</span> Product 마스터 가격 미입력</div>
+      <div><span class="pill pill-p3">P3</span> <span class="pill pill-area">DATA</span></div>
+    </div>
+    <div class="finding-body">
+      <p>HOI 174 OrderItem 중 <strong>174건 전부 <code>Product.salePrice = NULL</code></strong>. 마스터 정가가 비어있어서 ERP에서 "내가 올려둔 가격 vs 실제 결제가" 비교가 구조적으로 불가능. 채널별 listing 가격을 어딘가에 기록해야 함.</p>
+    </div>
+  </div>
+
+  <!-- 사장님 체감 패턴 매핑 -->
+  <h2 class="matrix">🎯 사장님 체감 패턴 → 실제 원인 매핑</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>체감 현상</th>
+        <th>실제 원인</th>
+        <th>영향 채널</th>
+        <th>현재 추적 가능?</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>가격이 더 <strong>높게</strong> 들어옴</td>
+        <td>Sales tax (미국 주별 ~9%)</td>
+        <td>Shopify, Amazon, TikTok</td>
+        <td><span class="badge-warn">Shopify만 ⚠️</span></td>
+      </tr>
+      <tr>
+        <td>가격이 더 <strong>높게</strong> 들어옴</td>
+        <td>배송비 ($5 등)</td>
+        <td>Shopify, Amazon, TikTok</td>
+        <td><span class="badge-warn">Shopify만 ⚠️</span></td>
+      </tr>
+      <tr>
+        <td>가격이 더 <strong>낮게</strong> 들어옴</td>
+        <td>모르는 발급 할인 코드 (INSIDER10 등)</td>
+        <td>Shopify</td>
+        <td><span class="badge-warn">부분적 ⚠️</span></td>
+      </tr>
+      <tr>
+        <td>가격이 더 <strong>낮게</strong> 들어옴</td>
+        <td>플랫폼 자동 프로모션 (Vine, voucher)</td>
+        <td>Amazon, TikTok</td>
+        <td><span class="badge-bad">불가 ✗</span></td>
+      </tr>
+      <tr>
+        <td>가격이 더 <strong>낮게</strong> 들어옴</td>
+        <td>Subscription 자동 할인 (Selling Plan)</td>
+        <td>Shopify</td>
+        <td><span class="badge-warn">부분적 ⚠️</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 매출 흐름 다이어그램 -->
+  <h2 class="flow">🔀 매출 흐름 다이어그램</h2>
+  <div class="ascii-diagram">     <span class="dim">고객 결제 흐름                             ERP 매출 인식 (현재 vs 권장)</span>
+     ─────────────                             ──────────────────────────
+
+     <span class="accent">정가 합계 ($19,688)</span>
+            │
+            ▼
+       <span class="amber">− 할인 ($57.90)</span>           ──┐
+            │                       │
+            ▼                       │
+     <span class="green">subtotal ($19,630.10)</span>     ←─┴──── <span class="green">권장: 매출로 인식 ✓</span>
+            │                                <span class="dim">(ASC 606, Shopify 표준)</span>
+            ▼
+       <span class="rose">+ 세금 ($335.53)</span>          ──┐
+            │                       │
+            ▼                       │
+       <span class="rose">+ 배송비 ($10.00)</span>         │
+            │                       │
+            ▼                       │
+     <span class="rose">total ($19,975.63)</span>        ←─┴──── <span class="rose">현재: 매출로 인식 ✗</span>
+            │                                <span class="dim">(부풀림 +$345.53 = +1.7%)</span>
+            ▼
+     <span class="dim">고객 카드 결제 →</span>
+     <span class="dim">Shopify Payments 수수료 차감 →</span>
+     <span class="dim">통장 입금</span></div>
+
+  <!-- 우선순위 액션 -->
+  <h2 class="actions">✅ 우선순위 액션 플랜</h2>
+
+  <div class="action-card p0">
+    <div class="action-header">
+      <span class="pill pill-p0">P0</span>
+      <span class="action-title">미인지 할인 코드 확인 (수작업)</span>
+      <span class="action-effort">~ 1시간</span>
+    </div>
+    <ul>
+      <li>Shopify 어드민 → Discounts 메뉴에서 <code>INSIDER10</code>, <code>berfodd</code>, <code>Seller discount</code> 누가/언제 만들었는지 확인</li>
+      <li>TikTok Shop 셀러센터 → Promotions 페이지 확인</li>
+      <li>Amazon Seller Central → Coupons / Promotions 확인</li>
+      <li>의도된 코드면 OK, 아니면 즉시 비활성화</li>
+    </ul>
+  </div>
+
+  <div class="action-card p1">
+    <div class="action-header">
+      <span class="pill pill-p1">P1</span>
+      <span class="action-title">Shopify 매출 매핑 수정 (가장 임팩트 큼)</span>
+      <span class="action-effort">~ 1시간</span>
+    </div>
+    <ul>
+      <li><code>shopify.ts:113</code>의 <code>total_price</code> → <code>subtotal_price</code> 변경</li>
+      <li>기존 222건 데이터에 대한 backfill 마이그레이션 작성</li>
+      <li>Sales 페이지 매출 검증 (예상: −$345 = −1.7%)</li>
+    </ul>
+  </div>
+
+  <div class="action-card p1">
+    <div class="action-header">
+      <span class="pill pill-p1">P1</span>
+      <span class="action-title">TikTok / Amazon 커넥터 가격 분해</span>
+      <span class="action-effort">~ 반나절</span>
+    </div>
+    <ul>
+      <li>TikTok CSV: <code>Item Price × Qty</code>로 unitPrice/originalUnitPrice 채움 + tax/shipping 컬럼 별도 파싱</li>
+      <li>Amazon: <code>OrderItem.ItemPrice</code> 합계 사용 + <code>PromotionDiscount</code> 별도 추적</li>
+    </ul>
+  </div>
+
+  <div class="action-card p2">
+    <div class="action-header">
+      <span class="pill pill-p2">P2</span>
+      <span class="action-title">TikTok / Amazon raw 데이터 보존</span>
+      <span class="action-effort">~ 1일</span>
+    </div>
+    <ul>
+      <li><code>sync-runner.ts</code>에서 <code>ExternalOrder.create({ rawData })</code> 누락 점검</li>
+      <li>기존 222 (Amazon) + 62 (TikTok) 주문에 대한 historical raw 백필 가능 여부 검토</li>
+      <li>향후 사후 검증/감사가 가능하도록 보장</li>
+    </ul>
+  </div>
+
+  <div class="action-card p2">
+    <div class="action-header">
+      <span class="pill pill-p2">P2</span>
+      <span class="action-title">Order 모델에 tax / shipping 컬럼 분리</span>
+      <span class="action-effort">~ 1일</span>
+    </div>
+    <ul>
+      <li>Prisma 스키마에 <code>taxAmount</code>, <code>shippingAmount</code> 추가</li>
+      <li>Sales 페이지에 "Gross Sales / Net Sales / Recognized Revenue" 3단 KPI 표시</li>
+      <li>모든 채널 커넥터에서 tax/shipping 분리 매핑</li>
+    </ul>
+  </div>
+
+  <div class="action-card p3">
+    <div class="action-header">
+      <span class="pill pill-p3">P3</span>
+      <span class="action-title">Product 마스터 정가 입력</span>
+      <span class="action-effort">지속</span>
+    </div>
+    <ul>
+      <li>Product.salePrice 채우기 → 향후 "올려둔 가격 vs 실제 결제가" 자동 비교 대시보드 가능</li>
+      <li>채널별 listing 가격이 다르면 SkuMapping 또는 별도 테이블로 분리 저장</li>
+    </ul>
+  </div>
+
+  <!-- 사장님 질문 답변 -->
+  <h2 class="tldr">💬 사장님 질문에 대한 정확한 답변</h2>
+
+  <div class="finding warn">
+    <div class="finding-header">
+      <div class="finding-title">Q1. "왜 어떤 고객은 더 적고 어떤 고객은 더 많은가?"</div>
+    </div>
+    <div class="finding-body">
+      <p><strong>더 많은 케이스</strong>: 미국 주별 sales tax (평균 ~9%) 또는 국제 배송비 ($5 등)가 매출(<code>total_price</code>)에 포함됨. 회계상으로는 매출이 아닌데 매출로 잡힘.</p>
+      <p><strong>더 적은 케이스</strong>: 셀러센터에서 누군가가 발급한 할인 코드(<code>INSIDER10</code> 등 6건)가 적용됨. 사장님이 인지하지 못한 것일 수 있음. <strong>Shopify 어드민의 Discounts 페이지에서 즉시 확인 가능.</strong></p>
+    </div>
+  </div>
+
+  <div class="finding warn">
+    <div class="finding-header">
+      <div class="finding-title">Q2. "통장에 결국 찍히는 금액이랑 비슷하다"</div>
+    </div>
+    <div class="finding-body">
+      <p>맞습니다 — 현재 우리 시스템은 Shopify의 <code>total_price</code>를 매출로 잡는데, 이건 "고객이 결제한 총액"이라 통장 입금 금액과 거의 같음.</p>
+      <p>하지만 <strong>회계상 매출 ≠ 통장 입금액</strong>. 정확한 등식은:</p>
+      <div class="breakdown" style="margin-top: 8px;">
+        <div><span class="label">통장 입금액</span><span class="val">=</span></div>
+        <div><span class="label">  매출 (= subtotal_price)</span><span class="val green"></span></div>
+        <div><span class="label">  + 세금 (고객한테 받아서 정부에 줄 돈)</span><span class="val warn">+</span></div>
+        <div><span class="label">  + 배송비 (보통 매출 아님, 운송회사 패스스루)</span><span class="val warn">+</span></div>
+        <div><span class="label">  − 결제 수수료 (Shopify Payments ~2.9%)</span><span class="val warn">−</span></div>
+      </div>
+      <p>이걸 분리해야 정확한 매출이 나옴. 현재는 모두 뭉뚱그려 매출로 잡힘.</p>
+    </div>
+  </div>
+
+  <!-- 결론 -->
+  <h2 class="actions">🎬 다음 단계</h2>
+  <p>아래 중 무엇부터 진행할지 선택해주세요:</p>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 80px;">선택</th>
+        <th>작업</th>
+        <th style="width: 100px;">예상 시간</th>
+        <th style="width: 100px;">우선순위</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="mono"><strong>(A)</strong></td>
+        <td>Shopify/TikTok/Amazon 어드민에서 INSIDER10 등 할인 코드 확인 (사장님 직접)</td>
+        <td>~ 1시간</td>
+        <td><span class="pill pill-p0">P0</span></td>
+      </tr>
+      <tr>
+        <td class="mono"><strong>(B)</strong></td>
+        <td>Shopify <code>totalAmount</code> 매핑을 <code>subtotal_price</code>로 변경 + 기존 데이터 backfill PR</td>
+        <td>~ 1시간</td>
+        <td><span class="pill pill-p1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="mono"><strong>(C)</strong></td>
+        <td>Amazon/TikTok 커넥터의 raw 데이터 보존 + 가격 분해 패치</td>
+        <td>~ 반나절</td>
+        <td><span class="pill pill-p1">P1</span></td>
+      </tr>
+      <tr>
+        <td class="mono"><strong>(D)</strong></td>
+        <td>Order 스키마에 tax/shipping 컬럼 추가 + Sales 페이지 3단 KPI</td>
+        <td>~ 1일</td>
+        <td><span class="pill pill-p2">P2</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="footnote">
+    <p><strong>분석 방법</strong></p>
+    <ul>
+      <li>HOI 회사ID <code>69b44456-1369-4892-8a41-6760a8b13412</code>에 대해 Prisma 직접 쿼리</li>
+      <li>지난 6개월 (2025-11-06 ~ 2026-05-06) 주문 179건 + Shopify 전체 222건 ExternalOrder rawData 분석</li>
+      <li><code>OrderItem.unitPrice</code> vs <code>Product.salePrice</code>, <code>Order.totalAmount</code> vs <code>line_items × qty</code> 비교</li>
+      <li>Shopify <code>discount_codes</code>, <code>discount_applications</code>, <code>tax_lines</code>, <code>shipping_lines</code> 필드 분해 집계</li>
+    </ul>
+    <p style="margin-top: 16px;"><strong>참고 자료</strong></p>
+    <ul>
+      <li>ASC 606 (US GAAP) — 매출 인식은 통제권 이전 시점, sales tax/shipping은 매출에서 분리</li>
+      <li>Shopify Help: Sales reports의 <code>Net Sales</code> = subtotal − discounts (= <code>subtotal_price</code>)</li>
+      <li>NetSuite: tax/shipping은 별도 GL 계정에 분리 처리</li>
+    </ul>
+    <p style="margin-top: 16px;">2026-05-06 작성 · HanahOne ERP IT</p>
+  </div>
+</div>
+</body>
+</html>
