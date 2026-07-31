@@ -132,6 +132,98 @@ function mapFinancialStatus(status: string): string {
   return "PAID";
 }
 
+export interface TiktokOrderFinance {
+  /** 플랫폼 수수료·세금 합(양수). 정산서의 fee_tax_amount는 음수로 오므로 뒤집는다. */
+  fee: number;
+  /** 셀러 실수령액. 미정산 건은 예상치. */
+  settlement: number;
+  /** 정산 기준 매출. */
+  revenue: number;
+  /** true = 정산 완료(정산서 확정), false = 미정산 예상치. */
+  settled: boolean;
+}
+
+async function paged(
+  creds: TiktokCredentials,
+  tokens: TokenFile,
+  path: string,
+  params: Record<string, string>,
+  listKey: string,
+): Promise<any[]> {
+  const out: any[] = [];
+  let pageToken: string | undefined;
+  let guard = 0;
+  while (guard++ < 200) {
+    const p: Record<string, string> = { ...params, page_size: "100" };
+    if (pageToken) p.page_token = pageToken;
+    const r = await signedCall(creds, tokens, path, p, null);
+    if (r.code !== 0) throw new Error(`TikTok ${path} failed: ${r.code} ${r.message}`);
+    out.push(...(r.data?.[listKey] || []));
+    pageToken = r.data?.next_page_token;
+    if (!pageToken) break;
+  }
+  return out;
+}
+
+/**
+ * 주문별 수수료·정산액 — Orders API엔 없고 Finance API에만 있다.
+ * 정산서(확정) + 미정산(예상)을 한 번에 훑어 주문 ID로 맵을 만든다.
+ * 정산은 주문 N건을 배치로 묶어 지급하므로 건별 조회보다 배치 수집이 맞다.
+ */
+export async function fetchTiktokOrderFinance(
+  credentials: TiktokCredentials,
+  since: Date | null,
+): Promise<Map<string, TiktokOrderFinance>> {
+  const tokens = await ensureTokens(credentials);
+  const cipher = await getShopCipher(credentials, tokens);
+  const map = new Map<string, TiktokOrderFinance>();
+
+  const from = Math.floor((since ?? new Date(Date.UTC(2026, 0, 1))).getTime() / 1000);
+  const to = Math.floor(Date.now() / 1000) + 86400;
+
+  const statements = await paged(credentials, tokens, "/finance/202309/statements", {
+    shop_cipher: cipher,
+    sort_field: "statement_time",
+    sort_order: "ASC",
+    statement_time_ge: String(from),
+    statement_time_lt: String(to),
+  }, "statements");
+
+  for (const s of statements) {
+    const txns = await paged(
+      credentials, tokens,
+      `/finance/202501/statements/${s.id}/statement_transactions`,
+      { shop_cipher: cipher, sort_field: "order_create_time" },
+      "transactions",
+    );
+    for (const t of txns) {
+      if (!t.order_id) continue;
+      map.set(String(t.order_id), {
+        fee: Math.abs(parseFloat(t.fee_tax_amount || "0") || 0),
+        settlement: parseFloat(t.settlement_amount || "0") || 0,
+        revenue: parseFloat(t.revenue_amount || "0") || 0,
+        settled: true,
+      });
+    }
+  }
+
+  const unsettled = await paged(credentials, tokens, "/finance/202507/orders/unsettled", {
+    shop_cipher: cipher,
+    sort_field: "order_create_time",
+  }, "transactions");
+  for (const t of unsettled) {
+    if (!t.order_id || map.has(String(t.order_id))) continue; // 확정 정산이 우선
+    map.set(String(t.order_id), {
+      fee: Math.abs(parseFloat(t.est_fee_tax_amount || "0") || 0),
+      settlement: parseFloat(t.est_settlement_amount || "0") || 0,
+      revenue: parseFloat(t.est_revenue_amount || "0") || 0,
+      settled: false,
+    });
+  }
+
+  return map;
+}
+
 export const tiktokConnector: Connector = {
   platform: "TIKTOK",
 
@@ -193,6 +285,13 @@ export const tiktokConnector: Connector = {
           }
         }
 
+        // 시스템 취소분 함정: 주문 status는 COMPLETED로 남는데 패키지가 전부 CANCELLED인
+        // 경우가 있다(배송 지연 자동 취소 등). 정산 기록상 매출 0·수수료만 청구되므로
+        // 매출로 잡으면 안 된다. 품목이 전부 취소면 취소 주문으로 본다.
+        const allItemsCancelled =
+          lineItems.length > 0 && lineItems.every((li) => li.package_status === "CANCELLED");
+        const effectiveStatus = allItemsCancelled ? "CANCELLED" : o.status;
+
         const tracking =
           o.tracking_number || lineItems.find((li) => li.tracking_number)?.tracking_number || undefined;
         const carrier = lineItems.find((li) => li.shipping_provider_name)?.shipping_provider_name
@@ -204,8 +303,8 @@ export const tiktokConnector: Connector = {
           externalOrderNumber: `TTS #${o.id}`,
           rawData: o,
           orderDate: new Date(Number(o.create_time) * 1000),
-          fulfillmentStatus: mapFulfillmentStatus(o.status),
-          financialStatus: mapFinancialStatus(o.status),
+          fulfillmentStatus: mapFulfillmentStatus(effectiveStatus),
+          financialStatus: mapFinancialStatus(effectiveStatus),
           // Shopify와 같은 규약: total = 공급가 + 세금 + 배송비(단 여기서 공급가는 셀러 매출 기준).
           totalAmount: +(revenueBase + taxAmount + shippingAmount).toFixed(2),
           taxAmount,

@@ -5,6 +5,7 @@ import type { Connector, SyncResult } from "./types";
 import { mapExternalOrder, mapFulfillmentStatus, mapFinancialStatus } from "./mappers/order-mapper";
 import { adjustInventoryForOrder } from "./inventory-deduction";
 import { fetchShopifyOrderFees } from "./connectors/shopify";
+import { fetchTiktokOrderFinance } from "./connectors/tiktok";
 
 const STALE_JOB_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
 
@@ -345,6 +346,37 @@ export async function runSync(connector: Connector, companyId: string): Promise<
         }
       } catch (err) {
         console.error("Shopify fees sync step failed:", (err as Error).message);
+      }
+    }
+
+    // TikTok: 수수료·정산액은 Orders API에 없고 Finance API에만 있다. 정산은 주문 N건을
+    // 배치로 묶어 지급하므로 건별 조회 대신 정산서를 한 번 훑어 맵으로 만들어 채운다.
+    // 미정산 건은 예상치라 확정 정산이 오면 덮어쓴다.
+    if (connector.platform === "TIKTOK") {
+      try {
+        const credsForFinance = JSON.parse(decrypt(config.credentials));
+        const finance = await fetchTiktokOrderFinance(credsForFinance, config.lastSyncAt);
+        const targets = await prisma.externalOrder.findMany({
+          where: { platform: "TIKTOK", companyId, mappedOrderId: { not: null } },
+          select: { externalOrderId: true, mappedOrder: { select: { id: true, commissionAmount: true, settlementAmount: true } } },
+        });
+        let filled = 0;
+        for (const eo of targets) {
+          const f = finance.get(eo.externalOrderId);
+          const order = eo.mappedOrder;
+          if (!f || !order) continue;
+          const sameFee = Number(order.commissionAmount ?? -1) === f.fee;
+          const sameSettle = Number(order.settlementAmount ?? -1) === f.settlement;
+          if (sameFee && sameSettle) continue;
+          await prisma.order.update({
+            where: { id: order.id },
+            data: { commissionAmount: f.fee, settlementAmount: f.settlement },
+          });
+          filled++;
+        }
+        console.log(`[sync] TikTok 정산 반영: ${filled}건 (조회 ${finance.size}건)`);
+      } catch (err) {
+        console.error("TikTok finance sync step failed:", (err as Error).message);
       }
     }
 
