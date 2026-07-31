@@ -27,3 +27,8 @@ npx tsx scripts/coupang-sync.ts 2>&1 | tee -a /tmp/naver-sync.log || true
 #    2026-06-11 추가: 이전엔 수동 트리거만 있어서 5/13~6/1 16일 공백 같은 사고가
 #    났음. 야간 잡에 합류시켜 자동화. Failures here don't fail the script.
 npx tsx scripts/shopify-sync.ts 2>&1 | tee -a /tmp/naver-sync.log || true
+
+# 5) Pull TikTok Shop orders. 2026-07-31 추가: 그전엔 CGETC(3PL) 피드가 유일한 경로라
+#    출고 전 주문이 안 보이고 정가만 잡혀 플랫폼 할인·판매세가 빠졌다. 이제 셀러 API가 정본.
+#    토큰은 worker/tiktok-finance/tokens.json 공유(같은 맥이라 refresh 충돌 없음).
+npx tsx scripts/tiktok-sync.ts 2>&1 | tee -a /tmp/naver-sync.log || true

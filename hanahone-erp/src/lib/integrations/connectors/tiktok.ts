@@ -168,6 +168,15 @@ export const tiktokConnector: Connector = {
         const lineItems: any[] = o.line_items || [];
         const recipient = o.recipient_address || {};
 
+        // 매출 기준 = **정가 − 셀러 할인**. 플랫폼 할인(platform_discount)은 틱톡이 부담해서
+        // 고객 결제액은 줄지만 셀러가 받는 금액은 정가 그대로다(정산 API est_revenue_amount와 전건 일치).
+        // payment.total_amount(고객 결제액)를 쓰면 정산 축과 어긋난다.
+        const listTotal = parseFloat(pay.original_total_product_price || "0") || 0;
+        const sellerDiscount = parseFloat(pay.seller_discount || "0") || 0;
+        const taxAmount = parseFloat(pay.tax || "0") || 0;
+        const shippingAmount = parseFloat(pay.shipping_fee || "0") || 0;
+        const revenueBase = listTotal - sellerDiscount;
+
         // 같은 SKU가 여러 줄로 오면 수량으로 합친다(틱톡은 개당 1줄).
         const bySku = new Map<string, { name: string; qty: number; paid: number; list: number; id: string }>();
         for (const li of lineItems) {
@@ -197,9 +206,10 @@ export const tiktokConnector: Connector = {
           orderDate: new Date(Number(o.create_time) * 1000),
           fulfillmentStatus: mapFulfillmentStatus(o.status),
           financialStatus: mapFinancialStatus(o.status),
-          totalAmount: parseFloat(pay.total_amount || "0") || 0,
-          taxAmount: parseFloat(pay.tax || "0") || 0,
-          shippingAmount: parseFloat(pay.shipping_fee || "0") || 0,
+          // Shopify와 같은 규약: total = 공급가 + 세금 + 배송비(단 여기서 공급가는 셀러 매출 기준).
+          totalAmount: +(revenueBase + taxAmount + shippingAmount).toFixed(2),
+          taxAmount,
+          shippingAmount,
           customerName: o.buyer_nickname || undefined,
           customerEmail: o.buyer_email || undefined,
           recipientName: recipient.name || undefined,
@@ -214,9 +224,10 @@ export const tiktokConnector: Connector = {
             productName: v.name,
             sku,
             quantity: v.qty,
-            unitPrice: +(v.paid / v.qty).toFixed(2),
+            // 단가도 셀러 매출 기준(정가). sale_price는 플랫폼 할인이 빠진 고객 결제가라
+            // 매출로 쓰면 주문 총액과 어긋난다.
+            unitPrice: +(v.list / v.qty).toFixed(2),
             originalUnitPrice: v.list > 0 ? +(v.list / v.qty).toFixed(2) : undefined,
-            discountAmount: v.list > v.paid ? +(v.list - v.paid).toFixed(2) : undefined,
           })),
         });
       }
