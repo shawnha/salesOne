@@ -506,10 +506,12 @@ function mapCgetcChannel(origin: string): { overridePlatform?: Platform; channel
   const o = (origin || "").toLowerCase().trim();
   // Shopify — already synced from Shopify API
   if (o.includes("shopify")) return { skip: true };
-  // TikTok — "TTS #...", "TTO #...", or bare 18-digit TTS order IDs
-  if (o.includes("tts") || o.includes("tto") || o.includes("tiktok")) return { overridePlatform: "TIKTOK" as Platform, skip: false };
-  if (/^\d{15,20}$/.test(o)) return { overridePlatform: "TIKTOK" as Platform, skip: false }; // bare TTS ID
-  if (/^\d{15,20}\/\d{15,20}/.test(o)) return { overridePlatform: "TIKTOK" as Platform, skip: false }; // double TTS ID
+  // TikTok — 셀러 Orders API가 정본(Shopify와 동일). CGETC는 출고돼야 데이터가 생겨
+  // 미출고 주문을 못 보고, 연동 이전분도 없어서 주문 소스로는 쓰지 않는다.
+  // "TTS #...", "TTO #...", or bare 18-digit TTS order IDs
+  if (o.includes("tts") || o.includes("tto") || o.includes("tiktok")) return { skip: true };
+  if (/^\d{15,20}$/.test(o)) return { skip: true }; // bare TTS ID
+  if (/^\d{15,20}\/\d{15,20}/.test(o)) return { skip: true }; // double TTS ID
   // Amazon
   if (o.includes("amazon")) return { overridePlatform: "AMAZON" as Platform, skip: false };
   // Promotion / seeding / gifting / sample — internal CGETC operations
