@@ -98,7 +98,9 @@ export const shopifyConnector: Connector = {
     const headers = { "X-Shopify-Access-Token": token, "Content-Type": "application/json" };
 
     let url = `${baseUrl}/orders.json?status=any&limit=250`;
-    if (since) url += `&created_at_min=${since.toISOString()}`;
+    // 갱신일 기준으로 조회한다. created_at_min이면 한 번 수집한 주문이 재조회 대상에서
+    // 빠져 출고·취소·환불(주문 며칠 뒤 붙음)을 영원히 못 본다.
+    if (since) url += `&updated_at_min=${since.toISOString()}`;
 
     const orders: ExternalOrderData[] = [];
     let hasNext = true;
